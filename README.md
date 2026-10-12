@@ -15,9 +15,11 @@ From this checkout:
 ```bash
 npm ci
 npm run build
-uv tool install perfdigest-mcp==1.2.0
+uv tool install perfdigest-mcp==1.2.0 --with mcp==1.27.2
 npm run demo
 ```
+
+The Python MCP dependency is pinned because PerfDigest 1.2.0 still uses the MCP v1 `FastMCP` interface; an unconstrained fresh install can select incompatible MCP 2.x. The pin matches PerfDigest's source lockfile. The runner continues to invoke the installed tool with `uvx perfdigest-mcp`.
 
 The demo performs genuine CPU work, saves a Chrome trace, digests it through `uvx perfdigest-mcp`, and verifies both traversal algorithms against an independent arithmetic formula. It makes **no model calls** by default. `--perf` additionally collects Linux process counters when `perf` and the required permissions are available. It fails explicitly if capture is unavailable.
 

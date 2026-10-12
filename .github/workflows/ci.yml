@@ -26,7 +26,8 @@ jobs:
       - name: TypeScript 6 build and network-mocked contract tests
         run: npm run build && npm test
       - name: Pin the Python tool used by uvx
-        run: uv tool install perfdigest-mcp==1.2.0
+        # PerfDigest 1.2.0 uses FastMCP; its published mcp>=1.2 range also admits incompatible MCP 2.x.
+        run: uv tool install perfdigest-mcp==1.2.0 --with mcp==1.27.2
       - name: Real local MCP, CPU capture and independent verification
         run: npm run test:local
       - name: Pack, clean install, demo and MCP discovery
