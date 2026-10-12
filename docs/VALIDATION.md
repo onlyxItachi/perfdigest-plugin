@@ -48,4 +48,32 @@ The [portable recorded example](../examples/recorded-cloudflare/README.md) ships
 - Build, contract tests, real CPU/Python MCP discovery, clean npm archive installation, CLI/TUI and three-tool evidence MCP discovery pass. The 50-test checkpoint passed [hosted CI](https://github.com/onlyxItachi/perfdigest-plugin/actions/runs/38242080918).
 - The earlier provider/TUI CI failure exposed an obsolete injected OpenAI client in benchmark arm B. The caller was fixed and a regression test added; the failed [workflow](https://github.com/onlyxItachi/perfdigest-plugin/actions/runs/38241555893) remains available.
 - PerfDigest [1.2.1](https://github.com/onlyxItachi/PerfDigest-MCP/releases/tag/v1.2.1) and [1.3.0](https://github.com/onlyxItachi/PerfDigest-MCP/releases/tag/v1.3.0) were independently published and verified. The plugin's TypeScript MCP SDK 1.32.1 passed all seven actual stdio tool calls against a clean PyPI 1.3.0 / Python MCP SDK 2.3.0 installation. This is supplemental evidence; the established plugin CI pin remains unchanged.
-- Local Clef model qualification, GPU profiling, a real PyTorch issue/patch, Desktop plugin activation, provider calibration and real A/B/C speed/cost benefits require their own evidence. The npm archive has not been published to the registry.
+- GPU profiling, a real PyTorch issue/patch, Desktop plugin activation, provider calibration and real A/B/C speed/cost benefits remain unvalidated. The npm archive has not been published to the registry.
+
+## Genuine local Clef qualification
+
+The official `Clef-Flash-Q4_K_M.gguf` (6,486,448,288 bytes) ran under official llama.cpp **b11565**, commit `f9a95aeb2`, using **Vulkan0 / NVIDIA RTX 4060 Laptop 8 GB**. This was Vulkan execution, not CUDA inference. Model SHA-256:
+
+```text
+3626116623ca8d89641952471fac9ce12af84fb3517520029a2ac6f5146868a2
+```
+
+A persistent loopback server used context/batch/ubatch 2048 and parallelism 1. Logs verified 33/33 layers offloaded. GPU model buffers were 5,629.85 MiB and compute buffers 474.32 MiB; 545.64 MiB of model data remained CPU-mapped, so full layer offload does not mean every byte resided exclusively on the GPU. The owned process used 6,147 MiB at the observed snapshot. No CUDA profiling workload ran concurrently.
+
+One genuine model response to synthetic input exercised choice, noul and score, and passed the plugin's production normalizer. It reported 399 input / 0 output tokens and took 12.523 seconds on the first request, including first-use runtime work. This is an inference/contract check, not a latency benchmark or fixture response.
+
+A separate single request used real PerfDigest CPU evidence captured before model loading and then the same-thread Astra/max review:
+
+| Observation | Recorded value |
+| --- | --- |
+| Local model decision latency | 7,864 ms |
+| End-to-end wall time | 64,448 ms |
+| Returned probability for `traversal-timing` | 0.7716861809340284 |
+| Returned confidence | 0.5433723618680568 |
+| Policy threshold | 0.65, unchanged |
+| Pipeline outcome | `needs_review`; no report route accepted |
+| Independent verifier | Exit 0 |
+| Codex review | Completed in the same thread |
+| Diagnostic process exit | 1, because the success gate requires `complete` |
+
+No threshold was lowered, retry made or provider fallback used to force a successful route. This qualifies real local inference and the abstention path; it does not qualify an accepted local evidence route. The hosted Cloudflare run above remains the completed demo. These runs use different captures and warmup conditions and do not establish a provider performance comparison. The localhost-only diagnostic deliberately leaves identity unqualified on its own; the independent process, runtime and pinned model-hash receipts provide that additional evidence.

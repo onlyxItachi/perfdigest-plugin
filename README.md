@@ -80,7 +80,7 @@ Select `--provider cloudflare|local|openai|offline` explicitly. The previous nam
 | Provider | Model/transport | Credential | Current qualification |
 | --- | --- | --- | --- |
 | `cloudflare` | `@cf/cloudflare/clef-flash`, Workers AI REST | Dedicated account ID + token | Genuine measured-evidence routing + same-thread Astra/max review + independent verification passed |
-| `local` | Clef-flash, llama.cpp `/v1/systemone` | None; loopback only | Real HTTP contract test passes; model inference pending download |
+| `local` | Clef-flash, llama.cpp `/v1/systemone` | None; loopback only | Genuine Q4_K_M inference on RTX 4060/Vulkan passed native question checks; measured route returned `needs_review` below the unchanged confidence threshold |
 | `openai` | `gpt-6-luna`, official OpenAI SDK | Dedicated Decisions key | Measured HTTP mock passes; valid-key inference pending |
 | `offline` | First report, deterministic | None | Real CPU/PerfDigest/verification validated; no decision inference |
 
