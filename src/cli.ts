@@ -2,11 +2,12 @@
 import { parseArgs } from 'node:util';
 import { readFile, realpath } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { manifestSchema } from './config.js';
+import { manifestSchema, type RoutingMode } from './config.js';
 import { investigate } from './run.js';
 import { demoManifest } from './demo.js';
 import { redact } from './environment.js';
 import { DecisionsError } from './decisions.js';
+import { createDecisionProvider, providerName } from './providers.js';
 
 const help = `PerfDigest Evidence — Codex-first MVP
 
@@ -19,12 +20,13 @@ Run defaults: existing Codex ChatGPT login + live Decisions (PERFDIGEST_DECISION
 Use --agent codex to demonstrate overlap with a real Codex session.
 --perf adds Linux hardware counters; otherwise the demo uses genuine elapsed-time traces.
 Raw reports, command receipts and timeline are saved under .perfdigest/runs/.
+--provider cloudflare|local|openai|offline explicitly selects inference; --routing keeps legacy aliases.
 `;
 
 async function main() {
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
     help: { type: 'boolean', short: 'h' }, workspace: { type: 'string' },
-    agent: { type: 'string' }, routing: { type: 'string' }, model: { type: 'string' }, perf: { type: 'boolean' },
+    agent: { type: 'string' }, routing: { type: 'string' }, provider: { type: 'string' }, model: { type: 'string' }, perf: { type: 'boolean' },
   } });
   if (values.help || !positionals[0]) { console.log(help); return; }
   const workspace = await realpath(values.workspace ?? process.cwd());
@@ -34,11 +36,15 @@ async function main() {
     await serve(workspace); return;
   }
   if (command !== 'demo' && command !== 'run') throw new Error('Unknown command; use --help');
-  const routing = values.routing ?? (command === 'demo' ? 'offline' : 'decisions');
+  const accepted = ['offline', 'cloudflare', 'local', 'openai', 'decisions', 'clef-local', 'clef-cloudflare', 'openai-luna'];
+  const selected = values.provider ?? values.routing ?? (command === 'demo' ? 'offline' : 'decisions');
+  if (!accepted.includes(selected)) throw new Error('Unknown provider; use cloudflare, local, openai or offline');
+  const routing = selected as RoutingMode;
+  if (values.provider && values.routing && (!accepted.includes(values.routing)
+      || providerName(values.routing as RoutingMode) !== providerName(routing))) throw new Error('--provider and --routing conflict');
   const agent = values.agent ?? (command === 'demo' ? 'none' : 'codex');
-  if (routing !== 'offline' && routing !== 'decisions') throw new Error('--routing must be offline or decisions');
   if (agent !== 'none' && agent !== 'codex') throw new Error('--agent must be none or codex');
-  if (routing === 'decisions' && !process.env.PERFDIGEST_DECISIONS_API_KEY?.trim()) throw new DecisionsError('missing_credential');
+  createDecisionProvider(routing); // Preflight credentials before creating/capturing a demo.
   if (command === 'run' && !positionals[1]) throw new Error('run requires a manifest path');
   const manifest = command === 'demo' ? await demoManifest(workspace, values.perf)
     : manifestSchema.parse(JSON.parse(await readFile(resolve(positionals[1]!), 'utf8')));
@@ -50,7 +56,7 @@ async function main() {
       ...(values.model ? { model: values.model } : {}),
       onEvent: (event, detail) => process.stderr.write(`${event}${detail ? `: ${redact(detail)}` : ''}\n`),
     });
-    console.log(JSON.stringify({ status: result.status, agent, routing, directory: result.directory,
+    console.log(JSON.stringify({ status: result.status, agent, routing, provider: providerName(routing), directory: result.directory,
       verification: result.verification?.exitCode ?? null, decisionsError: result.decisionsError, telemetry: result.telemetry }, null, 2));
     if (result.status !== 'complete') process.exitCode = 1;
   } finally {

@@ -1,16 +1,18 @@
 import type OpenAI from 'openai';
 import type { Emit, EvidencePacket, ReportSpec, RoutingMode } from './config.js';
 import { offlineSelection, selectReport } from './decisions.js';
+import { createDecisionProvider, providerName, type DecisionProvider } from './providers.js';
 import { reportFile } from './files.js';
 import { digestReport } from './perfdigest.js';
 
 export async function gatherEvidence(args: {
   workspace: string; issue: string; reports: ReportSpec[]; routing: RoutingMode;
-  client?: OpenAI; signal?: AbortSignal; emit?: Emit;
+  client?: OpenAI; provider?: DecisionProvider; signal?: AbortSignal; emit?: Emit;
 }): Promise<EvidencePacket> {
   const emit = args.emit ?? (() => {});
   args.signal?.throwIfAborted();
-  if (args.routing === 'decisions' && !args.client) throw new Error('Live routing needs a Decisions client');
+  const provider = args.provider ?? (args.client ? undefined : createDecisionProvider(args.routing));
+  const measuredRouting = providerName(args.routing) !== 'offline';
   const collect = async (report: ReportSpec): Promise<EvidencePacket['evidence'][number]> => {
     args.signal?.throwIfAborted();
     const before = await reportFile(args.workspace, report.path);
@@ -24,15 +26,15 @@ export async function gatherEvidence(args: {
   // Bounded top-three summaries from at most eight declared reports inform routing.
   // Collection still runs concurrently with the first Codex turn. No raw report is sent.
   const measured: EvidencePacket['evidence'] = [];
-  if (args.routing === 'decisions') {
+  if (measuredRouting) {
     emit('routing.evidence.started');
     for (const report of args.reports) measured.push(await collect(report));
     emit('routing.evidence.completed', String(measured.length));
   }
   emit('routing.started');
-  const decision = args.routing === 'decisions'
-    ? await selectReport(args.client!, args.issue, args.reports, args.signal, measured)
-    : offlineSelection(args.reports);
+  const decision = provider ? await provider.select(args.issue, args.reports, args.signal, measured)
+    : measuredRouting ? await selectReport(args.client!, args.issue, args.reports, args.signal, measured)
+      : offlineSelection(args.reports);
   for (const entry of measured) {
     if ((await reportFile(args.workspace, entry.report.path)).sha256 !== entry.sha256) {
       throw new Error('Report changed while routing; recapture and retry');

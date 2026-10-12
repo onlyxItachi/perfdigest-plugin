@@ -41,7 +41,8 @@
     "plugin:prepare": "node scripts/prepare-plugin.mjs",
     "benchmark:evidence": "npm run build && node scripts/benchmark.mjs",
     "test:decisions-http": "npm run build && node scripts/check-decisions-http.mjs",
-    "test:decisions-auth-boundary": "node scripts/check-decisions-auth-boundary.mjs"
+    "test:decisions-auth-boundary": "node scripts/check-decisions-auth-boundary.mjs",
+    "test:clef-live": "node scripts/check-clef-live.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",

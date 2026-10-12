@@ -2,9 +2,9 @@
 
 **Collect performance evidence while Codex investigates. Keep every conclusion tied to a report and an independent verification result.**
 
-A Codex-first hackathon MVP for HPC infrastructure performance debugging. It combines the existing Python [PerfDigest MCP](https://github.com/onlyxItachi/PerfDigest-MCP), a small TypeScript runner, an asynchronous MCP worker and a Codex skill. The Decisions adapter uses the official OpenAI TypeScript SDK directly.
+A Codex-first hackathon MVP for HPC infrastructure performance debugging. It combines the existing Python [PerfDigest MCP](https://github.com/onlyxItachi/PerfDigest-MCP), a small TypeScript runner, an asynchronous MCP worker and a Codex skill. A small, explicit decision provider contract supports Cloudflare Clef-flash, local Clef-flash, OpenAI Luna and offline routing. The OpenAI adapter continues to use the official TypeScript SDK directly.
 
-**Current validation:** real local CPU capture, PerfDigest MCP and a two-turn Codex SDK session have run successfully. Decisions is validated through a real loopback HTTP server with measured PerfDigest evidence; **successful live Decisions inference remains unvalidated pending a separately funded key**. The separate invalid-credential diagnostic checks only the authentication boundary. The npm package is a local pre-release, not an npm registry release. GPU/PyTorch debugging and A/B/C performance benefits are not yet demonstrated.
+**Current validation:** real local CPU capture, PerfDigest MCP and a two-turn Codex SDK session have run successfully. Decisions is validated through a real loopback HTTP server with measured PerfDigest evidence; **successful live Decisions inference remains unvalidated pending a separately funded key**. Clef request/response mapping is verified with HTTP fixtures; hosted and local real inference qualification is tracked separately below. The separate invalid-credential diagnostic checks only the authentication boundary. The npm package is a local pre-release, not an npm registry release. GPU/PyTorch debugging and A/B/C performance benefits are not yet demonstrated.
 
 ## Quick start
 
@@ -39,7 +39,7 @@ flowchart LR
     Q[Issue + manifest] --> W[Capture saved reports]
     Q --> C[Codex initial hypotheses]
     W --> P[PerfDigest MCP summaries + SHA-256]
-    P --> D[Decisions selects evidence for review]
+    P --> D[Selected decision provider routes evidence]
     D --> V[Independent verification command]
     C --> R[Same Codex thread: evidence review]
     V --> R
@@ -48,7 +48,7 @@ flowchart LR
 
 The worker starts before the first model turn is requested. Evidence is delivered in the next turn of the **same** Codex thread. This is ordinary evidence handoff; nothing is injected into hidden reasoning. The timeline measures actual overlap with `turn.started`. Fast evidence can finish before the model begins; that correctly records zero overlap.
 
-In Decisions mode, PerfDigest first gathers bounded top-three summaries from up to eight declared reports. Decisions selects which measured report to deliver for review, or abstains; selected evidence is reused and all input hashes are checked again. Offline mode digests only the first report. Codex examines the hypothesis and alternatives. Verification is an explicit command whose result cannot be overridden by confidence or model prose. This MVP applies no patches and has no generic provider framework.
+With an inference provider, PerfDigest first gathers bounded top-three summaries from up to eight declared reports. The selected provider chooses which measured report to deliver for review, or abstains; selected evidence is reused and all input hashes are checked again. Offline mode digests only the first report. Codex examines the hypothesis and alternatives. Verification is an explicit command whose result cannot be overridden by confidence or model prose. This MVP applies no patches. Provider selection is a bounded four-way switch, not a general orchestration framework.
 
 | Mode | Routing | Model access | Evidence |
 | --- | --- | --- | --- |
@@ -56,6 +56,41 @@ In Decisions mode, PerfDigest first gathers bounded top-three summaries from up 
 | `--agent codex --routing offline` | First declared report | Existing ChatGPT Codex session | Real local evidence, then Codex review |
 | `--agent codex --routing decisions` | Official Decisions API | Separate Decisions key + ChatGPT Codex | Adapter implemented; live Decisions validation pending |
 | `npm test` | Synthetic HTTP and subprocess fixtures | Loopback only; no external/model requests | Contract and failure tests; not a live API result |
+
+## Decision providers
+
+Select `--provider cloudflare|local|openai|offline` explicitly. The previous names `clef-cloudflare`, `clef-local`, `openai-luna` and `--routing decisions` remain aliases. Every run records the selected provider; errors never switch it to another provider or a fixture.
+
+| Provider | Model/transport | Credential | Current qualification |
+| --- | --- | --- | --- |
+| `cloudflare` | `@cf/cloudflare/clef-flash`, Workers AI REST | Dedicated account ID + token | Request/envelope/error fixtures pass; real call pending account access |
+| `local` | Clef-flash, llama.cpp `/v1/systemone` | None; loopback only | Real HTTP contract test passes; model inference pending download |
+| `openai` | `gpt-6-luna`, official OpenAI SDK | Dedicated Decisions key | Measured HTTP mock passes; valid-key inference pending |
+| `offline` | First report, deterministic | None | Real CPU/PerfDigest/verification validated; no decision inference |
+
+Cloudflare configuration uses `PERFDIGEST_CLOUDFLARE_ACCOUNT_ID` and `PERFDIGEST_CLOUDFLARE_API_TOKEN`. Store them in a private environment file **outside the repository**, with Unix permissions `600`. No token belongs in command arguments, configuration JSON, receipts or Git. The child-process allowlist also excludes both Cloudflare variables.
+
+```bash
+node --env-file=/absolute/private/cloudflare.env dist/cli.js demo --provider cloudflare --agent codex
+```
+
+Workers AI's documented free allocation is 10,000 Neurons/day. Account eligibility and remaining usage must be checked in the dashboard; this runner does not promise unlimited free inference or upgrade a plan. See [Cloudflare pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/) and the [REST token setup](https://developers.cloudflare.com/workers-ai/get-started/rest-api/). Tokens need Workers AI Read/Edit permissions, scoped to the intended account.
+
+For a separately running local server, set `PERFDIGEST_CLEF_URL=http://127.0.0.1:8137/v1/systemone`. The adapter uses a persistent HTTP server; it never loads a model per request. The official [Clef GGUF repository](https://huggingface.co/ggml-org/Clef-Flash-GGUF) supplies Q4_K_M. Use a Clef-capable [llama.cpp release](https://github.com/ggml-org/llama.cpp/releases); its entire decision prompt must fit `--ubatch-size`. Example settings to assess on your hardware are `--ctx-size 2048 --batch-size 2048 --ubatch-size 2048 --parallel 1`; reduce GPU layers if memory is insufficient. These are configuration suggestions, not a hardware fit guarantee.
+
+Capture CUDA performance evidence **before loading local Clef**, or unload its server before measuring. Then route the saved, hashed artifacts with `captures: []`. Do not present measurements taken under local inference load as isolated GPU benchmarks.
+
+The mapping converts OpenAI-style predicate questions to `noul`, choices to `choice/criteria`, and ordered score levels to `score/criteria`. It preserves returned probabilities and confidence, rejects missing fields, and never replaces missing metrics with zero. SystemOne confidence is zero at a uniform choice distribution; it is not the chosen option's probability or a correctness proof, and it is not assumed calibrated like another provider. Reported zero output tokens are retained. See the [native endpoint contract](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md#post-v1systemone-typesafe-compatible-system-one-api) and [Cloudflare Clef schema](https://developers.cloudflare.com/workers-ai/models/clef-flash/).
+
+The real integration diagnostic is opt-in, excluded from default CI, and makes one decision request:
+
+```bash
+PERFDIGEST_RUN_CLEF_INTEGRATION=1 node --env-file=/absolute/private/cloudflare.env scripts/check-clef-live.mjs --provider cloudflare --codex
+# Local: use a manifest captured before loading Clef and record the actual quantization.
+PERFDIGEST_RUN_CLEF_INTEGRATION=1 node scripts/check-clef-live.mjs --provider local --manifest /absolute/saved/manifest.json --workspace /absolute/saved --quantization Q4_K_M --codex
+```
+
+`--codex` uses the existing ChatGPT login with Astra/max. Receipts record provider/model, decision probabilities, hashes, latency, wall time, verification and same-thread Codex delivery. Without the opt-in flag the diagnostic sends nothing. Public CI uses fixtures only and needs no hosted credential.
 
 ## Use your own reports
 

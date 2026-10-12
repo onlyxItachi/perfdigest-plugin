@@ -44,3 +44,7 @@ jobs:
         env:
           PERFDIGEST_RUN_AUTH_BOUNDARY: '0'
         run: npm run test:decisions-auth-boundary
+      - name: Confirm hosted Clef integration stays opt-in
+        env:
+          PERFDIGEST_RUN_CLEF_INTEGRATION: '0'
+        run: npm run test:clef-live

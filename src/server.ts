@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { reportSchema, type EvidencePacket } from './config.js';
-import { decisionsClient } from './decisions.js';
+import { createDecisionProvider } from './providers.js';
 import { gatherEvidence } from './evidence.js';
 import { redact } from './environment.js';
 
@@ -24,20 +24,20 @@ export async function serve(workspace: string): Promise<void> {
   };
   const expiry = setInterval(cleanup, 30_000); expiry.unref();
   server.registerTool('launch_evidence_prefetch', {
-    description: 'Start evidence collection without blocking. Uses existing report files; never executes a profiler or build. mode=decisions requires a key in this server process.',
+    description: 'Start evidence collection without blocking. Uses existing reports; never runs a profiler or build. Select a provider explicitly; hosted modes need dedicated credentials in this server process.',
     inputSchema: { issue: z.string().min(1).max(12_000), reports: z.array(reportSchema).min(1).max(8),
-      mode: z.enum(['offline', 'decisions']).default('offline') },
+      mode: z.enum(['offline', 'cloudflare', 'local', 'openai', 'decisions', 'clef-local', 'clef-cloudflare', 'openai-luna']).default('offline') },
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
   }, async ({ issue, reports, mode }) => {
     cleanup();
     if (new Set(reports.map(r => r.id)).size !== reports.length) throw new Error('Report IDs must be unique');
     if (jobs.size >= 32) throw new Error('Job limit reached; collect or cancel existing jobs');
-    const client = mode === 'decisions' ? decisionsClient() : undefined;
+    const provider = createDecisionProvider(mode);
     const controller = new AbortController();
     const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(90_000)]);
     const id = crypto.randomUUID();
     const job: Job = { controller, createdAt: Date.now(), state: 'running', done: Promise.resolve() };
-    job.done = gatherEvidence({ workspace, issue, reports, routing: mode, signal, ...(client ? { client } : {}) })
+    job.done = gatherEvidence({ workspace, issue, reports, routing: mode, signal, provider })
       .then(result => { job.state = result.status; job.result = result; })
       .catch(error => { job.state = controller.signal.aborted ? 'cancelled' : 'failed';
         job.error = redact(error instanceof Error ? error.message : String(error)); });

@@ -6,7 +6,8 @@ import type { AgentMode, CommandReceipt, Emit, EvidencePacket, Manifest, Routing
 import { manifestSchema } from './config.js';
 import { commandPassed, runCommand } from './commands.js';
 import { codexThread, codexTurn, type CodexTurn } from './codex.js';
-import { decisionsClient, localDecisionsClient, DecisionsError, type DecisionsFailure } from './decisions.js';
+import { DecisionsError, type DecisionsFailure } from './decisions.js';
+import { createDecisionProvider } from './providers.js';
 import { gatherEvidence } from './evidence.js';
 import { newRunDirectory, reportFile, writeJson } from './files.js';
 import { redact } from './environment.js';
@@ -48,8 +49,8 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
   const manifest = manifestSchema.parse(options.manifest);
   const workspace = await realpath(options.workspace);
   // Fail before launching Codex or capture commands when the requested API mode lacks a key.
-  const decisions = options.routing === 'decisions'
-    ? options.decisionsMockURL ? localDecisionsClient(options.decisionsMockURL) : decisionsClient() : undefined;
+  const provider = createDecisionProvider(options.routing,
+    options.decisionsMockURL ? { decisionsMockURL: options.decisionsMockURL } : {});
   const directory = await newRunDirectory(workspace);
   const start = performance.now();
   const controller = new AbortController();
@@ -70,6 +71,7 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
   let decisionsError: DecisionsFailure | null = null;
   let status: 'complete' | 'needs_review' | 'failed' = 'failed';
   emit('run.started');
+  emit('provider.selected', provider.name);
   try {
     // Resolve login and inherited tool configuration before the concurrent work starts.
     const preparedThread = options.agent === 'codex' ? await codexThread(workspace, options.model, options.effort) : null;
@@ -96,7 +98,7 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
         }
       }
       evidence = await gatherEvidence({ workspace, issue: manifest.issue, reports: manifest.reports,
-        routing: options.routing, ...(decisions ? { client: decisions } : {}), signal, emit });
+        routing: options.routing, provider, signal, emit });
       return evidence;
     })();
     const agent = (async () => {
