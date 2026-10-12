@@ -40,6 +40,8 @@ The trace contains one measured row batch at approximately 3.179 ms and one colu
 
 The opt-in reproduction commands are in [HACKATHON.md](HACKATHON.md). Replaying a saved trace does not create a new physical measurement. Hosted inference is never a public CI dependency.
 
+The [portable recorded example](../examples/recorded-cloudflare/README.md) ships the original trace, bounded routing input and sanitized original receipt. Its hashes can be recomputed without a credential or a new model call.
+
 ## Other checks and boundaries
 
 - The OpenAI adapter passed real loopback HTTP E2E using actual measured PerfDigest input and synthetic Decisions/Codex responses. A separate single remote request using a deliberately invalid synthetic credential returned the expected HTTP 401. No valid-key OpenAI inference has been claimed.

@@ -25,6 +25,14 @@ Upstream [1.2.1](https://pypi.org/project/perfdigest-mcp/1.2.1/) now bounds the 
 
 In an unconfigured workspace, the demo performs genuine CPU work, saves a Chrome trace, digests it through `uvx perfdigest-mcp`, and verifies both traversal algorithms against an independent arithmetic formula. It makes **no model calls** without a saved provider selection or explicit inference flag. `--perf` additionally collects Linux process counters when `perf` and the required permissions are available. It fails explicitly if capture is unavailable.
 
+The package also includes the [recorded genuine Cloudflare/Codex example](examples/recorded-cloudflare/README.md), its original trace, decision request and receipt. Replay it without credentials from the checkout or installed package directory:
+
+```bash
+node dist/cli.js run examples/recorded-cloudflare/manifest.json --workspace examples/recorded-cloudflare --provider offline --agent none
+```
+
+This explicitly offline replay digests the saved bytes and reruns verification. It does not make a new inference call or create a fresh performance measurement.
+
 For a real Codex review using your existing ChatGPT login:
 
 ```bash
@@ -64,6 +72,8 @@ With an inference provider, PerfDigest first gathers bounded top-three summaries
 Configure the installed package with `npx --no-install perfdigest-plugin init`. The interactive menu offers Cloudflare, local llama.cpp and OpenAI; offline is an explicit deterministic option. There is no interactive npm lifecycle hook. Noninteractive automation uses `perfdigest-plugin init --provider offline --yes`. See the [setup guide](docs/SETUP.md) for private env-file references, endpoint checks and automation.
 
 The saved provider is used by subsequent CLI runs and the MCP worker's default mode. Explicit `--provider`/`--routing` takes priority. Setup checks executable presence and local health without making hosted inference calls. A prerequisite pass does not claim authenticated inference; missing prerequisites exit nonzero and retain the chosen provider visibly.
+
+`init --check-connection` explicitly adds one authenticated, read-only Cloudflare model-discovery request. It validates that read endpoint with a 5-second/64-KiB limit and no retries or redirects; it does not run inference or determine remaining quota. Default setup makes no hosted request.
 
 Select `--provider cloudflare|local|openai|offline` explicitly. The previous names `clef-cloudflare`, `clef-local`, `openai-luna` and `--routing decisions` remain aliases. Every run records the selected provider; errors never switch it to another provider or a fixture.
 
