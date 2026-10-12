@@ -31,6 +31,8 @@ export interface InitOptions {
   endpoint?: string;
   envFile?: string;
   yes?: boolean;
+  /** Opt in to one authenticated, read-only Cloudflare model-discovery request. */
+  checkConnection?: boolean;
   input?: Readable & { isTTY?: boolean };
   output?: Writable & { isTTY?: boolean };
   environment?: NodeJS.ProcessEnv;
@@ -239,7 +241,73 @@ async function saveConfiguration(configuration: PluginConfiguration, workspace: 
   return path;
 }
 
-async function diagnosticsFor(configuration: PluginConfiguration, workspace: string, environment: NodeJS.ProcessEnv): Promise<SetupDiagnostic[]> {
+const discoveryResponseLimit = 65_536;
+
+async function readDiscoveryResponse(response: Response): Promise<unknown> {
+  // Bound the decoded stream as it arrives; Content-Length alone is not a size limit.
+  if (Number(response.headers.get('content-length')) > discoveryResponseLimit) {
+    await response.body?.cancel();
+    throw new Error('Discovery response exceeds the setup limit.');
+  }
+  if (!response.body) throw new Error('Discovery response is empty.');
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let bytes = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      bytes += chunk.value.byteLength;
+      if (bytes > discoveryResponseLimit) throw new Error('Discovery response exceeds the setup limit.');
+      chunks.push(chunk.value);
+    }
+    return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown;
+  } finally {
+    // Never expose a response body or a stream error, even on cancellation.
+    await reader.cancel().catch(() => {});
+    reader.releaseLock();
+  }
+}
+
+async function checkCloudflareConnection(account: string, token: string, signal?: AbortSignal): Promise<SetupDiagnostic> {
+  // Official API: https://developers.cloudflare.com/api/resources/ai/subresources/models/methods/list/
+  // Workers AI Read OR Workers AI Write permits this endpoint. It does not run a model.
+  const url = new URL(`https://api.cloudflare.com/client/v4/accounts/${account}/ai/models/search`);
+  url.search = new URLSearchParams({ search: 'clef-flash', per_page: '1', page: '1' }).toString();
+  const timeout = AbortSignal.timeout(5000);
+  try {
+    const response = await fetch(url, {
+      method: 'GET', redirect: 'error',
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+    });
+    if (!response.ok) {
+      await response.body?.cancel();
+      const detail = response.status === 401 || response.status === 403
+        ? 'Check the account, token and Workers AI Read or Write permission.'
+        : response.status === 429 ? 'The read endpoint is rate-limited; this does not establish remaining inference quota.'
+        : 'Read-endpoint availability was not confirmed.';
+      return { check: 'endpoint', status: 'error', message:
+        `Cloudflare model-discovery read failed (HTTP ${response.status}). ${detail} Inference and remaining quota were not checked.` };
+    }
+    const value = await readDiscoveryResponse(response);
+    if (!value || typeof value !== 'object' || Array.isArray(value)
+        || !('success' in value) || value.success !== true || !('result' in value) || !Array.isArray(value.result)
+        || !('errors' in value) || !Array.isArray(value.errors) || value.errors.length !== 0) {
+      return { check: 'endpoint', status: 'error', message:
+        'Cloudflare model-discovery read did not return a successful discovery response; readiness was not confirmed. Inference and remaining quota were not checked.' };
+    }
+    return { check: 'endpoint', status: 'ok', message:
+      `Cloudflare authenticated model-discovery read accepted (HTTP ${response.status}); model availability, inference and remaining quota were not checked.` };
+  } catch {
+    // Fetch/JSON errors can contain URLs, headers or upstream text. Report fixed diagnostics only.
+    return { check: 'endpoint', status: 'error', message:
+      'Cloudflare model-discovery check failed: unreachable, redirected, cancelled, over the 5-second/64-KiB limit, or invalid response. Inference and remaining quota were not checked.' };
+  }
+}
+
+async function diagnosticsFor(configuration: PluginConfiguration, workspace: string, environment: NodeJS.ProcessEnv,
+  checkConnection: boolean, signal?: AbortSignal): Promise<SetupDiagnostic[]> {
   const diagnostics: SetupDiagnostic[] = [
     { check: 'configuration', status: 'ok', message: 'Workspace configuration saved; it contains references only.' },
   ];
@@ -258,21 +326,29 @@ async function diagnosticsFor(configuration: PluginConfiguration, workspace: str
     }
   }
   const effective = { ...environment };
+  let environmentReady = true;
   try {
     await applyConfigurationEnvironment(configuration, workspace, effective);
     diagnostics.push({ check: 'env_file', status: configuration.envFile ? 'ok' : 'skipped', message: configuration.envFile
       ? 'Private external env file read; values are not displayed or saved in configuration.'
       : 'No external env file configured; dedicated variables are read from the runner environment.' });
   } catch {
+    environmentReady = false;
     diagnostics.push({ check: 'env_file', status: 'error', message: 'External env file is missing, unreadable or invalid; no values were applied.' });
   }
   if (configuration.provider === 'cloudflare') {
     const account = effective.PERFDIGEST_CLOUDFLARE_ACCOUNT_ID?.trim();
     const token = effective.PERFDIGEST_CLOUDFLARE_API_TOKEN?.trim();
-    diagnostics.push({ check: 'credentials', status: account && /^[a-f0-9]{32}$/i.test(account) && token ? 'ok' : 'error',
-      message: account && /^[a-f0-9]{32}$/i.test(account) && token
-        ? 'Cloudflare account ID and token present; authentication and quota remain unverified.'
+    const credentialsReady = Boolean(account && /^[a-f0-9]{32}$/i.test(account) && token && !/[\r\n]/.test(token));
+    diagnostics.push({ check: 'credentials', status: credentialsReady ? 'ok' : 'error',
+      message: credentialsReady
+        ? 'Cloudflare account ID and token present; presence alone does not verify access or quota.'
         : 'Set PERFDIGEST_CLOUDFLARE_ACCOUNT_ID (32 hex characters) and PERFDIGEST_CLOUDFLARE_API_TOKEN in the private runner environment.' });
+    diagnostics.push(checkConnection && environmentReady && credentialsReady
+      ? await checkCloudflareConnection(account!, token!, signal)
+      : { check: 'endpoint', status: 'skipped', message: checkConnection
+        ? 'Cloudflare was not contacted because its credentials or external env file are missing or invalid.'
+        : 'Hosted endpoint was not contacted; use init --check-connection for one read-only Cloudflare check. Inference and remaining quota remain unverified.' });
   } else if (configuration.provider === 'openai') {
     const present = Boolean(effective.PERFDIGEST_DECISIONS_API_KEY?.trim());
     diagnostics.push({ check: 'credentials', status: present ? 'ok' : 'error', message: present
@@ -292,10 +368,10 @@ async function diagnosticsFor(configuration: PluginConfiguration, workspace: str
     } catch {
       diagnostics.push({ check: 'endpoint', status: 'error', message: 'Local /health was unreachable, redirected or timed out; start llama.cpp at the configured address.' });
     }
-  } else {
+  } else if (configuration.provider !== 'cloudflare') {
     diagnostics.push({ check: 'endpoint', status: 'skipped', message: configuration.provider === 'offline'
       ? 'Offline selected explicitly; no endpoint or model is contacted.'
-      : 'Hosted endpoint was not contacted; setup sends no inference or credential-verification requests.' });
+      : 'OpenAI was not contacted; --check-connection supports Cloudflare only. Authentication, inference and remaining quota remain unverified.' });
   }
   return diagnostics;
 }
@@ -362,7 +438,7 @@ export async function initConfiguration(options: InitOptions = {}): Promise<Init
     const path = await saveConfiguration(configuration, workspace);
     output.write(`Active provider: ${provider}\n`);
     if (configuration.endpoint) output.write(`Local endpoint: ${configuration.endpoint}\n`);
-    const diagnostics = await diagnosticsFor(configuration, workspace, environment);
+    const diagnostics = await diagnosticsFor(configuration, workspace, environment, options.checkConnection ?? false, options.signal);
     for (const diagnostic of diagnostics) output.write(`[${diagnostic.status}] ${diagnostic.message}\n`);
     const ready = !diagnostics.some(diagnostic => diagnostic.status === 'error');
     output.write(`Configuration saved to .perfdigest/config.json. ${ready ? 'Prerequisite checks passed.' : 'Some prerequisites need attention.'}\n`);

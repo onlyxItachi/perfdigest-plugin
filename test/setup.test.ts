@@ -2,8 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { chmod, mkdir, readFile, stat, symlink, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
+import { execFile } from 'node:child_process';
 import { join } from 'node:path';
 import { PassThrough, Writable } from 'node:stream';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { childEnvironment } from '../src/environment.js';
 import { applyConfigurationEnvironment, initConfiguration, loadConfiguration, normalizeSetupProvider,
   providerForRuntime, validateLocalEndpoint, type InitOptions } from '../src/setup.js';
@@ -130,7 +133,7 @@ test('closing an interactive prompt or declining replacement leaves configuratio
   assert.equal((await loadConfiguration(fixture.workspace))?.provider, 'offline');
 });
 
-test('hosted setup never makes requests and never persists, prints or inherits secret values', async () => {
+test('hosted setup defaults to no requests and never persists, prints or inherits secret values', async () => {
   const fixture = await project();
   const cloudflareSecret = 'synthetic-cloudflare-private-token';
   const decisionsSecret = 'synthetic-decisions-private-token';
@@ -237,7 +240,7 @@ test('local setup requests only GET /health without credentials or a body', asyn
   assert.ok(address && typeof address !== 'string');
   const endpoint = `http://127.0.0.1:${address.port}/v1/systemone`;
   try {
-    const options: InitOptions = { ...fixture, provider: 'local', endpoint, yes: true, output: outputCapture().output,
+    const options: InitOptions = { ...fixture, provider: 'local', endpoint, yes: true, checkConnection: true, output: outputCapture().output,
       environment: { ...fixture.environment, PERFDIGEST_CLOUDFLARE_API_TOKEN: 'must-not-be-sent' } };
     const result = await initConfiguration(options);
     assert.equal(result.ready, true);
@@ -276,4 +279,216 @@ test('configuration directory symlinks are refused before any write', { skip: pr
   await symlink(outside, join(fixture.workspace, '.perfdigest'), 'dir');
   await assert.rejects(initConfiguration({ ...fixture, provider: 'offline', yes: true, output: outputCapture().output }), /must not be a symlink/);
   await assert.rejects(stat(join(outside, 'config.json')), { code: 'ENOENT' });
+});
+
+const discoveryAccount = 'a'.repeat(32);
+const discoveryToken = 'synthetic-discovery-secret-never-log';
+const discoveryBody = JSON.stringify({ success: true, errors: [], messages: [], result: [] });
+
+test('opt-in Cloudflare discovery sends one authenticated GET and reports only read acceptance', async t => {
+  const fixture = await project();
+  const envFile = await privateEnv(fixture.root,
+    `PERFDIGEST_CLOUDFLARE_ACCOUNT_ID=${discoveryAccount}\nPERFDIGEST_CLOUDFLARE_API_TOKEN=${discoveryToken}\n`);
+  const capture = outputCapture();
+  const fetch = t.mock.method(globalThis, 'fetch', async (url: string | URL | Request, options?: RequestInit) => {
+    assert.equal(String(url), `https://api.cloudflare.com/client/v4/accounts/${discoveryAccount}/ai/models/search?search=clef-flash&per_page=1&page=1`);
+    assert.equal(options?.method, 'GET');
+    assert.equal(options?.redirect, 'error');
+    assert.equal(options?.body, undefined);
+    assert.equal(new Headers(options?.headers).get('authorization'), `Bearer ${discoveryToken}`);
+    assert.equal(new Headers(options?.headers).get('accept'), 'application/json');
+    assert.ok(options?.signal instanceof AbortSignal);
+    return new Response(JSON.stringify({ success: true, errors: [], messages: [discoveryToken], result: [] }));
+  });
+  const result = await initConfiguration({ ...fixture, provider: 'cloudflare', envFile, yes: true,
+    checkConnection: true, output: capture.output });
+  assert.equal(fetch.mock.callCount(), 1);
+  assert.equal(result.ready, true);
+  assert.equal(result.configuration.provider, 'cloudflare');
+  assert.equal(fixture.environment.PERFDIGEST_CLOUDFLARE_API_TOKEN, undefined);
+  assert.equal(result.diagnostics.find(check => check.check === 'endpoint')?.status, 'ok');
+  assert.match(capture.text(), /authenticated model-discovery read accepted/);
+  assert.match(capture.text(), /model availability, inference and remaining quota were not checked/);
+  const saved = await readFile(result.path, 'utf8');
+  assert.deepEqual(Object.keys(JSON.parse(saved)).sort(), ['envFile', 'provider', 'version']);
+  for (const value of [saved, capture.text(), JSON.stringify(result)]) assert.equal(value.includes(discoveryToken), false);
+});
+
+test('opt-in Cloudflare failures neither retry nor print upstream bodies, headers or errors', async t => {
+  const fixture = await project();
+  const environment = { ...fixture.environment,
+    PERFDIGEST_CLOUDFLARE_ACCOUNT_ID: discoveryAccount, PERFDIGEST_CLOUDFLARE_API_TOKEN: discoveryToken };
+  let response: () => Response = () => new Response();
+  const fetch = t.mock.method(globalThis, 'fetch', async () => response());
+  const cases = [
+    ...[301, 401, 403, 429, 500].map(status => () => new Response(discoveryToken, {
+      status, headers: { Location: 'https://never-follow.invalid', 'X-Private-Upstream': discoveryToken },
+    })),
+    () => new Response(JSON.stringify({ success: false, errors: [discoveryToken], result: [] })),
+    () => new Response(JSON.stringify({ success: true, errors: [discoveryToken], result: [] })),
+    () => new Response(JSON.stringify({ success: true, errors: [], result: {} })),
+    () => new Response(discoveryToken),
+    () => { throw new Error(`upstream headers and body: ${discoveryToken}`); },
+  ];
+  for (const [index, createResponse] of cases.entries()) {
+    response = createResponse;
+    const capture = outputCapture();
+    const result = await initConfiguration({ ...fixture, environment, provider: 'cloudflare', yes: true,
+      checkConnection: true, output: capture.output });
+    assert.equal(fetch.mock.callCount(), index + 1);
+    assert.equal(result.ready, false);
+    assert.equal(result.configuration.provider, 'cloudflare');
+    assert.equal(result.diagnostics.find(check => check.check === 'endpoint')?.status, 'error');
+    if (index === 2) assert.match(capture.text(), /Workers AI Read or Write permission/);
+    if (index === 3) assert.match(capture.text(), /rate-limited; this does not establish remaining inference quota/);
+    assert.equal(capture.text().includes(discoveryToken), false);
+    assert.equal(JSON.stringify(result).includes(discoveryToken), false);
+    assert.doesNotMatch(capture.text(), /read accepted|Prerequisite checks passed/);
+  }
+});
+
+test('opt-in discovery bounds response size while streaming and cancels the body', async t => {
+  const fixture = await project();
+  let cancelled = 0;
+  let chunks = 0;
+  let contentLength = false;
+  const fetch = t.mock.method(globalThis, 'fetch', async () => new Response(new ReadableStream({
+    pull(controller) { chunks++; controller.enqueue(new Uint8Array(32_768)); },
+    cancel() { cancelled++; },
+  }), { headers: contentLength ? { 'Content-Length': '65537' } : {} }));
+  for (const oversizedHeader of [false, true]) {
+    contentLength = oversizedHeader;
+    chunks = 0;
+    const result = await initConfiguration({ ...fixture, provider: 'cloudflare', yes: true, checkConnection: true,
+      environment: { ...fixture.environment, PERFDIGEST_CLOUDFLARE_ACCOUNT_ID: discoveryAccount,
+        PERFDIGEST_CLOUDFLARE_API_TOKEN: discoveryToken }, output: outputCapture().output });
+    assert.equal(result.ready, false);
+    assert.match(result.diagnostics.find(check => check.check === 'endpoint')!.message, /64-KiB limit/);
+    assert.ok(chunks <= (oversizedHeader ? 1 : 4), 'must stop reading oversized responses');
+  }
+  assert.equal(fetch.mock.callCount(), 2);
+  assert.equal(cancelled, 2);
+});
+
+test('opt-in discovery is cancellable and has a five-second deadline without retries', async t => {
+  const fixture = await project();
+  const capture = outputCapture();
+  const abort = new AbortController();
+  const timeouts: number[] = [];
+  const timeoutBefore = AbortSignal.timeout;
+  t.mock.method(AbortSignal, 'timeout', (milliseconds: number) => {
+    timeouts.push(milliseconds);
+    return timeoutBefore(20); // Exercise the configured deadline without delaying the suite five seconds.
+  });
+  let useCallerAbort = true;
+  const fetch = t.mock.method(globalThis, 'fetch', async (_url: string | URL | Request, options?: RequestInit) => {
+    const signal = options?.signal;
+    assert.ok(signal);
+    if (useCallerAbort) setImmediate(() => abort.abort(new Error(discoveryToken)));
+    return new Promise<Response>((_resolve, reject) => {
+      const keepAlive = setTimeout(() => reject(new Error('check failed to enforce deadline')), 1000);
+      signal.addEventListener('abort', () => { clearTimeout(keepAlive); reject(signal.reason); }, { once: true });
+    });
+  });
+  for (const caller of [true, false]) {
+    useCallerAbort = caller;
+    const result = await initConfiguration({ ...fixture, provider: 'cloudflare', yes: true, checkConnection: true,
+      ...(caller ? { signal: abort.signal } : {}),
+      environment: { ...fixture.environment, PERFDIGEST_CLOUDFLARE_ACCOUNT_ID: discoveryAccount,
+        PERFDIGEST_CLOUDFLARE_API_TOKEN: discoveryToken }, output: capture.output });
+    assert.equal(result.ready, false);
+    assert.equal(result.diagnostics.find(check => check.check === 'endpoint')?.status, 'error');
+  }
+  assert.deepEqual(timeouts, [5000, 5000]);
+  assert.equal(fetch.mock.callCount(), 2);
+  assert.equal(capture.text().includes(discoveryToken), false);
+});
+
+test('opt-in checks skip missing or invalid Cloudflare credentials/config, OpenAI and offline', async t => {
+  const fixture = await project();
+  const fetch = t.mock.method(globalThis, 'fetch', async () => { throw new Error('must never request'); });
+  for (const credentials of [{}, { PERFDIGEST_CLOUDFLARE_ACCOUNT_ID: 'bad', PERFDIGEST_CLOUDFLARE_API_TOKEN: discoveryToken },
+    { PERFDIGEST_CLOUDFLARE_ACCOUNT_ID: discoveryAccount, PERFDIGEST_CLOUDFLARE_API_TOKEN: 'invalid\r\nheader' }]) {
+    const result = await initConfiguration({ ...fixture, provider: 'cloudflare', yes: true, checkConnection: true,
+      environment: { ...fixture.environment, ...credentials }, output: outputCapture().output });
+    assert.equal(result.ready, false);
+    assert.equal(result.diagnostics.find(check => check.check === 'endpoint')?.status, 'skipped');
+  }
+  const envFile = await privateEnv(fixture.root, 'OPENAI_API_KEY=general-key-is-refused');
+  for (const file of [envFile, join(fixture.root, 'missing.env')]) {
+    const result = await initConfiguration({ ...fixture, provider: 'cloudflare', envFile: file, yes: true, checkConnection: true,
+      environment: { ...fixture.environment, PERFDIGEST_CLOUDFLARE_ACCOUNT_ID: discoveryAccount,
+        PERFDIGEST_CLOUDFLARE_API_TOKEN: discoveryToken }, output: outputCapture().output });
+    assert.equal(result.ready, false);
+    assert.equal(result.diagnostics.find(check => check.check === 'env_file')?.status, 'error');
+    assert.equal(result.diagnostics.find(check => check.check === 'endpoint')?.status, 'skipped');
+  }
+  for (const provider of ['openai', 'offline']) {
+    const result = await initConfiguration({ ...fixture, provider, yes: true, checkConnection: true,
+      output: outputCapture().output });
+    assert.equal(result.ready, provider === 'offline');
+    assert.equal(result.diagnostics.find(check => check.check === 'endpoint')?.status, 'skipped');
+  }
+  const withOpenAIKey = await initConfiguration({ ...fixture, provider: 'openai', yes: true, checkConnection: true,
+    environment: { ...fixture.environment, PERFDIGEST_DECISIONS_API_KEY: discoveryToken }, output: outputCapture().output });
+  assert.equal(withOpenAIKey.ready, true);
+  assert.equal(withOpenAIKey.diagnostics.find(check => check.check === 'endpoint')?.status, 'skipped');
+  assert.equal(fetch.mock.callCount(), 0);
+});
+
+test('interactive connection opt-in runs only after the save confirmation', async t => {
+  const fixture = await project();
+  const fetch = t.mock.method(globalThis, 'fetch', async () => new Response(discoveryBody));
+  for (const confirm of [false, true]) {
+    const input = new PassThrough() as PassThrough & { isTTY?: boolean };
+    input.isTTY = true;
+    const capture = outputCapture(text => {
+      if (text.includes('Save workspace configuration?')) {
+        assert.equal(fetch.mock.callCount(), 0);
+        setImmediate(() => input.write(confirm ? 'y\n' : 'n\n'));
+      }
+    });
+    capture.output.isTTY = true;
+    const pending = initConfiguration({ ...fixture, provider: 'cloudflare', envFile: '', checkConnection: true,
+      input, output: capture.output, environment: { ...fixture.environment,
+        PERFDIGEST_CLOUDFLARE_ACCOUNT_ID: discoveryAccount, PERFDIGEST_CLOUDFLARE_API_TOKEN: discoveryToken } });
+    if (confirm) assert.equal((await pending).ready, true);
+    else {
+      await assert.rejects(pending, /cancelled before saving/);
+      assert.equal(await loadConfiguration(fixture.workspace), null);
+    }
+  }
+  assert.equal(fetch.mock.callCount(), 1);
+});
+
+test('CLI wires --check-connection to init and refuses it on other commands', async () => {
+  const fixture = await project();
+  const cli = fileURLToPath(new URL('../src/cli.js', import.meta.url));
+  const preload = join(fixture.root, 'mock-discovery.mjs');
+  const log = join(fixture.root, 'discovery-requests.jsonl');
+  await writeFile(preload, `import { appendFileSync } from 'node:fs';
+globalThis.fetch = async (url, options) => {
+  appendFileSync(${JSON.stringify(log)}, JSON.stringify({ url: String(url), method: options.method, redirect: options.redirect }) + '\\n');
+  return new Response(${JSON.stringify(discoveryBody)});
+};\n`);
+  const run = promisify(execFile);
+  const environment = { ...fixture.environment, PERFDIGEST_CLOUDFLARE_ACCOUNT_ID: discoveryAccount,
+    PERFDIGEST_CLOUDFLARE_API_TOKEN: discoveryToken };
+  const init = await run(process.execPath, ['--import', preload, cli, 'init', '--workspace', fixture.workspace,
+    '--provider', 'cloudflare', '--yes', '--check-connection'], { env: environment });
+  assert.match(init.stderr, /authenticated model-discovery read accepted/);
+  const requests = (await readFile(log, 'utf8')).trim().split('\n').map(line => JSON.parse(line));
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].method, 'GET');
+  assert.equal(requests[0].redirect, 'error');
+  assert.match(requests[0].url, /\/ai\/models\/search\?/);
+  await assert.rejects(run(process.execPath, ['--import', preload, cli, 'demo', '--workspace', fixture.workspace,
+    '--check-connection'], { env: environment }), error => {
+    assert.match((error as Error & { stderr: string }).stderr, /--check-connection belong to init/); return true;
+  });
+  await assert.rejects(run(process.execPath, ['--import', preload, cli, 'init', '--workspace', fixture.workspace,
+    '--provider', 'cloudflare', '--yes', '--check-connection'], { env: fixture.environment }), error => {
+    assert.match((error as Error & { stderr: string }).stderr, /Cloudflare was not contacted/); return true;
+  });
+  assert.equal((await readFile(log, 'utf8')).trim().split('\n').length, 1);
 });

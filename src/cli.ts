@@ -12,7 +12,7 @@ import { initConfiguration, loadConfiguration, applyConfigurationEnvironment } f
 
 const help = `PerfDigest Evidence — Codex-first MVP
 
-  perfdigest-plugin init [--provider cloudflare|local|openai|offline --yes] [--env-file PATH] [--endpoint URL]
+  perfdigest-plugin init [--provider cloudflare|local|openai|offline --yes] [--env-file PATH] [--endpoint URL] [--check-connection]
   perfdigest-plugin demo [--agent none|codex] [--routing offline|decisions] [--perf]
   perfdigest-plugin run manifest.json [--workspace PATH] [--routing decisions|offline] [--agent codex|none]
   perfdigest-plugin mcp [--workspace PATH]
@@ -23,27 +23,28 @@ Use --agent codex to demonstrate overlap with a real Codex session.
 --perf adds Linux hardware counters; otherwise the demo uses genuine elapsed-time traces.
 Raw reports, command receipts and timeline are saved under .perfdigest/runs/.
 --provider cloudflare|local|openai|offline explicitly selects inference; --routing keeps legacy aliases.
+init --check-connection opts in to one read-only Cloudflare check; inference and quota are not checked.
 `;
 
 async function main() {
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
     help: { type: 'boolean', short: 'h' }, workspace: { type: 'string' },
     agent: { type: 'string' }, routing: { type: 'string' }, provider: { type: 'string' }, model: { type: 'string' }, perf: { type: 'boolean' },
-    endpoint: { type: 'string' }, 'env-file': { type: 'string' }, yes: { type: 'boolean' },
+    endpoint: { type: 'string' }, 'env-file': { type: 'string' }, yes: { type: 'boolean' }, 'check-connection': { type: 'boolean' },
   } });
   if (values.help || !positionals[0]) { console.log(help); return; }
   const workspace = await realpath(values.workspace ?? process.cwd());
   const command = positionals[0];
   if (command === 'init') {
-    const result = await initConfiguration({ workspace, yes: values.yes ?? false,
+    const result = await initConfiguration({ workspace, yes: values.yes ?? false, checkConnection: values['check-connection'] ?? false,
       ...(values.provider !== undefined ? { provider: values.provider } : {}),
       ...(values.endpoint !== undefined ? { endpoint: values.endpoint } : {}),
       ...(values['env-file'] !== undefined ? { envFile: values['env-file'] } : {}) });
     if (!result.ready) process.exitCode = 1;
     return;
   }
-  if (values.yes !== undefined || values.endpoint !== undefined || values['env-file'] !== undefined) {
-    throw new Error('--yes, --endpoint and --env-file belong to init; configure the workspace first');
+  if (values.yes !== undefined || values.endpoint !== undefined || values['env-file'] !== undefined || values['check-connection'] !== undefined) {
+    throw new Error('--yes, --endpoint, --env-file and --check-connection belong to init; configure the workspace first');
   }
   if (!['demo', 'run', 'mcp'].includes(command)) throw new Error('Unknown command; use --help');
   const configured = await loadConfiguration(workspace);
