@@ -66,7 +66,8 @@ export function providerForRuntime(provider: SetupProvider): RuntimeProvider {
 }
 
 export function validateLocalEndpoint(value: string): string {
-  // Keep this identical to the runner's explicit loopback-only endpoint contract.
+  // Shared by setup and the runtime. Check the explicit port before URL parsing
+  // can erase a default :80 port; both stages must accept the same saved address.
   const match = /^http:\/\/127\.0\.0\.1:(\d{1,5})\/v1\/systemone$/.exec(value);
   if (!match || Number(match[1]) < 1 || Number(match[1]) > 65535) {
     throw new Error('Local endpoint must be http://127.0.0.1:PORT/v1/systemone with no credentials, query or fragment.');

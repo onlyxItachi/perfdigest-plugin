@@ -257,6 +257,7 @@ test('local setup requests only GET /health without credentials or a body', asyn
 });
 
 test('local endpoint validation refuses remote hosts, credentials and inference parameters', () => {
+  assert.equal(validateLocalEndpoint('http://127.0.0.1:80/v1/systemone'), 'http://127.0.0.1:80/v1/systemone');
   for (const endpoint of [
     'https://127.0.0.1:8137/v1/systemone', 'http://localhost:8137/v1/systemone',
     'http://127.0.0.1/v1/systemone', 'http://127.0.0.1:0/v1/systemone',

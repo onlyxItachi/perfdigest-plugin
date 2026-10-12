@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { EvidencePacket, ProviderName, ReportSpec, RouteDecision, RoutingMode } from './config.js';
 import { DecisionsError, decisionsClient, localDecisionsClient, decisionsFailure, decisionsInput,
   offlineSelection, routeDecision, routingQuestion, selectReport, type DecisionsErrorKind } from './decisions.js';
+import { validateLocalEndpoint } from './setup.js';
 
 export function providerName(mode: RoutingMode): ProviderName {
   switch (mode) {
@@ -69,6 +70,10 @@ const answerSchema = z.discriminatedUnion('type', [
 ]);
 const systemResponse = z.object({ model: z.string().min(1), answers: z.record(z.string(), answerSchema),
   usage: z.object({ input_tokens: z.number().int().nonnegative(), output_tokens: z.number().int().nonnegative() }) });
+// Native adapters can round each probability and score to four decimals. Bound the
+// resulting error per field, without renormalizing probabilities or confidence.
+const roundingHalfUnit = 0.00005;
+const arithmeticEpsilon = 1e-12;
 export function normalizeSystemOne(raw: unknown, questions: DecisionQuestion[]) {
   const checked = questionsChecked(questions);
   const result = systemResponse.parse(raw);
@@ -79,15 +84,26 @@ export function normalizeSystemOne(raw: unknown, questions: DecisionQuestion[]) 
     if (answer.type === 'noul') return { name: q.name, type: 'predicate' as const, probability: answer.noul };
     const allowed = q.type === 'choice' ? keys(q) : q.type === 'score' ? q.levels.map((_, i) => String(i)) : [];
     if (Object.keys(answer.probabilities).length !== allowed.length || allowed.some(k => answer.probabilities[k] === undefined)
-      || Math.abs(Object.values(answer.probabilities).reduce((s, p) => s + p, 0) - 1) > 0.001) throw new DecisionsError('schema');
+      || Math.abs(Object.values(answer.probabilities).reduce((s, p) => s + p, 0) - 1)
+        > allowed.length * roundingHalfUnit + arithmeticEpsilon) throw new DecisionsError('schema');
     if (answer.type === 'choice' && q.type === 'choice') {
       const index = allowed.indexOf(answer.choice);
-      if (index < 0) throw new DecisionsError('schema');
+      if (index < 0 || answer.probabilities[answer.choice]! + arithmeticEpsilon < Math.max(...Object.values(answer.probabilities))) {
+        throw new DecisionsError('schema');
+      }
       return { name: q.name, type: 'choice' as const, choice: q.choices[index]!.value, confidence: answer.confidence,
         probabilities: allowed.map((key, i) => ({ value: q.choices[i]!.value, probability: answer.probabilities[key]! })) };
     }
     if (answer.type === 'score' && q.type === 'score') {
-      if (answer.score < 0 || answer.score > q.levels.length - 1) throw new DecisionsError('schema');
+      const expectedScore = allowed.reduce((sum, key, index) => sum + index * answer.probabilities[key]!, 0);
+      // Each p_i contributes at most i * halfUnit, plus one halfUnit for score.
+      const scoreTolerance = (1 + allowed.length * (allowed.length - 1) / 2) * roundingHalfUnit + arithmeticEpsilon;
+      if (answer.score < 0 || answer.score > q.levels.length - 1 || Math.abs(answer.score - expectedScore) > scoreTolerance
+          || Object.keys(answer.legend).length !== allowed.length
+          || allowed.some((key, index) => {
+            const level = q.levels[index]!;
+            return answer.legend[key] !== (level.description ? `${level.label}: ${level.description}` : level.label);
+          })) throw new DecisionsError('schema');
       return { name: q.name, type: 'score' as const, score: answer.score, confidence: answer.confidence,
         probabilities: allowed.map((key, i) => ({ value: i, label: q.levels[i]!.label, probability: answer.probabilities[key]! })) };
     }
@@ -95,11 +111,7 @@ export function normalizeSystemOne(raw: unknown, questions: DecisionQuestion[]) 
   }) };
 }
 function localEndpoint(value: string): string {
-  let url: URL;
-  try { url = new URL(value); } catch { throw new ProviderError('local', 'schema'); }
-  if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || !url.port || url.pathname !== '/v1/systemone'
-      || url.username || url.password || url.search || url.hash) throw new ProviderError('local', 'schema');
-  return url.href;
+  try { return validateLocalEndpoint(value); } catch { throw new ProviderError('local', 'schema'); }
 }
 function httpFailure(provider: ProviderName, status: number, code?: number): ProviderError {
   // Workers AI's documented quota and paid-model codes are billing boundaries, not transient rate limits.
@@ -159,7 +171,10 @@ export function createDecisionProvider(mode: RoutingMode, options: { decisionsMo
         if (!envelope.success) throw new ProviderError(name, 'service', response.status);
         raw = envelope.result;
       }
-      return routeDecision(normalizeSystemOne(raw, questions), reports, { source: name === 'local' ? 'clef_local' : 'clef_cloudflare',
+      const normalized = normalizeSystemOne(raw, questions);
+      // Check the advertised model identity; this alone cannot verify the server's weights.
+      if (!['clef-flash', '@cf/cloudflare/clef-flash'].includes(normalized.model)) throw new ProviderError(name, 'schema');
+      return routeDecision(normalized, reports, { source: name === 'local' ? 'clef_local' : 'clef_cloudflare',
         provider: name, transport: name === 'local' ? 'loopback_http' : 'cloudflare_https', confidenceSemantics: 'systemone_uniform_zero',
         inputSha256: createHash('sha256').update(input).digest('hex'), evidenceCount: evidence.length,
         latencyMs: Math.round(performance.now() - start) });

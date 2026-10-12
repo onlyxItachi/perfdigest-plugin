@@ -53,6 +53,88 @@ test('missing and invalid native fields fail closed rather than fabricating a co
   assert.throws(() => toSystemOne('x', [questions[0]!, questions[0]!]));
 });
 
+test('native choices must maximize the reported distribution, while genuine ties keep the returned choice', () => {
+  const lowerProbabilityChoice = structuredClone(native);
+  lowerProbabilityChoice.answers.next_evidence.probabilities = { cpu: 0.1, __human_review__: 0.9 };
+  lowerProbabilityChoice.answers.next_evidence.confidence = 0.99;
+  assert.throws(() => normalizeSystemOne(lowerProbabilityChoice, questions), { kind: 'schema' });
+  for (const choice of ['cpu', '__human_review__']) {
+    const tied = structuredClone(native);
+    tied.answers.next_evidence = { type: 'choice', choice, confidence: 0.1234, probabilities: { cpu: 0.5, __human_review__: 0.5 } };
+    const answer = normalizeSystemOne(tied, questions).answers[1]!;
+    assert.equal(answer.type, 'choice');
+    if (answer.type !== 'choice') throw new Error('Expected choice');
+    assert.equal(answer.choice, choice);
+    assert.equal(answer.confidence, 0.1234, 'Provider confidence is preserved, not recomputed');
+  }
+});
+
+test('native score must match weighted probabilities and the requested legend', () => {
+  for (const mutate of [
+    (r: any) => { r.answers.severity.score = 0.25; },
+    (r: any) => { r.answers.severity.legend = { 0: 'low' }; },
+    (r: any) => { r.answers.severity.legend = { 0: 'low', 2: 'high: severe' }; },
+    (r: any) => { r.answers.severity.legend[1] = 'different rubric'; },
+    (r: any) => { r.answers.severity.legend.extra = 'extra'; },
+  ]) {
+    const response = structuredClone(native); mutate(response);
+    assert.throws(() => normalizeSystemOne(response, questions), { kind: 'schema' });
+  }
+  const scoreQuestions: DecisionQuestion[] = [{ type: 'score', name: 'level', instructions: 'Level',
+    levels: [{ label: 'low' }, { label: 'middle' }, { label: 'high' }] }];
+  const rounded = { model: 'clef-flash', answers: { level: { type: 'score', score: 1, confidence: 0.2468,
+    probabilities: { 0: 0.3333, 1: 0.3333, 2: 0.3333 }, legend: { 0: 'low', 1: 'middle', 2: 'high' } } },
+  usage: { input_tokens: 12, output_tokens: 0 } };
+  const answer = normalizeSystemOne(rounded, scoreQuestions).answers[0]!;
+  assert.equal(answer.type, 'score');
+  if (answer.type !== 'score') throw new Error('Expected score');
+  assert.equal(answer.score, 1, 'Preserve the reported rounded score rather than replacing it with 0.9999');
+  assert.equal(answer.confidence, 0.2468);
+  assert.deepEqual(answer.probabilities.map(p => p.probability), [0.3333, 0.3333, 0.3333]);
+  rounded.answers.level.score = 1.001;
+  assert.throws(() => normalizeSystemOne(rounded, scoreQuestions), { kind: 'schema' });
+});
+
+test('four-decimal rounding tolerance scales with the number of native probabilities without renormalizing them', () => {
+  const many: DecisionQuestion[] = [{ type: 'choice', name: 'many', instructions: 'Pick',
+    choices: Array.from({ length: 255 }, (_, i) => ({ value: `c${i}` })) }];
+  const probabilities = Object.fromEntries(Array.from({ length: 255 }, (_, i) => [`c${i}`, 0.0039]));
+  const rounded = { model: 'clef-flash', answers: { many: { type: 'choice', choice: 'c254', confidence: 0, probabilities } },
+    usage: { input_tokens: 12, output_tokens: 0 } };
+  const answer = normalizeSystemOne(rounded, many).answers[0]!;
+  assert.equal(answer.type, 'choice');
+  if (answer.type !== 'choice') throw new Error('Expected choice');
+  assert.equal(answer.choice, 'c254');
+  assert.equal(answer.confidence, 0);
+  assert.equal(answer.probabilities.length, 255);
+  assert.ok(answer.probabilities.every(p => p.probability === 0.0039));
+  for (const key of Object.keys(probabilities)) probabilities[key] = 0.0038;
+  assert.throws(() => normalizeSystemOne(rounded, many), { kind: 'schema' });
+});
+
+test('Clef factories refuse a different advertised model and preserve one-request failure behavior', async () => {
+  const saved = { ...process.env }; const fetch = globalThis.fetch;
+  try {
+    process.env.PERFDIGEST_CLEF_URL = 'http://127.0.0.1:8137/v1/systemone';
+    process.env.PERFDIGEST_CLOUDFLARE_ACCOUNT_ID = 'a'.repeat(32);
+    process.env.PERFDIGEST_CLOUDFLARE_API_TOKEN = 'synthetic-cloudflare-token';
+    for (const provider of ['local', 'cloudflare'] as const) {
+      for (const model of ['openjev', 'clef', 'unrecognized', 'clef-flash', '@cf/cloudflare/clef-flash']) {
+        let requests = 0;
+        globalThis.fetch = async () => {
+          requests++;
+          const result = { ...routingResponse, model };
+          return new Response(JSON.stringify(provider === 'local' ? result : { success: true, result, errors: [] }));
+        };
+        const result = createDecisionProvider(provider).select('Synthetic identity fixture', reports);
+        if (model === 'clef-flash' || model === '@cf/cloudflare/clef-flash') assert.equal((await result).model, model);
+        else await assert.rejects(result, { kind: 'schema' });
+        assert.equal(requests, 1);
+      }
+    }
+  } finally { globalThis.fetch = fetch; for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k]; Object.assign(process.env, saved); }
+});
+
 test('real loopback SystemOne HTTP uses measured inputs without credentials or raw paths', async () => {
   const previous = process.env.PERFDIGEST_CLEF_URL;
   let requests = 0;
@@ -121,8 +203,11 @@ test('provider aliases stay explicit, offline sends no request, invalid local UR
   try {
     globalThis.fetch = async () => { throw new Error('Offline must not fetch'); };
     assert.equal((await createDecisionProvider('offline').select('test', reports)).requests, 0);
+    process.env.PERFDIGEST_CLEF_URL = 'http://127.0.0.1:80/v1/systemone';
+    assert.equal(createDecisionProvider('local').name, 'local', 'An explicit default port accepted by init is accepted by runtime');
     for (const url of ['https://api.example.test/v1/systemone', 'http://user:secret@127.0.0.1:8000/v1/systemone',
-      'http://127.0.0.1:8000/v1/systemone?token=x']) {
+      'http://127.0.0.1:8000/v1/systemone?token=x', 'http://127.0.0.1/v1/systemone',
+      'http://127.0.0.1:8000/v1/systemone#fragment', 'http://127.0.0.1:65536/v1/systemone']) {
       process.env.PERFDIGEST_CLEF_URL = url; assert.throws(() => createDecisionProvider('local'), { kind: 'schema' });
     }
     assert.throws(() => createDecisionProvider('local', { decisionsMockURL: 'http://127.0.0.1:8123/v1' }), { kind: 'schema' });
