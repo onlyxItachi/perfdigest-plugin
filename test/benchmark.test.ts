@@ -47,6 +47,12 @@ test('comparison records failed verification and rejects changed shared evidence
     assert.equal(result.decisions.fixtureRequests, 1); assert.equal(result.decisions.liveRequests, 0);
     assert.equal(result.decisions.observedTokenUsage, null); assert.equal(result.telemetry.modelUsage, null);
     assert.equal(result.modelReadingGrade, null); assert.equal(result.telemetry.actualModelOverlapMs, null);
+    const digestOnly = await benchmarkArm({ workspace: root, manifest, arm: 'B_digest',
+      agent: 'none', expected: 'row_major', expectedHashes: { trace: hash } });
+    assert.equal(digestOnly.verification?.exitCode, 7, 'B must reach the verifier without an injected inference provider');
+    assert.equal(digestOnly.decisions.fixtureRequests, 0);
+    assert.equal(digestOnly.decisions.execution, 'not_used');
+    assert.ok(digestOnly.evidence, 'B keeps the real MCP evidence path');
     await writeFile(join(root, 'trace.json'), '{"changed":true}');
     const changed = await benchmarkArm({ workspace: root, manifest, arm: 'A_raw',
       agent: 'none', expected: 'row_major', expectedHashes: { trace: hash } });

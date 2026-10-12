@@ -17,8 +17,8 @@ const help = `PerfDigest Evidence — Codex-first MVP
   perfdigest-plugin run manifest.json [--workspace PATH] [--routing decisions|offline] [--agent codex|none]
   perfdigest-plugin mcp [--workspace PATH]
 
-Demo defaults: real local CPU measurements + verification, offline routing, no model calls.
-Run defaults: existing Codex ChatGPT login + live Decisions (PERFDIGEST_DECISIONS_API_KEY).
+Unconfigured demo defaults: real local CPU measurements + verification, offline routing, no model calls.
+Unconfigured run defaults: existing Codex ChatGPT login + live Decisions (PERFDIGEST_DECISIONS_API_KEY).
 Use --agent codex to demonstrate overlap with a real Codex session.
 --perf adds Linux hardware counters; otherwise the demo uses genuine elapsed-time traces.
 Raw reports, command receipts and timeline are saved under .perfdigest/runs/.

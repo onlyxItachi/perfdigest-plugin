@@ -1,7 +1,8 @@
-// Explicit opt-in: one actual Clef request using measured PerfDigest evidence, then Codex review.
+// Explicit opt-in: one provider request using measured PerfDigest evidence, then Codex review.
+// Local HTTP alone cannot attest which weights/process produced a response.
 import assert from 'node:assert/strict';
 import { readFile, mkdir, mkdtemp } from 'node:fs/promises';
-import { resolve, join, dirname } from 'node:path';
+import { resolve, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { demoManifest } from '../dist/demo.js';
 import { investigate } from '../dist/run.js';
@@ -11,7 +12,7 @@ import { writeJson } from '../dist/files.js';
 import { redact } from '../dist/environment.js';
 
 if (process.env.PERFDIGEST_RUN_CLEF_INTEGRATION !== '1') {
-  console.log(JSON.stringify({ status: 'skipped', requests: 0, inferenceValidated: false }));
+  console.log(JSON.stringify({ status: 'skipped', requests: 0, inferenceValidated: false, responseValidated: false }));
   process.exit(0);
 }
 const { values } = parseArgs({ options: { provider: { type: 'string' }, manifest: { type: 'string' },
@@ -31,8 +32,12 @@ try {
   const result = await investigate({ workspace, manifest, routing: provider, agent: values.codex ? 'codex' : 'none',
     model: 'gpt-6-astra', effort: 'max', onEvent: (event, detail) => process.stderr.write(`${event}${detail ? `: ${redact(detail)}` : ''}\n`) });
   const decision = result.evidence?.decision;
-  const receipt = { status: result.status, inferenceValidated: !!decision, syntheticFixture: false,
+  const receipt = { status: result.status, responseValidated: !!decision,
+    inferenceValidated: provider === 'cloudflare' && !!decision, syntheticFixture: provider === 'cloudflare' ? false : null,
+    identityBasis: provider === 'cloudflare' ? 'authenticated TLS request to fixed Workers AI model endpoint'
+      : 'local SystemOne response only; correlate independent server/process/model-hash receipt before claiming genuine Clef inference',
     provider, model: decision?.model ?? null, quantization: provider === 'local' ? values.quantization ?? null : null,
+    quantizationBasis: provider === 'local' ? 'caller label; verify against independent model hash receipt' : 'provider managed, not observed',
     requests: decision?.requests ?? null, decision: decision ?? null,
     evidence: result.evidence?.evidence.map(e => ({ id: e.report.id, reference: e.report.path, sha256: e.sha256, provenance: e.provenance })) ?? [],
     verification: result.verification ? { exitCode: result.verification.exitCode, timedOut: result.verification.timedOut, aborted: result.verification.aborted } : null,
@@ -44,7 +49,7 @@ try {
     limits: ['Controlled CPU example, not a solved PyTorch issue', 'One trial, no speedup or calibration claim', 'Provider confidence is not verification'],
   };
   await writeJson(join(workspace, 'clef-receipt.json'), receipt);
-  console.log(JSON.stringify(receipt, null, 2));
+  console.log(redact(JSON.stringify(receipt, null, 2)));
   assert.equal(result.status, 'complete'); assert.equal(decision.requests, 1); assert.equal(result.verification.exitCode, 0);
   if (values.codex) assert.equal(result.analysis.threadId, result.review.threadId);
 } catch (error) { console.error(redact(error instanceof Error ? error.message : 'Clef integration failed')); process.exitCode = 1; }

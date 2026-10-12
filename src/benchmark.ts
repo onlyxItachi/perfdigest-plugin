@@ -104,7 +104,8 @@ export async function benchmarkArm(options: {
             usage: { input_tokens: 0, output_tokens: 0 } }), { headers: { 'content-type': 'application/json' } });
         } });
       const evidence = await gatherEvidence({ workspace: options.workspace, issue: options.manifest.issue,
-        reports: options.manifest.reports, routing: options.arm === 'C_fixture_prefetch' ? 'decisions' : 'offline', client, signal, emit });
+        reports: options.manifest.reports, routing: options.arm === 'C_fixture_prefetch' ? 'decisions' : 'offline',
+        ...(options.arm === 'C_fixture_prefetch' ? { client } : {}), signal, emit });
       if (evidence.status !== 'complete') throw new Error('Evidence was not complete');
       // B and C receive identical evidence content; fixture confidence/usage never enters
       // the receipt as a service observation, and never acts as a correctness score.

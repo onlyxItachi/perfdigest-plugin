@@ -21,7 +21,7 @@ npm run demo
 
 The Python MCP dependency is pinned because PerfDigest 1.2.0 still uses the MCP v1 `FastMCP` interface; an unconstrained fresh install can select incompatible MCP 2.x. The pin matches PerfDigest's source lockfile. The runner continues to invoke the installed tool with `uvx perfdigest-mcp`.
 
-The demo performs genuine CPU work, saves a Chrome trace, digests it through `uvx perfdigest-mcp`, and verifies both traversal algorithms against an independent arithmetic formula. It makes **no model calls** by default. `--perf` additionally collects Linux process counters when `perf` and the required permissions are available. It fails explicitly if capture is unavailable.
+In an unconfigured workspace, the demo performs genuine CPU work, saves a Chrome trace, digests it through `uvx perfdigest-mcp`, and verifies both traversal algorithms against an independent arithmetic formula. It makes **no model calls** without a saved provider selection or explicit inference flag. `--perf` additionally collects Linux process counters when `perf` and the required permissions are available. It fails explicitly if capture is unavailable.
 
 For a real Codex review using your existing ChatGPT login:
 
@@ -80,7 +80,7 @@ node --env-file=/absolute/private/cloudflare.env dist/cli.js demo --provider clo
 
 Workers AI's documented free allocation is 10,000 Neurons/day. Account eligibility and remaining usage must be checked in the dashboard; this runner does not promise unlimited free inference or upgrade a plan. See [Cloudflare pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/) and the [REST token setup](https://developers.cloudflare.com/workers-ai/get-started/rest-api/). Tokens need Workers AI Read/Edit permissions, scoped to the intended account.
 
-For a separately running local server, set `PERFDIGEST_CLEF_URL=http://127.0.0.1:8137/v1/systemone`. The adapter uses a persistent HTTP server; it never loads a model per request. The official [Clef GGUF repository](https://huggingface.co/ggml-org/Clef-Flash-GGUF) supplies Q4_K_M. Use a Clef-capable [llama.cpp release](https://github.com/ggml-org/llama.cpp/releases); its entire decision prompt must fit `--ubatch-size`. Example settings to assess on your hardware are `--ctx-size 2048 --batch-size 2048 --ubatch-size 2048 --parallel 1`; reduce GPU layers if memory is insufficient. These are configuration suggestions, not a hardware fit guarantee.
+Start the local server with `--alias clef-flash`; unexpected response model identities are rejected. For a separately running local server, set `PERFDIGEST_CLEF_URL=http://127.0.0.1:8137/v1/systemone`. The adapter uses a persistent HTTP server; it never loads a model per request. The official [Clef GGUF repository](https://huggingface.co/ggml-org/Clef-Flash-GGUF) supplies Q4_K_M. Use a Clef-capable [llama.cpp release](https://github.com/ggml-org/llama.cpp/releases); its entire decision prompt must fit `--ubatch-size`. Example settings to assess on your hardware are `--ctx-size 2048 --batch-size 2048 --ubatch-size 2048 --parallel 1`; reduce GPU layers if memory is insufficient. These are configuration suggestions, not a hardware fit guarantee.
 
 Capture CUDA performance evidence **before loading local Clef**, or unload its server before measuring. Then route the saved, hashed artifacts with `captures: []`. Do not present measurements taken under local inference load as isolated GPU benchmarks.
 
@@ -94,7 +94,7 @@ PERFDIGEST_RUN_CLEF_INTEGRATION=1 node --env-file=/absolute/private/cloudflare.e
 PERFDIGEST_RUN_CLEF_INTEGRATION=1 node scripts/check-clef-live.mjs --provider local --manifest /absolute/saved/manifest.json --workspace /absolute/saved --quantization Q4_K_M --codex
 ```
 
-`--codex` uses the existing ChatGPT login with Astra/max. Receipts record provider/model, decision probabilities, hashes, latency, wall time, verification and same-thread Codex delivery. Without the opt-in flag the diagnostic sends nothing. Public CI uses fixtures only and needs no hosted credential.
+`--codex` uses the existing ChatGPT login with Astra/max. Receipts record provider/model, decision probabilities, hashes, latency, wall time, verification and same-thread Codex delivery. A localhost response alone does not prove which weights produced it: local qualification also requires an independently recorded server process, runtime and GGUF hash. A caller-supplied quantization label is not model verification. Without the opt-in flag the diagnostic sends nothing. Public CI uses fixtures only and needs no hosted credential.
 
 ## Use your own reports
 
@@ -193,7 +193,7 @@ The evidence MCP provides three tools:
 
 | Tool | Behavior |
 | --- | --- |
-| `launch_evidence_prefetch` | Return a job ID immediately; digest existing reports asynchronously. Offline by default. |
+| `launch_evidence_prefetch` | Return a job ID immediately; digest existing reports asynchronously. Offline unless setup selects another default. |
 | `get_evidence_job` | Poll with at most 5 seconds of waiting; consume the terminal result once. |
 | `cancel_evidence_job` | Abort collection and release the job slot. |
 
