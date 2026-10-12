@@ -28,7 +28,7 @@
     ".mcp.json",
     "README.md",
     "LICENSE",
-    "docs/SETUP.md"
+    "docs"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",

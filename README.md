@@ -4,7 +4,7 @@
 
 A Codex-first hackathon MVP for HPC infrastructure performance debugging. It combines the existing Python [PerfDigest MCP](https://github.com/onlyxItachi/PerfDigest-MCP), a small TypeScript runner, an asynchronous MCP worker and a Codex skill. A small, explicit decision provider contract supports Cloudflare Clef-flash, local Clef-flash, OpenAI Luna and offline routing. The OpenAI adapter continues to use the official TypeScript SDK directly.
 
-**Current validation:** real local CPU capture, PerfDigest MCP and a two-turn Codex SDK session have run successfully. Decisions is validated through a real loopback HTTP server with measured PerfDigest evidence; **successful live Decisions inference remains unvalidated pending a separately funded key**. Clef request/response mapping is verified with HTTP fixtures; hosted and local real inference qualification is tracked separately below. The separate invalid-credential diagnostic checks only the authentication boundary. The npm package is a local pre-release, not an npm registry release. GPU/PyTorch debugging and A/B/C performance benefits are not yet demonstrated.
+**Current validation:** genuine CPU evidence → PerfDigest MCP → **Cloudflare Clef-flash → Astra/max through the Codex SDK → independent verification** passed on 12 October 2026. One hosted decision request took 2.588 seconds; the complete two-turn Codex workflow took 90.461 seconds. See the [recorded validation](docs/VALIDATION.md). OpenAI Decisions is validated through a real loopback HTTP server with measured evidence; **successful valid-key OpenAI inference remains unvalidated**. The invalid-credential diagnostic checks only authentication rejection. The npm package is a local pre-release, not an npm registry release. GPU/PyTorch debugging and A/B/C performance benefits are not yet demonstrated.
 
 ## Quick start
 
@@ -20,6 +20,8 @@ npm run demo
 ```
 
 The Python MCP dependency is pinned because PerfDigest 1.2.0 still uses the MCP v1 `FastMCP` interface; an unconstrained fresh install can select incompatible MCP 2.x. The pin matches PerfDigest's source lockfile. The runner continues to invoke the installed tool with `uvx perfdigest-mcp`.
+
+Upstream [1.2.1](https://pypi.org/project/perfdigest-mcp/1.2.1/) now bounds the legacy SDK, and [1.3.0](https://pypi.org/project/perfdigest-mcp/1.3.0/) migrates to MCP SDK 2.3. The plugin's TypeScript MCP client 1.32.1 separately passed actual stdio discovery and calls to all seven tools against a clean PyPI 1.3.0 installation on Python 3.14.3. The established hackathon CI installation pin above remains unchanged; this supplemental compatibility check is recorded separately from that baseline.
 
 In an unconfigured workspace, the demo performs genuine CPU work, saves a Chrome trace, digests it through `uvx perfdigest-mcp`, and verifies both traversal algorithms against an independent arithmetic formula. It makes **no model calls** without a saved provider selection or explicit inference flag. `--perf` additionally collects Linux process counters when `perf` and the required permissions are available. It fails explicitly if capture is unavailable.
 
@@ -67,7 +69,7 @@ Select `--provider cloudflare|local|openai|offline` explicitly. The previous nam
 
 | Provider | Model/transport | Credential | Current qualification |
 | --- | --- | --- | --- |
-| `cloudflare` | `@cf/cloudflare/clef-flash`, Workers AI REST | Dedicated account ID + token | Request/envelope/error fixtures pass; real call pending account access |
+| `cloudflare` | `@cf/cloudflare/clef-flash`, Workers AI REST | Dedicated account ID + token | Genuine measured-evidence routing + same-thread Astra/max review + independent verification passed |
 | `local` | Clef-flash, llama.cpp `/v1/systemone` | None; loopback only | Real HTTP contract test passes; model inference pending download |
 | `openai` | `gpt-6-luna`, official OpenAI SDK | Dedicated Decisions key | Measured HTTP mock passes; valid-key inference pending |
 | `offline` | First report, deterministic | None | Real CPU/PerfDigest/verification validated; no decision inference |
