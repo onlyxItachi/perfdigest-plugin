@@ -4,7 +4,7 @@
 
 A Codex-first hackathon MVP for HPC infrastructure performance debugging. It combines the existing Python [PerfDigest MCP](https://github.com/onlyxItachi/PerfDigest-MCP), a small TypeScript runner, an asynchronous MCP worker and a Codex skill. The Decisions adapter uses the official OpenAI TypeScript SDK directly.
 
-**Current validation:** real local CPU capture, PerfDigest MCP and a two-turn Codex SDK session have run successfully. Decisions requests are validated with synthetic HTTP fixtures; **live Decisions access is pending API credits**. The npm package is a local pre-release, not an npm registry release. GPU/PyTorch debugging and A/B/C performance benefits are not yet demonstrated.
+**Current validation:** real local CPU capture, PerfDigest MCP and a two-turn Codex SDK session have run successfully. Decisions is validated through a real loopback HTTP server with measured PerfDigest evidence; **successful live Decisions inference remains unvalidated pending a separately funded key**. The separate invalid-credential diagnostic checks only the authentication boundary. The npm package is a local pre-release, not an npm registry release. GPU/PyTorch debugging and A/B/C performance benefits are not yet demonstrated.
 
 ## Quick start
 
@@ -38,9 +38,9 @@ The runner finds the existing `codex` on `PATH`; `PERFDIGEST_CODEX_PATH` can sel
 flowchart LR
     Q[Issue + manifest] --> W[Capture saved reports]
     Q --> C[Codex initial hypotheses]
-    W --> D[Decisions routing or explicit offline order]
-    D --> P[PerfDigest MCP digest + raw reference + SHA-256]
-    P --> V[Independent verification command]
+    W --> P[PerfDigest MCP summaries + SHA-256]
+    P --> D[Decisions selects evidence for review]
+    D --> V[Independent verification command]
     C --> R[Same Codex thread: evidence review]
     V --> R
     R --> O[Receipt + evidence report]
@@ -48,14 +48,14 @@ flowchart LR
 
 The worker starts before the first model turn is requested. Evidence is delivered in the next turn of the **same** Codex thread. This is ordinary evidence handoff; nothing is injected into hidden reasoning. The timeline measures actual overlap with `turn.started`. Fast evidence can finish before the model begins; that correctly records zero overlap.
 
-PerfDigest supplies measurements. Decisions selects one report to inspect from up to eight declared reports, or abstains. Codex examines the hypothesis and alternatives. Verification is an explicit command whose result cannot be overridden by confidence or model prose. This MVP applies no patches and has no generic provider framework.
+In Decisions mode, PerfDigest first gathers bounded top-three summaries from up to eight declared reports. Decisions selects which measured report to deliver for review, or abstains; selected evidence is reused and all input hashes are checked again. Offline mode digests only the first report. Codex examines the hypothesis and alternatives. Verification is an explicit command whose result cannot be overridden by confidence or model prose. This MVP applies no patches and has no generic provider framework.
 
 | Mode | Routing | Model access | Evidence |
 | --- | --- | --- | --- |
 | Default demo | First declared report, deterministic | None | Real CPU execution + Python MCP |
 | `--agent codex --routing offline` | First declared report | Existing ChatGPT Codex session | Real local evidence, then Codex review |
 | `--agent codex --routing decisions` | Official Decisions API | Separate Decisions key + ChatGPT Codex | Adapter implemented; live Decisions validation pending |
-| `npm test` | Synthetic fixtures where needed | No network/model requests | Contract and failure tests; not a live API result |
+| `npm test` | Synthetic HTTP and subprocess fixtures | Loopback only; no external/model requests | Contract and failure tests; not a live API result |
 
 ## Use your own reports
 
@@ -90,7 +90,7 @@ Missing measurements remain `null`. Billing is not observed, so `costUsd` stays 
 
 ## Decisions authentication and deferred integration
 
-The adapter calls `client.decisions.create()` with `gpt-6-luna`, one explicit choice question, a 20-second timeout and no retries. Only issue text and report IDs, formats and descriptions go into routing; raw report contents and local paths are not sent to Decisions. Refusal, unknown choices, invalid confidence, HTTP errors and cancellation never silently switch to offline success. The 0.65 confidence cutoff is a routing policy, not a correctness threshold.
+The adapter calls `client.decisions.create()` with `gpt-6-luna`, one explicit choice question, a 20-second timeout and no retries. Routing input includes issue text, report IDs/formats/descriptions, artifact hashes and a numeric allowlist from genuine PerfDigest summaries. It preserves zero, null and `not_available_in_this_export` distinctly. Raw contents, local paths, unit names and arbitrary report fields are not sent. SDK logging and redirects are disabled, including when `OPENAI_LOG=debug` is inherited. Responses and exceptions never log provider bodies or headers. Refusal, unknown choices, invalid confidence, HTTP errors and cancellation never silently switch to offline success. The 0.65 confidence cutoff is a routing policy, not a correctness threshold.
 
 Use **`PERFDIGEST_DECISIONS_API_KEY`** in the standalone runner's environment. The adapter never falls back to `OPENAI_API_KEY`. Keep its env file outside the investigated repository and protect it with mode 600. Node can load that file for the runner without putting the key on the command line:
 
@@ -100,13 +100,34 @@ node --env-file=/absolute/private/decisions.env dist/cli.js demo --agent codex -
 
 The runner supplies an explicit child-environment allowlist to Codex, profiler commands and Python MCP. It omits Decisions and generic API credentials while preserving `HOME`/`CODEX_HOME` for the existing login. Inherited MCP servers are disabled for the runner's Codex calls with per-process overrides; global configuration is not edited. This controls environment inheritance, not OS-level access by code already running as your user.
 
-Live integration is **opt-in and excluded from CI**. After credits/access are resolved, enable the one-request routing check explicitly:
+Error receipts distinguish `missing_credential`, `authentication`, `billing`, `schema`, `network`, `rate_limit`, `permission`, `service` and `cancelled`; no case falls back to mock or offline data. A generic 429 is a rate limit, while known quota/billing codes are billing failures. Missing credentials fail before capture or Codex startup. A `local_mock` receipt is never live inference evidence.
+
+Run the local HTTP end-to-end check without an API key:
+
+```bash
+npm run test:decisions-http
+# Optional: same local mock, real existing ChatGPT Codex session (Astra/max):
+npm run test:decisions-http -- --codex
+```
+
+The default check uses genuine CPU measurements and Python MCP, a real loopback HTTP server, the official OpenAI SDK and a synthetic Codex executable through the actual Codex SDK. `--codex` consumes Codex usage; Decisions remains local mock. Both validate the same-thread handoff and independent verifier.
+
+The separate authentication-boundary check is **explicitly opt-in and disabled in CI**:
+
+```bash
+npm run build
+PERFDIGEST_RUN_AUTH_BOUNDARY=1 npm run test:decisions-auth-boundary
+```
+
+It never reads a real key: it makes one POST to `https://api.openai.com/v1/decisions` with synthetic data and an intentionally invalid credential, expecting 401. Retries and redirects are disabled. It validates rejection at the authentication boundary only: no billing, valid-key access, model availability or inference claim follows from it. Any other response fails the diagnostic. Without the flag, no request is sent.
+
+Successful live integration remains **opt-in and disabled in CI**. Once a real key and budget are supplied, enable the one-request real-evidence check explicitly:
 
 ```bash
 PERFDIGEST_RUN_LIVE_DECISIONS=1 node --env-file=/absolute/private/decisions.env scripts/check-decisions-live.mjs
 ```
 
-Without that flag it prints `SKIPPED` and sends nothing. A successful routing check would still not validate the full Codex + Decisions workflow; run the full demo separately afterward.
+Without that flag it prints `SKIPPED` and sends nothing. This captures a small CPU trace, obtains its real PerfDigest digest and makes exactly one Decisions request, then runs the independent verifier. No Codex model call occurs in this diagnostic. It does not establish arbitrary diagnosis quality or a performance improvement. The existing standalone demo can use the same key without architectural changes.
 
 ## npm package and Codex plugin
 
@@ -142,7 +163,7 @@ Jobs have a 90-second deadline, expire after five minutes, and are limited to 32
 ## Development and CI
 
 ```bash
-npm test                 # SDK HTTP fixtures, subprocess and MCP failure tests; no model calls
+npm test                 # SDK, loopback HTTP, subprocess and MCP failure tests; no model calls
 npm run test:local       # Real Python MCP discovery, CPU capture and verification
 npm run test:package     # Actual tarball, clean prefix install, real offline demo and MCP discovery
 npm run check            # All of the above, including the TypeScript build

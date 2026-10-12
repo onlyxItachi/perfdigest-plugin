@@ -74,11 +74,11 @@ test('documented response fixture and request contract are verified without netw
 
 test('cancellation and malformed usage are failures, not offline success', async () => {
   const controller = new AbortController(); controller.abort(new Error('fixture cancelled'));
-  await assert.rejects(selectReport(fakeClient({}).client, 'issue', reports, controller.signal), /fixture cancelled/);
+  await assert.rejects(selectReport(fakeClient({}).client, 'issue', reports, controller.signal), /cancelled/);
   const client = new OpenAI({ apiKey: 'synthetic-test-key', maxRetries: 0,
     fetch: async () => new Response(JSON.stringify({ answers: [], usage: { input_tokens: -1, output_tokens: 1 } }),
       { headers: { 'content-type': 'application/json' } }) });
-  await assert.rejects(selectReport(client, 'fixture', reports), /Invalid Decisions response/);
+  await assert.rejects(selectReport(client, 'fixture', reports), /schema/);
 });
 
 test('offline results carry no invented confidence or token usage', () => {

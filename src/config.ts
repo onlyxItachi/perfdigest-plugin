@@ -47,6 +47,9 @@ export interface CommandReceipt {
 
 export interface RouteDecision {
   source: 'offline_order' | 'openai_decisions';
+  transport?: 'openai_https' | 'local_mock' | 'injected_client';
+  inputSha256?: string;
+  evidenceCount?: number;
   selectedId: string | null;
   confidence: number | null;
   reason: 'selected' | 'refused' | 'low_confidence' | 'human_review';

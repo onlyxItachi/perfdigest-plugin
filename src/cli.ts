@@ -6,6 +6,7 @@ import { manifestSchema } from './config.js';
 import { investigate } from './run.js';
 import { demoManifest } from './demo.js';
 import { redact } from './environment.js';
+import { DecisionsError } from './decisions.js';
 
 const help = `PerfDigest Evidence — Codex-first MVP
 
@@ -37,7 +38,7 @@ async function main() {
   const agent = values.agent ?? (command === 'demo' ? 'none' : 'codex');
   if (routing !== 'offline' && routing !== 'decisions') throw new Error('--routing must be offline or decisions');
   if (agent !== 'none' && agent !== 'codex') throw new Error('--agent must be none or codex');
-  if (routing === 'decisions' && !process.env.PERFDIGEST_DECISIONS_API_KEY) throw new Error('Missing PERFDIGEST_DECISIONS_API_KEY; no live call started.');
+  if (routing === 'decisions' && !process.env.PERFDIGEST_DECISIONS_API_KEY?.trim()) throw new DecisionsError('missing_credential');
   if (command === 'run' && !positionals[1]) throw new Error('run requires a manifest path');
   const manifest = command === 'demo' ? await demoManifest(workspace, values.perf)
     : manifestSchema.parse(JSON.parse(await readFile(resolve(positionals[1]!), 'utf8')));
@@ -50,11 +51,14 @@ async function main() {
       onEvent: (event, detail) => process.stderr.write(`${event}${detail ? `: ${redact(detail)}` : ''}\n`),
     });
     console.log(JSON.stringify({ status: result.status, agent, routing, directory: result.directory,
-      verification: result.verification?.exitCode ?? null, telemetry: result.telemetry }, null, 2));
+      verification: result.verification?.exitCode ?? null, decisionsError: result.decisionsError, telemetry: result.telemetry }, null, 2));
     if (result.status !== 'complete') process.exitCode = 1;
   } finally {
     process.off('SIGINT', onSignal); process.off('SIGTERM', onSignal);
   }
 }
 
-main().catch(error => { console.error(redact(error instanceof Error ? error.message : String(error))); process.exitCode = 1; });
+main().catch(error => {
+  console.error(error instanceof DecisionsError ? JSON.stringify(error.toJSON()) : redact(error instanceof Error ? error.message : String(error)));
+  process.exitCode = 1;
+});

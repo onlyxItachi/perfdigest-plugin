@@ -37,9 +37,11 @@
     "test:local": "npm run build && node scripts/check-local.mjs",
     "test:package": "npm run build && node scripts/check-package.mjs",
     "test:decisions-live": "node scripts/check-decisions-live.mjs",
-    "check": "npm run build && npm test && npm run test:local && npm run test:package",
+    "check": "npm run build && npm test && npm run test:local && npm run test:decisions-http && npm run test:package",
     "plugin:prepare": "node scripts/prepare-plugin.mjs",
-    "benchmark:evidence": "npm run build && node scripts/benchmark.mjs"
+    "benchmark:evidence": "npm run build && node scripts/benchmark.mjs",
+    "test:decisions-http": "npm run build && node scripts/check-decisions-http.mjs",
+    "test:decisions-auth-boundary": "node scripts/check-decisions-auth-boundary.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
