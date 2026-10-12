@@ -11,8 +11,11 @@ export async function gatherEvidence(args: {
 }): Promise<EvidencePacket> {
   const emit = args.emit ?? (() => {});
   args.signal?.throwIfAborted();
+  const selectedProvider = providerName(args.routing);
+  if ((args.client && selectedProvider !== 'openai') || (args.client && args.provider)
+      || (args.provider && args.provider.name !== selectedProvider)) throw new Error('Injected provider does not match the explicit routing selection');
   const provider = args.provider ?? (args.client ? undefined : createDecisionProvider(args.routing));
-  const measuredRouting = providerName(args.routing) !== 'offline';
+  const measuredRouting = selectedProvider !== 'offline';
   const collect = async (report: ReportSpec): Promise<EvidencePacket['evidence'][number]> => {
     args.signal?.throwIfAborted();
     const before = await reportFile(args.workspace, report.path);

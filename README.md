@@ -59,6 +59,10 @@ With an inference provider, PerfDigest first gathers bounded top-three summaries
 
 ## Decision providers
 
+Configure the installed package with `npx --no-install perfdigest-plugin init`. The interactive menu offers Cloudflare, local llama.cpp and OpenAI; offline is an explicit deterministic option. There is no interactive npm lifecycle hook. Noninteractive automation uses `perfdigest-plugin init --provider offline --yes`. See the [setup guide](docs/SETUP.md) for private env-file references, endpoint checks and automation.
+
+The saved provider is used by subsequent CLI runs and the MCP worker's default mode. Explicit `--provider`/`--routing` takes priority. Setup checks executable presence and local health without making hosted inference calls. A prerequisite pass does not claim authenticated inference; missing prerequisites exit nonzero and retain the chosen provider visibly.
+
 Select `--provider cloudflare|local|openai|offline` explicitly. The previous names `clef-cloudflare`, `clef-local`, `openai-luna` and `--routing decisions` remain aliases. Every run records the selected provider; errors never switch it to another provider or a fixture.
 
 | Provider | Model/transport | Credential | Current qualification |

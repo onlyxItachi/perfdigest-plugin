@@ -27,7 +27,8 @@
     ".codex-plugin",
     ".mcp.json",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "docs/SETUP.md"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",

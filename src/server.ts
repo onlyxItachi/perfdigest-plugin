@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { reportSchema, type EvidencePacket } from './config.js';
+import { reportSchema, type EvidencePacket, type RoutingMode } from './config.js';
 import { createDecisionProvider } from './providers.js';
 import { gatherEvidence } from './evidence.js';
 import { redact } from './environment.js';
@@ -13,7 +13,7 @@ const reply = (data: Record<string, unknown>) => ({
   content: [{ type: 'text' as const, text: JSON.stringify(data) }], structuredContent: data,
 });
 
-export async function serve(workspace: string): Promise<void> {
+export async function serve(workspace: string, defaultRouting: RoutingMode = 'offline'): Promise<void> {
   const jobs = new Map<string, Job>();
   const server = new McpServer({ name: 'perfdigest-evidence', version: '0.1.0' }, { instructions:
     'Read-only asynchronous evidence from saved local reports. Launch a job, continue independent work, then collect it. Confidence is not correctness. This server never runs capture commands or applies patches. Offline routing is explicitly labeled.' });
@@ -26,7 +26,7 @@ export async function serve(workspace: string): Promise<void> {
   server.registerTool('launch_evidence_prefetch', {
     description: 'Start evidence collection without blocking. Uses existing reports; never runs a profiler or build. Select a provider explicitly; hosted modes need dedicated credentials in this server process.',
     inputSchema: { issue: z.string().min(1).max(12_000), reports: z.array(reportSchema).min(1).max(8),
-      mode: z.enum(['offline', 'cloudflare', 'local', 'openai', 'decisions', 'clef-local', 'clef-cloudflare', 'openai-luna']).default('offline') },
+      mode: z.enum(['offline', 'cloudflare', 'local', 'openai', 'decisions', 'clef-local', 'clef-cloudflare', 'openai-luna']).default(defaultRouting) },
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
   }, async ({ issue, reports, mode }) => {
     cleanup();

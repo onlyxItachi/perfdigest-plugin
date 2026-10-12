@@ -8,9 +8,11 @@ import { demoManifest } from './demo.js';
 import { redact } from './environment.js';
 import { DecisionsError } from './decisions.js';
 import { createDecisionProvider, providerName } from './providers.js';
+import { initConfiguration, loadConfiguration, applyConfigurationEnvironment } from './setup.js';
 
 const help = `PerfDigest Evidence — Codex-first MVP
 
+  perfdigest-plugin init [--provider cloudflare|local|openai|offline --yes] [--env-file PATH] [--endpoint URL]
   perfdigest-plugin demo [--agent none|codex] [--routing offline|decisions] [--perf]
   perfdigest-plugin run manifest.json [--workspace PATH] [--routing decisions|offline] [--agent codex|none]
   perfdigest-plugin mcp [--workspace PATH]
@@ -27,21 +29,35 @@ async function main() {
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
     help: { type: 'boolean', short: 'h' }, workspace: { type: 'string' },
     agent: { type: 'string' }, routing: { type: 'string' }, provider: { type: 'string' }, model: { type: 'string' }, perf: { type: 'boolean' },
+    endpoint: { type: 'string' }, 'env-file': { type: 'string' }, yes: { type: 'boolean' },
   } });
   if (values.help || !positionals[0]) { console.log(help); return; }
   const workspace = await realpath(values.workspace ?? process.cwd());
   const command = positionals[0];
-  if (command === 'mcp') {
-    const { serve } = await import('./server.js');
-    await serve(workspace); return;
+  if (command === 'init') {
+    const result = await initConfiguration({ workspace, yes: values.yes ?? false,
+      ...(values.provider !== undefined ? { provider: values.provider } : {}),
+      ...(values.endpoint !== undefined ? { endpoint: values.endpoint } : {}),
+      ...(values['env-file'] !== undefined ? { envFile: values['env-file'] } : {}) });
+    if (!result.ready) process.exitCode = 1;
+    return;
   }
-  if (command !== 'demo' && command !== 'run') throw new Error('Unknown command; use --help');
+  if (values.yes !== undefined || values.endpoint !== undefined || values['env-file'] !== undefined) {
+    throw new Error('--yes, --endpoint and --env-file belong to init; configure the workspace first');
+  }
+  if (!['demo', 'run', 'mcp'].includes(command)) throw new Error('Unknown command; use --help');
+  const configured = await loadConfiguration(workspace);
   const accepted = ['offline', 'cloudflare', 'local', 'openai', 'decisions', 'clef-local', 'clef-cloudflare', 'openai-luna'];
-  const selected = values.provider ?? values.routing ?? (command === 'demo' ? 'offline' : 'decisions');
+  const selected = values.provider ?? values.routing ?? configured?.provider ?? (command === 'run' ? 'decisions' : 'offline');
   if (!accepted.includes(selected)) throw new Error('Unknown provider; use cloudflare, local, openai or offline');
   const routing = selected as RoutingMode;
   if (values.provider && values.routing && (!accepted.includes(values.routing)
       || providerName(values.routing as RoutingMode) !== providerName(routing))) throw new Error('--provider and --routing conflict');
+  if (configured && providerName(routing) !== 'offline') await applyConfigurationEnvironment(configured, workspace);
+  if (command === 'mcp') {
+    const { serve } = await import('./server.js');
+    await serve(workspace, routing); return;
+  }
   const agent = values.agent ?? (command === 'demo' ? 'none' : 'codex');
   if (agent !== 'none' && agent !== 'codex') throw new Error('--agent must be none or codex');
   createDecisionProvider(routing); // Preflight credentials before creating/capturing a demo.
