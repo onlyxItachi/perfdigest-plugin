@@ -1,0 +1,16 @@
+{
+  "answers": [{
+    "name": "next_evidence", "type": "choice", "choice": "counters", "confidence": 0.91,
+    "probabilities": [
+      { "value": "trace", "probability": 0.06 },
+      { "value": "counters", "probability": 0.91 },
+      { "value": "__human_review__", "probability": 0.03 }
+    ]
+  }],
+  "model": "gpt-6-luna",
+  "usage": {
+    "input_tokens": 123, "output_tokens": 4, "total_tokens": 127,
+    "input_tokens_details": { "cache_write_tokens": 0, "cached_tokens": 0 },
+    "output_tokens_details": { "reasoning_tokens": 0 }
+  }
+}

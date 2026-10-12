@@ -1,0 +1,53 @@
+{
+  "name": "perfdigest-plugin",
+  "version": "0.1.0",
+  "description": "Codex-first asynchronous performance evidence with PerfDigest MCP and OpenAI Decisions",
+  "type": "module",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/onlyxItachi/perfdigest-plugin.git"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "perfdigest-plugin": "dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "examples",
+    "skills",
+    ".codex-plugin",
+    ".mcp.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.test.json && node --test .test-build/test/*.test.js",
+    "demo": "node dist/cli.js demo",
+    "prepack": "npm run build",
+    "test:local": "npm run build && node scripts/check-local.mjs",
+    "test:package": "npm run build && node scripts/check-package.mjs",
+    "test:decisions-live": "node scripts/check-decisions-live.mjs",
+    "check": "npm run build && npm test && npm run test:local && npm run test:package",
+    "plugin:prepare": "node scripts/prepare-plugin.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@openai/codex-sdk": "0.162.1",
+    "openai": "7.32.0",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "typescript": "6.0.3"
+  }
+}

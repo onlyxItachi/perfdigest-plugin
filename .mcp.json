@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "perfdigest-evidence": {
+      "command": "perfdigest-plugin",
+      "args": ["mcp"]
+    },
+    "perfdigest": {
+      "command": "uvx",
+      "args": ["perfdigest-mcp"]
+    }
+  }
+}

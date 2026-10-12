@@ -1,0 +1,8 @@
+{
+  "name": "perfdigest-evidence",
+  "version": "0.1.0",
+  "description": "Asynchronous local performance evidence, raw report provenance and independent verification for Codex.",
+  "author": { "name": "Hamza Usta" },
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json"
+}

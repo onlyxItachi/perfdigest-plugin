@@ -1,0 +1,35 @@
+name: CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+        with:
+          version: '0.10.11'
+          python-version: '3.12'
+      - run: npm ci
+      - name: TypeScript 6 build and network-mocked contract tests
+        run: npm run build && npm test
+      - name: Pin the Python tool used by uvx
+        run: uv tool install perfdigest-mcp==1.2.0
+      - name: Real local MCP, CPU capture and independent verification
+        run: npm run test:local
+      - name: Pack, clean install, demo and MCP discovery
+        run: npm run test:package
+      - name: Confirm live API test stays disabled
+        run: npm run test:decisions-live

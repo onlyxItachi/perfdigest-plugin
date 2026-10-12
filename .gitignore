@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.test-build/
+*.tgz
+.env
+.env.*
+!.env.example
+.perfdigest/
+work/
