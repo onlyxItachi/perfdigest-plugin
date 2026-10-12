@@ -1,7 +1,7 @@
 {
   "name": "perfdigest-plugin",
   "version": "0.1.0",
-  "description": "Codex-first asynchronous performance evidence with PerfDigest MCP and OpenAI Decisions",
+  "description": "Evidence-driven performance debugging for Codex: PerfDigest MCP evidence, lightweight decision routing (Cloudflare/local Clef-flash, OpenAI, offline) and independent verification",
   "type": "module",
   "license": "Apache-2.0",
   "repository": {
@@ -23,6 +23,7 @@
   "files": [
     "dist",
     "examples",
+    "!examples/**/.perfdigest",
     "skills",
     ".codex-plugin",
     ".mcp.json",

@@ -6,7 +6,7 @@ The MVP uses TypeScript 6, the official Codex SDK and the existing ChatGPT login
 
 ## Presentation sequence
 
-1. Show the README's provider qualification table. Distinguish actual CPU/Codex execution, synthetic HTTP fixtures and genuine decision inference. A valid-key OpenAI Decisions result has not been obtained.
+1. Show the README's validation table and the provider qualification table in [REFERENCE.md](REFERENCE.md#decision-providers). Distinguish actual CPU/Codex execution, synthetic HTTP fixtures and genuine decision inference. A valid-key OpenAI Decisions result has not been obtained.
 2. Show `perfdigest-plugin init`: Cloudflare is the recommended hosted option, local llama.cpp uses a persistent server, OpenAI uses a separate key, and offline is visibly deterministic. Setup is an explicit command, never an npm install hook.
 3. Open a completed, recorded evidence run. Show the provider/model, report SHA-256, selected route, returned probabilities, inference latency, end-to-end wall time and verifier exit status. For local inference, pair this with the actual server/runtime/GGUF-hash receipt; a localhost response alone is insufficient.
 4. Show the two Codex turns in the same thread: initial hypotheses, then evidence review. Report the observed overlap, including zero if collection finished before `turn.started`. No hidden reasoning injection is claimed.
