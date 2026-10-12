@@ -1,0 +1,85 @@
+{
+  "status": "complete",
+  "responseValidated": true,
+  "inferenceValidated": true,
+  "syntheticFixture": false,
+  "identityBasis": "authenticated TLS request to fixed Workers AI model endpoint",
+  "provider": "cloudflare",
+  "model": "clef-flash",
+  "quantization": null,
+  "quantizationBasis": "provider managed, not observed",
+  "requests": 1,
+  "decision": {
+    "source": "clef_cloudflare",
+    "provider": "cloudflare",
+    "transport": "cloudflare_https",
+    "confidenceSemantics": "systemone_uniform_zero",
+    "inputSha256": "91b483661e1ede8e727b3a28003e0ae6d0b6e48c502d7e9506c4b0694ede5743",
+    "evidenceCount": 1,
+    "latencyMs": 2588,
+    "model": "clef-flash",
+    "requests": 1,
+    "probabilities": [
+      {
+        "value": "traversal-timing",
+        "probability": 0.9072
+      },
+      {
+        "value": "__human_review__",
+        "probability": 0.0928
+      }
+    ],
+    "inputTokens": 652,
+    "outputTokens": 0,
+    "costUsd": null,
+    "selectedId": "traversal-timing",
+    "confidence": 0.6632,
+    "reason": "selected"
+  },
+  "evidence": [
+    {
+      "id": "traversal-timing",
+      "reference": "cpu.chrome-trace.json",
+      "sha256": "aaf4a474c360387d4c4fd9a74b3d03eaafa20aa4cedbf087deef01c2908a5938",
+      "provenance": "perfdigest_mcp"
+    }
+  ],
+  "verification": {
+    "exitCode": 0,
+    "timedOut": false,
+    "aborted": false
+  },
+  "wallMs": 90461,
+  "overlapMs": 2575.26,
+  "codex": {
+    "execution": "existing_chatgpt_login",
+    "model": "gpt-6-astra",
+    "effort": "max",
+    "sameThread": true,
+    "usage": {
+      "analysis": {
+        "input_tokens": 10767,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1025,
+        "reasoning_output_tokens": 843
+      },
+      "review": {
+        "input_tokens": 23422,
+        "cached_input_tokens": 10624,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 2233,
+        "reasoning_output_tokens": 1786
+      }
+    }
+  },
+  "error": null,
+  "limits": [
+    "Controlled CPU example, not a solved PyTorch issue",
+    "One trial, no speedup or calibration claim",
+    "Provider confidence is not verification"
+  ],
+  "recordedAt": "2026-10-12T11:35:53.657Z",
+  "recordedResult": true,
+  "replayIsNewInference": false
+}

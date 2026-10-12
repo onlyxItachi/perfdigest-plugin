@@ -1,12 +1,12 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { Codex, type Thread, type Usage } from '@openai/codex-sdk';
+import { Codex, type Thread, type Usage, type ModelReasoningEffort } from '@openai/codex-sdk';
 import { childEnvironment, executable, redact } from './environment.js';
 import type { Emit } from './config.js';
 
 export interface CodexTurn { text: string; usage: Usage | null; threadId: string | null }
 
-export async function codexThread(workspace: string, model?: string): Promise<Thread> {
+export async function codexThread(workspace: string, model?: string, effort: ModelReasoningEffort = 'low'): Promise<Thread> {
   const binary = executable(process.env.PERFDIGEST_CODEX_PATH ?? 'codex');
   const env = childEnvironment();
   const exec = promisify(execFile);
@@ -24,7 +24,7 @@ export async function codexThread(workspace: string, model?: string): Promise<Th
       hooks: false, memories: false, plugins: false } } });
   return sdk.startThread({ workingDirectory: workspace, skipGitRepoCheck: true,
     sandboxMode: 'read-only', approvalPolicy: 'never', networkAccessEnabled: false,
-    webSearchMode: 'disabled', modelReasoningEffort: 'low', ...(model ? { model } : {}) });
+    webSearchMode: 'disabled', modelReasoningEffort: effort, ...(model ? { model } : {}) });
 }
 
 export function disabledMcpOverrides(names: string[]): string[] {

@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "issue": "This controlled CPU demo sums the same row-major matrix in row and column traversal order. Which measured region takes longer, what cache-locality hypothesis could explain it, and what additional counters or repetitions would falsify that hypothesis? No PyTorch issue or patch is represented.",
+  "captures": [],
+  "reports": [
+    {
+      "id": "traversal-timing",
+      "path": "cpu.chrome-trace.json",
+      "format": "chrome-trace",
+      "description": "Replay of the original real CPU capture; no fresh measurement."
+    }
+  ],
+  "verification": {
+    "command": "node",
+    "args": [
+      "../cpu-workload.mjs",
+      "--verify"
+    ],
+    "timeoutMs": 30000
+  }
+}

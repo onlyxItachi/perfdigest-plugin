@@ -21,7 +21,10 @@ export const manifestSchema = z.object({
 export type CommandSpec = z.infer<typeof commandSchema>;
 export type ReportSpec = z.infer<typeof reportSchema>;
 export type Manifest = z.infer<typeof manifestSchema>;
-export type RoutingMode = 'offline' | 'decisions';
+export const providerNames = ['offline', 'openai', 'local', 'cloudflare'] as const;
+export type ProviderName = typeof providerNames[number];
+/** decisions is the backwards-compatible alias for openai-luna. */
+export type RoutingMode = ProviderName | 'decisions' | 'openai-luna' | 'clef-local' | 'clef-cloudflare';
 export type AgentMode = 'none' | 'codex';
 
 export interface TimelineEvent {
@@ -46,9 +49,16 @@ export interface CommandReceipt {
 }
 
 export interface RouteDecision {
-  source: 'offline_order' | 'openai_decisions';
+  source: 'offline_order' | 'openai_decisions' | 'clef_local' | 'clef_cloudflare';
+  provider?: ProviderName;
+  model?: string;
+  confidenceSemantics?: 'provider_reported' | 'systemone_uniform_zero';
+  transport?: 'openai_https' | 'local_mock' | 'injected_client' | 'loopback_http' | 'cloudflare_https';
+  inputSha256?: string;
+  evidenceCount?: number;
   selectedId: string | null;
   confidence: number | null;
+  probabilities?: Array<{ value: string; probability: number }>;
   reason: 'selected' | 'refused' | 'low_confidence' | 'human_review';
   latencyMs: number;
   requests: number;

@@ -30,7 +30,21 @@ jobs:
         run: uv tool install perfdigest-mcp==1.2.0 --with mcp==1.27.2
       - name: Real local MCP, CPU capture and independent verification
         run: npm run test:local
+      - name: Real evidence through loopback Decisions HTTP and isolated Codex SDK orchestration
+        run: npm run test:decisions-http
       - name: Pack, clean install, demo and MCP discovery
         run: npm run test:package
+      - name: Controlled raw/digest/fixture comparison without model access
+        run: npm run benchmark:evidence -- --trials 1
       - name: Confirm live API test stays disabled
+        env:
+          PERFDIGEST_RUN_LIVE_DECISIONS: '0'
         run: npm run test:decisions-live
+      - name: Confirm external authentication diagnostic stays disabled
+        env:
+          PERFDIGEST_RUN_AUTH_BOUNDARY: '0'
+        run: npm run test:decisions-auth-boundary
+      - name: Confirm hosted Clef integration stays opt-in
+        env:
+          PERFDIGEST_RUN_CLEF_INTEGRATION: '0'
+        run: npm run test:clef-live

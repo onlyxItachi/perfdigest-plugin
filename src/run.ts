@@ -1,11 +1,13 @@
 import { realpath, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
+import type { ModelReasoningEffort } from '@openai/codex-sdk';
 import type { AgentMode, CommandReceipt, Emit, EvidencePacket, Manifest, RoutingMode, TimelineEvent } from './config.js';
 import { manifestSchema } from './config.js';
 import { commandPassed, runCommand } from './commands.js';
 import { codexThread, codexTurn, type CodexTurn } from './codex.js';
-import { decisionsClient } from './decisions.js';
+import { DecisionsError, type DecisionsFailure } from './decisions.js';
+import { createDecisionProvider } from './providers.js';
 import { gatherEvidence } from './evidence.js';
 import { newRunDirectory, reportFile, writeJson } from './files.js';
 import { redact } from './environment.js';
@@ -16,8 +18,11 @@ export interface RunOptions {
   routing: RoutingMode;
   agent: AgentMode;
   model?: string;
+  effort?: ModelReasoningEffort;
   signal?: AbortSignal;
   onEvent?: Emit;
+  /** Explicit local HTTP contract test only; never reads a real API credential. */
+  decisionsMockURL?: string;
 }
 
 export interface RunResult {
@@ -34,6 +39,7 @@ export interface RunResult {
   verification: CommandReceipt | null;
   review: CodexTurn | null;
   error: string | null;
+  decisionsError: DecisionsFailure | null;
   events: TimelineEvent[];
   telemetry: { wallMs: number; evidenceModelOverlapMs: number | null; costUsd: null;
     costNote: string; delivery: 'next_turn'; patchApplied: false };
@@ -43,7 +49,8 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
   const manifest = manifestSchema.parse(options.manifest);
   const workspace = await realpath(options.workspace);
   // Fail before launching Codex or capture commands when the requested API mode lacks a key.
-  const decisions = options.routing === 'decisions' ? decisionsClient() : undefined;
+  const provider = createDecisionProvider(options.routing,
+    options.decisionsMockURL ? { decisionsMockURL: options.decisionsMockURL } : {});
   const directory = await newRunDirectory(workspace);
   const start = performance.now();
   const controller = new AbortController();
@@ -53,7 +60,7 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
   const emit: Emit = (event, detail) => {
     events.push({ event, at: new Date().toISOString(), elapsedMs: Math.round((performance.now() - start) * 100) / 100,
       ...(detail ? { detail: redact(detail) } : {}) });
-    options.onEvent?.(event, detail);
+    options.onEvent?.(event, detail ? redact(detail) : undefined);
   };
   const captures: CommandReceipt[] = [];
   let evidence: EvidencePacket | null = null;
@@ -61,11 +68,13 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
   let review: CodexTurn | null = null;
   let verification: CommandReceipt | null = null;
   let failure: string | null = null;
+  let decisionsError: DecisionsFailure | null = null;
   let status: 'complete' | 'needs_review' | 'failed' = 'failed';
   emit('run.started');
+  emit('provider.selected', provider.name);
   try {
     // Resolve login and inherited tool configuration before the concurrent work starts.
-    const preparedThread = options.agent === 'codex' ? await codexThread(workspace, options.model) : null;
+    const preparedThread = options.agent === 'codex' ? await codexThread(workspace, options.model, options.effort) : null;
     // Start collection before the first model turn, rather than waiting for a tool call.
     const worker = (async () => {
       emit('evidence.prefetch.started');
@@ -89,7 +98,7 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
         }
       }
       evidence = await gatherEvidence({ workspace, issue: manifest.issue, reports: manifest.reports,
-        routing: options.routing, ...(decisions ? { client: decisions } : {}), signal, emit });
+        routing: options.routing, provider, signal, emit });
       return evidence;
     })();
     const agent = (async () => {
@@ -120,6 +129,7 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
         JSON.stringify({ evidence, verification, pipelineStatus: status }), 'review', signal, emit);
     }
   } catch (error) {
+    if (error instanceof DecisionsError) decisionsError = error.toJSON();
     failure = redact(error instanceof Error ? error.message : String(error));
     status = 'failed'; emit('run.failed', failure);
   } finally {
@@ -135,7 +145,7 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
     ? Math.max(0, Math.min(ready, modelEnd) - Math.max(workerStart, modelStart)) : null;
   const result: RunResult = { version: 1, status, issue: manifest.issue, workspace, directory,
     routing: options.routing, agent: options.agent, captures, evidence, analysis, verification, review,
-    error: failure, events, telemetry: { wallMs: Math.round(performance.now() - start), evidenceModelOverlapMs: overlapMs,
+    error: failure, decisionsError, events, telemetry: { wallMs: Math.round(performance.now() - start), evidenceModelOverlapMs: overlapMs,
       costUsd: null, costNote: 'Billing is not observed by this runner; token usage is recorded per API/SDK response.',
       delivery: 'next_turn', patchApplied: false },
   };
