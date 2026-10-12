@@ -1,99 +1,116 @@
 # PerfDigest Evidence
 
-**Collect performance evidence while Codex investigates. Keep every conclusion tied to a report and an independent verification result.**
+*Evidence-first performance debugging for coding agents.*
 
-[![CI](https://github.com/onlyxItachi/perfdigest-plugin/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/onlyxItachi/perfdigest-plugin/actions/workflows/ci.yml)
+[![CI](https://github.com/onlyxItachi/perfdigest-plugin/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/onlyxItachi/perfdigest-plugin/actions/workflows/ci.yml) [![Release](https://img.shields.io/badge/release-v0.1.0--hackathon-orange)](https://github.com/onlyxItachi/perfdigest-plugin/releases/tag/v0.1.0-hackathon)
 
-A Codex-first hackathon MVP for HPC performance debugging, distributed as `perfdigest-plugin` (TypeScript 6, Node.js 22+). Real profiler measurements are digested by the Python [PerfDigest MCP](https://github.com/onlyxItachi/PerfDigest-MCP). A lightweight decision model then selects the most relevant **measured** report. Codex reviews that evidence, plus an independent verifier result, in the next turn of the same thread. The coding agent gets verifiable facts instead of searching profiler output blindly.
+**PerfDigest Evidence collects real profiler measurements while Codex investigates. It then hands Codex the most relevant measured report, with SHA-256 provenance and an independent verification result, so the agent reasons from verifiable facts instead of searching raw profiler output.**
 
-## Pipeline
+- **Existing engine:** [PerfDigest MCP](https://github.com/onlyxItachi/PerfDigest-MCP) (Python, published on PyPI) turns profiler reports into structured, hashed metrics.
+- **New in this hackathon:** `perfdigest-plugin` (TypeScript 6, Node.js 22+). It adds the async evidence worker, the decision router, the same-thread Codex SDK handoff, independent verification, receipts, a CLI/TUI, and Codex plugin packaging.
+
+## The problem
+
+Performance debugging requires expensive, fragmented evidence gathering: profilers, traces and counters, each in its own format. Coding agents either guess or spend their context reading raw dumps, and their conclusions are rarely tied back to a measurement.
+
+## Architecture
 
 ```mermaid
 flowchart LR
-    Q[Issue + manifest] --> W[Real profiler capture]
-    Q --> C[Codex turn 1: initial hypotheses]
-    W --> P[PerfDigest MCP: digest + SHA-256 provenance]
-    P --> D["Decision provider: Clef-flash (Cloudflare or local), OpenAI Luna, or offline"]
-    D --> V[Independent verification command]
-    C --> R[Codex turn 2, same thread: evidence review]
-    V --> R
-    R --> O[Receipt + evidence report]
+    W[Performance workload] --> M["PerfDigest MCP · real measurements"]
+    M --> E["Evidence + SHA-256 provenance"]
+    E --> D{"Decision router · Cloudflare / Local / OpenAI / Offline"}
+    D --> V[Independent verification]
+    I[Issue] --> C1["Codex SDK turn 1 · initial hypotheses"]
+    I --> W
+    C1 --> C2["Codex SDK turn 2, same thread · evidence review"]
+    V --> C2
+    C2 --> R[Receipt + report]
 ```
 
-- The evidence worker runs asynchronously alongside the first Codex turn. Evidence is delivered in the **next turn of the same thread**; nothing is injected into hidden reasoning.
-- The decision model chooses among existing measured reports, or abstains. It does not invent profiler commands or apply patches.
-- Verification is an explicit command. Model confidence can never turn a failed verifier into a pass, and provider errors never silently fall back to another provider or a fixture.
-- Codex runs through the official [Codex SDK](https://developers.openai.com/codex/sdk) using your existing ChatGPT/Codex login. No tokens are copied.
+- Evidence collection runs **asynchronously** alongside Codex's first turn. Results are delivered in the **next turn of the same thread**; nothing is injected into hidden reasoning.
+- The router **selects among already-measured reports**, or abstains. It does not choose new profiler commands or apply patches.
+- Verification is an explicit command. Provider confidence can never turn a failed verifier into a pass, and errors never silently fall back to another provider.
 
-## What has actually been validated (12 October 2026)
+## Proof, not promises
 
-| Path | Result | Record |
+Recorded on 12 October 2026, from **one controlled CPU example** (row- vs column-major matrix traversal):
+
+| What | Observed result | Evidence |
 | --- | --- | --- |
-| **Cloudflare Workers AI Clef-flash → Codex** | 1 genuine hosted request: 2.588 s decision latency, selected `traversal-timing` (p = 0.9072). Two Codex turns (gpt-6-astra/max) in the same thread; independent verifier passed; 90.461 s end to end. No fallback, no patch. | [VALIDATION.md](docs/VALIDATION.md), [recorded receipt](examples/recorded-cloudflare/) |
-| **Local Clef-flash Q4_K_M (llama.cpp, Vulkan, RTX 4060 Laptop)** | Genuine local inference passed native question checks. On real evidence it returned confidence 0.543, below the unchanged 0.65 policy, so the pipeline correctly reported **`needs_review`**. Verifier exit 0. The threshold was not lowered and nothing was retried. | [VALIDATION.md](docs/VALIDATION.md#genuine-local-clef-qualification) |
-| OpenAI Decisions (`gpt-6-luna`) | Real loopback HTTP E2E with measured evidence, plus an intentionally invalid-key 401 check. **Valid-key inference not yet validated.** | [REFERENCE.md](docs/REFERENCE.md#decisions-authentication-and-deferred-integration) |
-| Offline (deterministic) | Real CPU capture → PerfDigest MCP → verifier, no model calls | CI |
-| Engineering | 57 contract tests, real-MCP checks, clean npm-archive install and MCP discovery run in GitHub Actions without credentials | [CI](https://github.com/onlyxItachi/perfdigest-plugin/actions/workflows/ci.yml) |
+| Cloudflare Clef-flash → Codex | 1 genuine hosted decision selected `traversal-timing`. Codex (gpt-6-astra/max) then reviewed it in turn 2 of the same thread. No fallback, no patch. | [Receipt](examples/recorded-cloudflare/receipt.json) · [Validation](docs/VALIDATION.md#genuine-cloudflare-clef-and-codex-run) |
+| Latency | **2.588 s** decision · **90.461 s** end-to-end wall time (single run) | [Validation](docs/VALIDATION.md#genuine-cloudflare-clef-and-codex-run) |
+| Independent verification | **Exit 0**: both traversals match an independent arithmetic formula | [Recorded demo](examples/recorded-cloudflare/) |
+| Local Clef-flash Q4_K_M (RTX 4060 Laptop, Vulkan) | Real local inference. Confidence 0.543 was below the unchanged 0.65 policy, so the run correctly ended **`needs_review`**. | [Local qualification](docs/VALIDATION.md#genuine-local-clef-qualification) |
+| Engineering | **57/57** contract tests, real MCP check, clean install of the package archive, green GitHub Actions without credentials | [CI run](https://github.com/onlyxItachi/perfdigest-plugin/actions/runs/38247676550) · [Evaluation method](docs/EVALUATION.md) |
 
-These results come from one controlled CPU example (row-major vs column-major matrix traversal). They do **not** establish root-cause accuracy, provider calibration, speedup, a solved PyTorch issue or GPU-profiling support.
+**Three different signals.** In the Cloudflare run, the **selection probability** for `traversal-timing` was 0.9072: how strongly the model preferred that option. The **provider confidence** was 0.6632: Clef's SystemOne score, which is 0 at a uniform distribution and is not calibrated. Neither number is correctness. Only the **independent verifier** (exit 0) is checked, and it validates the workload's arithmetic, not the causal explanation.
+
+This is a single-report, single-run demonstration. It does **not** establish routing accuracy, diagnosis quality, speedup, a solved PyTorch issue or GPU-profiling support. OpenAI Decisions has been tested only against a loopback mock (no valid-key inference).
 
 ## Quick start
 
-Requirements: Node.js 22+, npm, Python 3.11+ and [uv](https://docs.astral.sh/uv/). Linux is the validated platform.
+Requirements: Node.js 22+, Python 3.11+, [uv](https://docs.astral.sh/uv/). Linux is the validated platform. The package archive is attached to the [v0.1.0-hackathon prerelease](https://github.com/onlyxItachi/perfdigest-plugin/releases/tag/v0.1.0-hackathon); it is **not** published to the npm registry.
+
+```bash
+# 1. Install the prerelease archive into a local prefix
+curl -LO https://github.com/onlyxItachi/perfdigest-plugin/releases/download/v0.1.0-hackathon/perfdigest-plugin-0.1.0.tgz
+npm install --prefix ~/pd-tools ./perfdigest-plugin-0.1.0.tgz
+export PATH="$HOME/pd-tools/node_modules/.bin:$PATH"
+uv tool install perfdigest-mcp==1.2.0 --with mcp==1.27.2
+
+# 2. Real CPU capture -> PerfDigest MCP -> verifier (no model calls, no credentials)
+perfdigest-plugin init --provider offline --yes
+perfdigest-plugin demo
+```
+
+Replay the recorded Cloudflare run from source. This needs no credentials and makes no new inference; it re-digests the original trace and reruns the verifier:
 
 ```bash
 git clone https://github.com/onlyxItachi/perfdigest-plugin && cd perfdigest-plugin
 npm ci && npm run build
-uv tool install perfdigest-mcp==1.2.0 --with mcp==1.27.2
-npm run demo            # real CPU capture + PerfDigest MCP + verifier; no model calls
-```
-
-**Replay the recorded Cloudflare/Codex run.** No credentials and no new inference are needed; it re-digests the original trace and reruns the verifier:
-
-```bash
 node dist/cli.js run examples/recorded-cloudflare/manifest.json \
   --workspace examples/recorded-cloudflare --provider offline --agent none
 ```
 
-**Choose a decision provider** with the interactive CLI/TUI menu (Cloudflare, local llama.cpp, OpenAI or explicit offline). No hosted call is made unless you opt in:
-
-```bash
-npx --no-install perfdigest-plugin init                  # interactive menu
-perfdigest-plugin init --provider offline --yes          # noninteractive
-```
-
-**Run a real Codex review** with your existing ChatGPT login: `npm run demo -- --agent codex --routing offline`.
-
-**Install the local package archive.** It is not published to the npm registry:
-
-```bash
-npm pack
-npm install --prefix /path/to/local-tools ./perfdigest-plugin-0.1.0.tgz
-export PATH="/path/to/local-tools/node_modules/.bin:$PATH"
-perfdigest-plugin demo
-```
+Choose a provider interactively with `npx --no-install perfdigest-plugin init`. For a real Codex review with your existing ChatGPT login, run `perfdigest-plugin demo --agent codex --provider offline`. See [docs/SETUP.md](docs/SETUP.md) for provider configuration, private credential files and authentication.
 
 ## Documentation
 
-| Document | Contents |
+| Topic | Link |
 | --- | --- |
-| [docs/SETUP.md](docs/SETUP.md) | Provider selection, private credential files, connection checks |
-| [docs/HACKATHON.md](docs/HACKATHON.md) | Submission walkthrough and reproduction without hosted credentials |
-| [docs/VALIDATION.md](docs/VALIDATION.md) | Recorded hosted and local Clef runs, hashes, timings and claim boundaries |
-| [docs/EVALUATION.md](docs/EVALUATION.md) | Controlled A/B/C evidence-delivery protocol and what it does not prove |
-| [docs/REFERENCE.md](docs/REFERENCE.md) | Full technical reference: providers, manifests, Decisions security, npm/Codex plugin, MCP tools, CI |
-| [examples/recorded-cloudflare/](examples/recorded-cloudflare/) | Original trace, bounded decision request, sanitized receipt |
+| Getting started | [docs/SETUP.md](docs/SETUP.md) |
+| Hackathon demo | [docs/HACKATHON.md](docs/HACKATHON.md) |
+| Measurements & evaluation | [docs/EVALUATION.md](docs/EVALUATION.md) |
+| Validation & compatibility | [docs/VALIDATION.md](docs/VALIDATION.md) |
+| Detailed reference | [docs/REFERENCE.md](docs/REFERENCE.md) |
+| Recorded Cloudflare demo | [examples/recorded-cloudflare/](examples/recorded-cloudflare/) |
+| GitHub release | [v0.1.0-hackathon](https://github.com/onlyxItachi/perfdigest-plugin/releases/tag/v0.1.0-hackathon) (built from `bc1d72f`; later README edits are not in that archive) |
 
-## Security boundaries
-
-Provider credentials (`PERFDIGEST_CLOUDFLARE_*`, `PERFDIGEST_DECISIONS_API_KEY`) are read only from a private env file outside the repository (mode 600). They are excluded from the Codex, capture, verifier and Python MCP child environments, and never appear in receipts or logs. Public CI uses no hosted credentials. This is environment isolation, not an OS-level sandbox.
+**Security:** provider credentials are read only from a private env file outside the repository (mode 600). They are excluded from the Codex, profiler, verifier and MCP child processes, and never written to receipts. CI uses no credentials. This is environment isolation, not an OS sandbox.
 
 ## Future Update Trajectories
 
-- **GPU and compiler evidence:** CUDA/CUTLASS profiling and real PyTorch/compiler performance issues, validated on hardware before any support claim.
-- **Advanced orchestration:** iterative evidence planning where the decision model proposes the next measurement, with prioritization, repeated measurement and stronger A/B/C evaluation.
-- **Multi-agent:** add explicit roles and handoffs after the Codex-first path is validated.
-- **Additional agent runtimes / Hermes/auth:** investigate additional agent authentication in a later release; no Hermes integration is present in this MVP.
-- **Platform compatibility:** validate GPU/CUDA/ROCm, macOS/Windows and TypeScript 7 separately, without turning missing hardware measurements into support claims.
+These are research and engineering directions. **None of them is shipped functionality** in v0.1.0.
+
+**Near-term**
+- Multi-report decision-routing benchmarks and accuracy evaluation.
+- Real PyTorch / `torch.compile` and CUTLASS performance-debugging scenarios.
+- Local Clef inference qualification on Linux, Windows and macOS.
+- Improved model/provider configuration, error handling and distribution.
+
+**Medium-term**
+- Iterative evidence acquisition and multi-stage decision chaining.
+- Adaptive profiler selection using bounded decision policies.
+- Measured asynchronous evidence-prefetch latency improvements.
+- Comparison of end-to-end wall-clock time, model usage, cost and diagnosis reliability.
+
+**Long-term**
+- Broader HPC, compiler and infrastructure-debugging integrations.
+- Agent-runtime interoperability beyond Codex.
+- Advanced multi-agent investigation and provenance-preserving evidence graphs.
+- Production-grade evaluation with realistic heterogeneous HPC workloads.
+
+---
 
 Apache-2.0. Built on [PerfDigest MCP](https://github.com/onlyxItachi/PerfDigest-MCP), the [Codex SDK](https://developers.openai.com/codex/sdk), [Cloudflare Workers AI Clef-flash](https://developers.cloudflare.com/workers-ai/models/clef-flash/) and the [OpenAI Decisions API](https://developers.openai.com/api/docs/guides/decisions).
