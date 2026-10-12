@@ -151,7 +151,18 @@ npm run test:decisions-live  # Skipped unless explicitly enabled
 
 GitHub Actions runs these non-model checks on Linux/Node 22 with pinned action revisions and read-only repository permissions. No API key or Codex login is required. Hosted CI status must be checked on the actual GitHub run; a local pass is not a hosted CI pass.
 
-The intended comparison is A: ordinary tools, B: PerfDigest digests, C: Decisions + PerfDigest + early evidence. Measure elapsed time, observed token usage, independently billed cost and independently verified correctness on the same task. That comparative evaluation and the real PyTorch demo issue remain future work.
+## Controlled evidence comparison
+
+Run from a source checkout:
+
+```bash
+npm run benchmark:evidence -- --trials 3                # No model calls
+npm run benchmark:evidence -- --trials 1 --agent codex  # Existing ChatGPT login; Astra/max by default
+```
+
+This bounded experiment captures the CPU example once and reuses its SHA-256-checked bytes in three arms: **A**, scripted raw-report delivery; **B**, a real PerfDigest digest after the initial hypothesis; **C**, a network-free Decisions SDK fixture and early digest collection. Three trials rotate all arm positions. Results and failures are saved under `work/benchmark/` after each arm. With `--agent codex`, each arm gets a fresh two-turn thread, actual usage and overlap timings, and a narrow reading grade against the original trace and independent verifier. Without a model, token usage and the reading grade remain unmeasured. Fixture tokens are never counted as observed usage; cost stays unknown.
+
+The intended full comparison remains A: ordinary autonomous tools, B: PerfDigest, C: **live** Decisions + PerfDigest + early evidence on a real debugging task. The controlled experiment does not establish routing quality, diagnosis accuracy, cost savings or speedup. Its tiny two-span trace can be **smaller than the digest**, whose provenance and metric metadata have overhead. See [the evaluation protocol](docs/EVALUATION.md) and [the submission walkthrough](docs/HACKATHON.md). The real PyTorch demo issue remains unselected.
 
 ## Future Update Trajectories
 

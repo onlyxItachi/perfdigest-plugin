@@ -38,7 +38,8 @@
     "test:package": "npm run build && node scripts/check-package.mjs",
     "test:decisions-live": "node scripts/check-decisions-live.mjs",
     "check": "npm run build && npm test && npm run test:local && npm run test:package",
-    "plugin:prepare": "node scripts/prepare-plugin.mjs"
+    "plugin:prepare": "node scripts/prepare-plugin.mjs",
+    "benchmark:evidence": "npm run build && node scripts/benchmark.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",

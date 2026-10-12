@@ -32,5 +32,7 @@ jobs:
         run: npm run test:local
       - name: Pack, clean install, demo and MCP discovery
         run: npm run test:package
+      - name: Controlled raw/digest/fixture comparison without model access
+        run: npm run benchmark:evidence -- --trials 1
       - name: Confirm live API test stays disabled
         run: npm run test:decisions-live
