@@ -75,6 +75,27 @@ node dist/cli.js run examples/recorded-cloudflare/manifest.json \
 
 Choose a provider interactively with `npx --no-install perfdigest-plugin init`. For a real Codex review with your existing ChatGPT login, run `perfdigest-plugin demo --agent codex --provider offline`. See [docs/SETUP.md](docs/SETUP.md) for provider configuration, private credential files and authentication.
 
+## Bring your own key (BYOK)
+
+**You provide your own credentials only for hosted decision inference.** Cloudflare Clef-flash uses a Workers AI account ID and API token; OpenAI Decisions requires a separate OpenAI Platform API key and available API billing. **Local Clef (llama.cpp) and offline routing require no API key.** Codex review is separately authenticated through your existing ChatGPT/Codex login.
+
+Keep credentials **outside the repository** in a private env file (Unix permissions `600`), never in commits, command arguments, setup JSON or demo receipts. For Cloudflare, create an external file such as `/absolute/private/perfdigest.env` containing:
+
+```dotenv
+PERFDIGEST_CLOUDFLARE_ACCOUNT_ID=YOUR_CLOUDFLARE_ACCOUNT_ID
+PERFDIGEST_CLOUDFLARE_API_TOKEN=YOUR_WORKERS_AI_TOKEN
+```
+
+Then configure the installed CLI:
+
+```bash
+chmod 600 /absolute/private/perfdigest.env
+perfdigest-plugin init --provider cloudflare --env-file /absolute/private/perfdigest.env --yes
+perfdigest-plugin demo --provider cloudflare --agent codex
+```
+
+For OpenAI Decisions, use `PERFDIGEST_DECISIONS_API_KEY` in a **separate private env file** and select `--provider openai`. For free local usage, choose `--provider local` with a running compatible Clef server, or `--provider offline` for deterministic routing. Provider setup, token permissions, optional connection checks and local server instructions are in **[the provider setup guide](docs/SETUP.md)**. **GitHub CI never needs real API keys.**
+
 ## Documentation
 
 | Topic | Link |
