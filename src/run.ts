@@ -98,7 +98,7 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
     const worker = (async () => {
       emit('evidence.prefetch.started');
       const oldReports = await Promise.all(manifest.reports.map(async r => {
-        try { return await reportFile(workspace, r.path); } catch { return null; }
+        try { return await reportFile(workspace, r.path, workspace); } catch { return null; }
       }));
       for (const capture of manifest.captures) {
         emit('capture.started', capture.command);
@@ -109,7 +109,7 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
       }
       if (manifest.captures.length) {
         for (let i = 0; i < manifest.reports.length; i++) {
-          const current = await reportFile(workspace, manifest.reports[i]!.path);
+          const current = await reportFile(workspace, manifest.reports[i]!.path, workspace);
           const old = oldReports[i];
           if (old && old.sha256 === current.sha256 && old.modifiedAt === current.modifiedAt) {
             throw new Error(`Capture did not refresh report ${manifest.reports[i]!.id}`);

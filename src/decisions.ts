@@ -89,7 +89,12 @@ export function decisionsInput(issue: string, reports: ReportSpec[], evidence: C
       const measured = byId.get(r.id);
       if (measured && (measured.report.format !== r.format || measured.provenance !== 'perfdigest_mcp'
           || !/^[a-f0-9]{64}$/.test(measured.sha256))) throw new DecisionsError('schema');
-      const summary = measured ? digestInputSchema.parse(measured.digest) : undefined;
+      const rawDigest = measured?.digest;
+      const boundedDigest = rawDigest && Array.isArray(rawDigest.units) && rawDigest.units.length > 3
+          && rawDigest.units.length <= 10 && rawDigest.returned === rawDigest.units.length
+        ? { ...rawDigest, returned: 3, units: rawDigest.units.slice(0, 3) }
+        : rawDigest;
+      const summary = boundedDigest ? digestInputSchema.parse(boundedDigest) : undefined;
       if (summary && summary.format !== r.format) throw new DecisionsError('schema');
       return { id: r.id, format: r.format, description: redact(r.description), ...(measured ? { evidence: {
         provenance: measured.provenance, artifact_sha256: measured.sha256, bytes: measured.bytes, summary,

@@ -19,9 +19,17 @@ export async function runCommand(spec: CommandSpec, cwd: string, signal?: AbortS
       if (!child.pid) return;
       try { process.platform === 'win32' ? child.kill(kind) : process.kill(-child.pid, kind); } catch { /* Already exited. */ }
     };
-    const stop = () => { kill('SIGTERM'); escalation ??= setTimeout(() => kill('SIGKILL'), 500); };
+    const stop = () => {
+      kill('SIGTERM');
+      if (!escalation) {
+        escalation = setTimeout(() => kill('SIGKILL'), 500);
+        escalation.unref?.();
+      }
+    };
     const abort = () => { receipt.aborted = true; stop(); };
-    const timer = setTimeout(() => { receipt.timedOut = true; stop(); }, spec.timeoutMs);
+    const timeoutMs = spec.timeoutMs ?? 30_000;
+    const timer = setTimeout(() => { receipt.timedOut = true; stop(); }, timeoutMs);
+    timer.unref?.();
     signal?.addEventListener('abort', abort, { once: true });
     if (signal?.aborted) abort();
     // Keep bounded text; raw profiler artifacts are separate files, never stdout prompts.
