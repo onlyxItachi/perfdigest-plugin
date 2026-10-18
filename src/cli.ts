@@ -9,17 +9,18 @@ import { redact } from './environment.js';
 import { DecisionsError } from './decisions.js';
 import { createDecisionProvider, providerName } from './providers.js';
 import { initConfiguration, loadConfiguration, applyConfigurationEnvironment } from './setup.js';
+import { genericCliAdapter } from './agents.js';
 
 const help = `PerfDigest Evidence — Codex-first MVP
 
   perfdigest-plugin init [--provider cloudflare|local|openai|offline --yes] [--env-file PATH] [--endpoint URL] [--check-connection]
-  perfdigest-plugin demo [--agent none|codex] [--routing offline|decisions] [--perf]
-  perfdigest-plugin run manifest.json [--workspace PATH] [--routing decisions|offline] [--agent codex|none]
+  perfdigest-plugin demo [--agent none|codex|generic] [--agent-command PATH] [--agent-sessions] [--routing offline|decisions] [--perf]
+  perfdigest-plugin run manifest.json [--workspace PATH] [--routing decisions|offline] [--agent codex|none|generic] [--agent-command PATH] [--agent-sessions]
   perfdigest-plugin mcp [--workspace PATH]
 
 Unconfigured demo defaults: real local CPU measurements + verification, offline routing, no model calls.
 Unconfigured run defaults: existing Codex ChatGPT login + live Decisions (PERFDIGEST_DECISIONS_API_KEY).
-Use --agent codex to demonstrate overlap with a real Codex session.
+Use --agent codex to demonstrate overlap with a real Codex session, or --agent generic --agent-command PATH for a JSONL CLI agent.
 --perf adds Linux hardware counters; otherwise the demo uses genuine elapsed-time traces.
 Raw reports, command receipts and timeline are saved under .perfdigest/runs/.
 --provider cloudflare|local|openai|offline explicitly selects inference; --routing keeps legacy aliases.
@@ -29,7 +30,8 @@ init --check-connection opts in to one read-only Cloudflare check; inference and
 async function main() {
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
     help: { type: 'boolean', short: 'h' }, workspace: { type: 'string' },
-    agent: { type: 'string' }, routing: { type: 'string' }, provider: { type: 'string' }, model: { type: 'string' }, perf: { type: 'boolean' },
+    agent: { type: 'string' }, 'agent-command': { type: 'string' }, 'agent-sessions': { type: 'boolean' },
+    routing: { type: 'string' }, provider: { type: 'string' }, model: { type: 'string' }, perf: { type: 'boolean' },
     endpoint: { type: 'string' }, 'env-file': { type: 'string' }, yes: { type: 'boolean' }, 'check-connection': { type: 'boolean' },
   } });
   if (values.help || !positionals[0]) { console.log(help); return; }
@@ -60,7 +62,16 @@ async function main() {
     await serve(workspace, routing); return;
   }
   const agent = values.agent ?? (command === 'demo' ? 'none' : 'codex');
-  if (agent !== 'none' && agent !== 'codex') throw new Error('--agent must be none or codex');
+  if (agent !== 'none' && agent !== 'codex' && agent !== 'generic') throw new Error('--agent must be none, codex or generic');
+  if (agent !== 'generic' && (values['agent-command'] !== undefined || values['agent-sessions'] !== undefined)) {
+    throw new Error('--agent-command and --agent-sessions require --agent generic');
+  }
+  if (agent === 'generic' && !values['agent-command']) {
+    throw new Error('--agent generic requires --agent-command PATH');
+  }
+  const agentAdapter = agent === 'generic'
+    ? genericCliAdapter({ command: values['agent-command']!, sessions: values['agent-sessions'] ?? false })
+    : undefined;
   createDecisionProvider(routing); // Preflight credentials before creating/capturing a demo.
   if (command === 'run' && !positionals[1]) throw new Error('run requires a manifest path');
   const manifest = command === 'demo' ? await demoManifest(workspace, values.perf)
@@ -70,11 +81,13 @@ async function main() {
   process.once('SIGINT', onSignal); process.once('SIGTERM', onSignal);
   try {
     const result = await investigate({ workspace, manifest, routing, agent, signal: abort.signal,
+      ...(agentAdapter ? { agentAdapter } : {}),
       ...(values.model ? { model: values.model } : {}),
       onEvent: (event, detail) => process.stderr.write(`${event}${detail ? `: ${redact(detail)}` : ''}\n`),
     });
-    console.log(JSON.stringify({ status: result.status, agent, routing, provider: providerName(routing), directory: result.directory,
-      verification: result.verification?.exitCode ?? null, decisionsError: result.decisionsError, telemetry: result.telemetry }, null, 2));
+    console.log(JSON.stringify({ status: result.status, decisionOutcome: result.decisionOutcome, agent, routing,
+      provider: providerName(routing), directory: result.directory, verification: result.verification?.exitCode ?? null,
+      decisionsError: result.decisionsError, agentError: result.agentError, telemetry: result.telemetry }, null, 2));
     if (result.status !== 'complete') process.exitCode = 1;
   } finally {
     process.off('SIGINT', onSignal); process.off('SIGTERM', onSignal);

@@ -1,7 +1,8 @@
 export { investigate, type RunOptions, type RunResult } from './run.js';
 export { gatherEvidence } from './evidence.js';
-export { manifestSchema, type Manifest, type EvidencePacket } from './config.js';
+export { manifestSchema, type Manifest, type EvidencePacket, type EvidenceProvenance, type DecisionOutcome } from './config.js';
 export { childEnvironment } from './environment.js';
 export { decisionsClient, localDecisionsClient, decisionsInput, selectReport, DecisionsError } from './decisions.js';
 export { createDecisionProvider, providerName, toSystemOne, normalizeSystemOne, ProviderError, type DecisionProvider, type DecisionQuestion } from './providers.js';
 export { initConfiguration, loadConfiguration, applyConfigurationEnvironment, type PluginConfiguration } from './setup.js';
+export { codexAdapter, genericCliAdapter, AgentError, type AgentAdapter, type AgentCapabilities, type AgentSession, type AgentTurn, type AgentErrorKind, type AgentPhase, type EvidenceDelivery, type GenericCliAgentOptions } from './agents.js';

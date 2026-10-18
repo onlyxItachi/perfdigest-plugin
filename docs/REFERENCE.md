@@ -61,7 +61,20 @@ With an inference provider, PerfDigest first gathers bounded top-three summaries
 | Default demo | First declared report, deterministic | None | Real CPU execution + Python MCP |
 | `--agent codex --routing offline` | First declared report | Existing ChatGPT Codex session | Real local evidence, then Codex review |
 | `--agent codex --routing decisions` | Official Decisions API | Separate Decisions key + ChatGPT Codex | Adapter implemented; live Decisions validation pending |
+| `--agent generic --agent-command PATH` | Any selected provider | Subprocess speaking `perfdigest-agent/v1` JSONL | Same-session next-turn (`--agent-sessions`) or stateless context handoff |
 | `npm test` | Synthetic HTTP and subprocess fixtures | Loopback only; no external/model requests | Contract and failure tests; not a live API result |
+
+## Agent interoperability
+
+`investigate` orchestrates coding agents through a capability-based `AgentAdapter` interface (`src/agents.ts`) with explicit feature flags:
+
+- `sameSessionContinuation`: whether the adapter preserves conversational state across the `analysis` and `review` turns (`evidenceDelivery: "same_session_next_turn"` when true, or `"fresh_session_with_context"` when false).
+- `nativeAsyncInput`: whether the agent accepts mid-turn streaming evidence injection (`false` for both built-in adapters; requesting `nativeAsyncInput: true` fails closed with `AgentError` kind `unsupported`).
+- `cancellation`: whether in-flight turns obey `AbortSignal` and per-turn timeouts (`true`).
+- `usageReporting`: whether token usage is surfaced when returned by the agent (`true`).
+- `sandbox`: execution isolation requested from the agent runtime (`"read-only"` for Codex, `"agent-defined"` for generic CLI subprocesses).
+
+`codexAdapter()` wraps the existing Codex SDK thread and preserves same-thread next-turn evidence delivery (`codex.*` timeline events). `genericCliAdapter({ command, args, sessions, timeoutMs, maxOutputBytes })` spawns a non-shell subprocess per turn with the `childEnvironment()` allowlist (excluding Cloudflare, OpenAI and Decisions API keys), sends a single-line JSON request on `stdin` (`{ protocol: "perfdigest-agent/v1", phase, prompt, sessionId }`), and reads JSON lines on `stdout` (optional `{"type":"started"}` and exactly one `{"type":"result","text","sessionId","usage"}`). It enforces bounded output size (`maxOutputBytes`, default 1 MiB), per-turn timeouts (`SIGTERM` followed by `SIGKILL`), external cancellation, and session-ID continuation checks when `sessions: true`. Structured failures are recorded in `run.json` under `agentError` (`{ kind: "failed" | "timed_out" | "cancelled" | "protocol" | "unsupported", phase, message }`) and `agentCapabilities`.
 
 ## Decision providers
 

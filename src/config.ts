@@ -25,7 +25,8 @@ export const providerNames = ['offline', 'openai', 'local', 'cloudflare'] as con
 export type ProviderName = typeof providerNames[number];
 /** decisions is the backwards-compatible alias for openai-luna. */
 export type RoutingMode = ProviderName | 'decisions' | 'openai-luna' | 'clef-local' | 'clef-cloudflare';
-export type AgentMode = 'none' | 'codex';
+/** 'generic' requires an explicit adapter (CLI: --agent-command); nothing is selected implicitly. */
+export type AgentMode = 'none' | 'codex' | 'generic';
 
 export interface TimelineEvent {
   event: string;
