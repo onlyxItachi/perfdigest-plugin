@@ -2,7 +2,7 @@ import { realpath, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import type { ModelReasoningEffort } from '@openai/codex-sdk';
-import type { AgentMode, CommandReceipt, Emit, EvidencePacket, Manifest, RoutingMode, TimelineEvent } from './config.js';
+import type { AgentMode, CommandReceipt, DecisionOutcome, Emit, EvidencePacket, EvidenceProvenance, Manifest, RoutingMode, TimelineEvent } from './config.js';
 import { manifestSchema } from './config.js';
 import { commandPassed, runCommand } from './commands.js';
 import { codexThread, codexTurn, type CodexTurn } from './codex.js';
@@ -35,6 +35,10 @@ export interface RunResult {
   agent: AgentMode;
   captures: CommandReceipt[];
   evidence: EvidencePacket | null;
+  /** Hash-checked provenance of every digested report, retained on abstention and failure. */
+  provenance: EvidenceProvenance[];
+  /** Structured routing outcome, independent of verification and agent status. */
+  decisionOutcome: DecisionOutcome;
   analysis: CodexTurn | null;
   verification: CommandReceipt | null;
   review: CodexTurn | null;
@@ -63,6 +67,8 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
     options.onEvent?.(event, detail ? redact(detail) : undefined);
   };
   const captures: CommandReceipt[] = [];
+  const provenance: EvidenceProvenance[] = [];
+  let routingStarted = false;
   let evidence: EvidencePacket | null = null;
   let analysis: CodexTurn | null = null;
   let review: CodexTurn | null = null;
@@ -98,7 +104,8 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
         }
       }
       evidence = await gatherEvidence({ workspace, issue: manifest.issue, reports: manifest.reports,
-        routing: options.routing, provider, signal, emit });
+        routing: options.routing, provider, signal, provenance,
+        emit: (event, detail) => { if (event === 'routing.started') routingStarted = true; emit(event, detail); } });
       return evidence;
     })();
     const agent = (async () => {
@@ -143,8 +150,12 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
   const modelEnd = time('codex.analysis.completed');
   const overlapMs = workerStart !== null && ready !== null && modelStart !== null && modelEnd !== null
     ? Math.max(0, Math.min(ready, modelEnd) - Math.max(workerStart, modelStart)) : null;
+  const packet = evidence as EvidencePacket | null;
+  const decisionOutcome: DecisionOutcome = packet ? (packet.decision.selectedId ? 'accepted' : 'abstained')
+    : decisionsError ? (decisionsError.kind === 'schema' ? 'rejected' : 'failed')
+      : routingStarted ? 'failed' : 'not_reached';
   const result: RunResult = { version: 1, status, issue: manifest.issue, workspace, directory,
-    routing: options.routing, agent: options.agent, captures, evidence, analysis, verification, review,
+    routing: options.routing, agent: options.agent, captures, evidence, provenance: [...provenance], decisionOutcome, analysis, verification, review,
     error: failure, decisionsError, events, telemetry: { wallMs: Math.round(performance.now() - start), evidenceModelOverlapMs: overlapMs,
       costUsd: null, costNote: 'Billing is not observed by this runner; token usage is recorded per API/SDK response.',
       delivery: 'next_turn', patchApplied: false },
@@ -154,11 +165,12 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
     '# PerfDigest Evidence', '', `Status: **${status}** · Agent: ${options.agent} · Routing: ${options.routing}`, '',
     `Question: ${manifest.issue}`, '',
     review?.text ?? 'No Codex review was produced. See run.json for measured evidence and verification receipts.', '',
+    `Routing outcome: ${decisionOutcome}. Digested reports with SHA-256 provenance: ${provenance.length}.`,
     `Independent verification: ${verification ? commandPassed(verification) ? 'passed' : 'failed' : 'not run'}.`,
     `Observed model/evidence overlap: ${overlapMs === null ? 'not measured' : `${overlapMs.toFixed(2)} ms`}.`,
     'No patch was applied. A single timing sample is not a performance improvement claim.',
     failure ? `\nError: ${failure}` : '', '', 'Exact commands, exit codes, artifact hashes, token usage and timeline: run.json', '',
   ].join('\n');
-  await writeFile(join(directory, 'report.md'), redact(text));
+  await writeFile(join(directory, 'report.md'), redact(text), { mode: 0o600 });
   return result;
 }

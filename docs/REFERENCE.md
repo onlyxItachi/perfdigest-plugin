@@ -133,6 +133,8 @@ Reports are existing files inside the workspace, at most 20 MiB each, with an ex
 
 Each run saves `.perfdigest/runs/<id>/run.json` and `report.md`: command receipts, report hashes, raw references, missing metrics, route provenance, Codex usage, errors and timestamps. Raw reports remain on disk. A failed or cancelled capture, changed report, empty digest or failed verification produces a failed run. Abstention/low routing confidence produces `needs_review`. Both exit nonzero. `complete` means the declared pipeline succeeded, not that an arbitrary diagnosis or patch was proved correct.
 
+`run.json` also records `provenance`: one entry per digested report (`id`, `reference`, `format`, `sha256`, `bytes`, `modifiedAt`, `provenance: "perfdigest_mcp"`, `delivered`). It is retained when routing abstains, when a provider response is rejected and when a provider request fails, so the measured inputs of every routing attempt stay auditable; `delivered` is true only for evidence handed to the agent. `decisionOutcome` is `accepted`, `abstained` (refusal, human review or confidence below the unchanged 0.65 policy), `rejected` (schema or model-identity validation failed), `failed` (transport, authentication, billing or other provider error) or `not_reached` (the run failed before routing). Both `run.json` and `report.md` are written with mode 600.
+
 Missing measurements remain `null`. Billing is not observed, so `costUsd` stays `null`; token usage is reported only when provided by the service. The controlled CPU demo is not a real PyTorch issue and one timing sample is not a speedup claim.
 
 ## Decisions authentication and deferred integration

@@ -67,10 +67,37 @@ export interface RouteDecision {
   costUsd: null;
 }
 
+/**
+ * Hash-checked provenance for every report digested during a run, recorded even when the
+ * router abstains or fails. `delivered` is true only for evidence handed to the agent.
+ * Digest contents stay in `EvidencePacket.evidence`; this record never carries raw data.
+ */
+export interface EvidenceProvenance {
+  id: string;
+  reference: string;
+  format: string;
+  sha256: string;
+  bytes: number;
+  modifiedAt: string;
+  provenance: 'perfdigest_mcp';
+  delivered: boolean;
+}
+
+/**
+ * accepted: a report route passed policy. abstained: refusal, human review or low confidence.
+ * rejected: schema or identity validation failed (request refused as invalid, or response
+ * failed validation, unknown choice or unexpected model identity). failed: transport,
+ * authentication, billing or other provider error. not_reached: the run failed before routing.
+ */
+export type DecisionOutcome = 'accepted' | 'abstained' | 'rejected' | 'failed' | 'not_reached';
+
 export interface EvidencePacket {
   status: 'complete' | 'needs_review';
   routing: RoutingMode;
   decision: RouteDecision;
+  /** Every digested report, including those not delivered. */
+  considered: EvidenceProvenance[];
+  /** Evidence delivered to the agent (empty unless a route was accepted). */
   evidence: Array<{
     report: ReportSpec;
     sha256: string;
