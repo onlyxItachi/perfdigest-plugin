@@ -9,7 +9,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { manifestSchema, mcpReuseResultSchema, resultSchema } from './schema/formats.mjs';
+import { manifestSchema, mcpReuseResultSchema, realWorkloadEvalResultSchema, resultSchema } from './schema/formats.mjs';
 
 const benchDir = dirname(fileURLToPath(import.meta.url));
 const listJson = async (dir) => (await readdir(join(benchDir, dir)).catch(() => [])).filter((f) => f.endsWith('.json')).map((f) => join(benchDir, dir, f));
@@ -29,6 +29,8 @@ function selectSchema(doc) {
       return { kind: 'result', schema: resultSchema };
     case 'perfdigest.mcp-reuse-result.v1':
       return { kind: 'mcp-reuse', schema: mcpReuseResultSchema };
+    case 'perfdigest.real-workload-eval.v1':
+      return { kind: 'real-workload-eval', schema: realWorkloadEvalResultSchema };
     default:
       return { kind: 'unknown', schema: resultSchema };
   }
@@ -88,6 +90,16 @@ for (const file of files) {
       }
     }
   }
+  if (parsed.success && kind === 'real-workload-eval') {
+    for (const st of doc.studies) {
+      if (!st.abstentionGuardCheck.provenanceHashesMatch) {
+        problems.push(`${st.id}: abstentionGuardCheck.provenanceHashesMatch must be true`);
+      }
+      if (st.validatedFix.attempted && !st.validatedFix.correctnessPassed) {
+        problems.push(`${st.id}: validatedFix.correctnessPassed must be true`);
+      }
+    }
+  }
   if (problems.length) {
     failures++;
     console.error(`FAIL ${file}\n  ${problems.join('\n  ')}`);
@@ -96,7 +108,9 @@ for (const file of files) {
       ? 'manifest'
       : kind === 'mcp-reuse'
         ? `mcp-reuse, ${Object.keys(doc.multiReportWorkflows).length} workflows`
-        : `result, ${doc.cells.length} cells`;
+        : kind === 'real-workload-eval'
+          ? `real-workload-eval, ${doc.studies.length} studies`
+          : `result, ${doc.cells.length} cells`;
     console.log(`ok   ${file} (${summary})`);
   }
 }

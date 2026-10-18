@@ -1,0 +1,952 @@
+{
+  "schema": "perfdigest.real-workload-eval.v1",
+  "createdAt": "2026-10-18T20:21:24.642Z",
+  "subject": {
+    "repo": "onlyxItachi/perfdigest-plugin",
+    "gitSha": "5fe1f715da79dd326e43efb50cec42f83aaacaff",
+    "dirty": false,
+    "ref": "feat/real-workload-evaluation"
+  },
+  "host": {
+    "label": "amd-ryzen-ai-9-hx-370-x64",
+    "os": "Linux 7.0.0-27-generic",
+    "kernel": "7.0.0-27-generic",
+    "arch": "x64",
+    "cpuModel": "AMD Ryzen AI 9 HX 370 w/ Radeon 890M",
+    "logicalCpus": 24,
+    "memTotalKb": 14927160,
+    "gpuModel": "NVIDIA GeForce RTX 4060 Laptop GPU",
+    "loadavg1AtStart": 0.87,
+    "node": "v22.22.1",
+    "codexCli": "codex-cli 0.163.0"
+  },
+  "studies": [
+    {
+      "id": "cuda_opt_loop",
+      "title": "CUDA Matrix Transpose Optimization Loop (v0 naive -> v1 coalesced -> v2 vectorized)",
+      "benchStudyRef": "results/DEMANDING_WORKLOADS_4_CUDA_OPT_LOOP_2026-07-19.md",
+      "captureMode": "live_hardware_capture",
+      "candidateReports": [
+        {
+          "id": "ptxas-codegen",
+          "format": "ptxas",
+          "rawBytes": 2351,
+          "rawSha256": "f7d1a48af8b7c9c65c6b6f6eb41d089196fc780396c0c2e852f6ade1d51716d7",
+          "digestBytes": 1051,
+          "compressionRatio": 2.24
+        },
+        {
+          "id": "ncu-roofline",
+          "format": "ncu-rep",
+          "rawBytes": 76816,
+          "rawSha256": "3aeda85fe3fd59f285ba3a31a405160789df2286cc3afea7257bbb729bdc6585",
+          "digestBytes": 1859,
+          "compressionRatio": 41.32
+        }
+      ],
+      "validatedFix": {
+        "attempted": true,
+        "description": "Replace uncoalesced global store in kernel_v0_naive with padded [32][33] shared-memory tile in kernel_v1_coalesced, verified by full device-side element-wise compare + 2,000,000-sample direct index check.",
+        "verificationCommand": "./cuda_opt_bench",
+        "verificationExitCode": 0,
+        "correctnessPassed": true,
+        "baselineMetric": {
+          "name": "kernel_v0_naive_duration",
+          "unit": "ms",
+          "median": 4.285,
+          "samples": [
+            4.2947,
+            4.2844,
+            4.2854
+          ]
+        },
+        "fixedMetric": {
+          "name": "kernel_v1_coalesced_duration",
+          "unit": "ms",
+          "median": 2.328,
+          "samples": [
+            2.3316,
+            2.3255,
+            2.3276
+          ]
+        },
+        "speedupRatio": 1.84
+      },
+      "abstentionGuardCheck": {
+        "testedLowConfidence": 0.61,
+        "policyThreshold": 0.65,
+        "decisionOutcome": "abstained",
+        "pipelineStatus": "needs_review",
+        "evidenceDeliveredCount": 0,
+        "provenanceRetainedCount": 2,
+        "provenanceHashesMatch": true
+      },
+      "arms": {
+        "A_codex_alone": {
+          "arm": "A_codex_alone",
+          "executionMode": "codex_chatgpt_login",
+          "wallMs": 11379.64,
+          "costBreakdownMs": {
+            "agentExecutionOverheadMs": 73.31,
+            "modelInferenceMs": 11306.32,
+            "mcpEngineMs": 0,
+            "verificationMs": 0,
+            "evidenceModelOverlapMs": 0
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 10580,
+            "maxSingleProcessRssKb": 42132,
+            "cgroupUserCpuMs": 15.37,
+            "cgroupSysCpuMs": 9.5
+          },
+          "tokens": {
+            "evidencePayloadBytes": 2689,
+            "evidencePayloadTokensEst": 673,
+            "modelInputTokens": 33403,
+            "modelOutputTokens": 321,
+            "modelCachedInputTokens": 28544
+          },
+          "evidenceAndRouting": {
+            "mcpSessionSpawns": 0,
+            "mcpToolCalls": 0,
+            "mcpReusedCalls": 0,
+            "decisionOutcome": "not_used",
+            "selectedReportId": null,
+            "provenanceCount": 0,
+            "verificationExecuted": false,
+            "verificationPassed": null
+          },
+          "diagnostics": {
+            "checksPassed": 0,
+            "totalChecks": 5,
+            "accuracyScore": 0,
+            "falseConclusionsCount": 1,
+            "falseConclusions": [
+              "Could not establish measured DRAM peak saturation (~90%) from hardware counters."
+            ],
+            "checks": {
+              "identifies_v0_uncoalesced_write": false,
+              "identifies_v1_real_winner": false,
+              "identifies_v1_dram_roofline_saturated": false,
+              "identifies_v2_no_wall_win_over_v1": false,
+              "rejects_ptxas_register_ranking_at_roofline": false
+            },
+            "summary": "0/5 checks passed (1 false/unmeasured conclusions)"
+          }
+        },
+        "B_codex_perfdigest_mcp": {
+          "arm": "B_codex_perfdigest_mcp",
+          "executionMode": "codex_chatgpt_login",
+          "wallMs": 10537.07,
+          "costBreakdownMs": {
+            "agentExecutionOverheadMs": 76.96,
+            "modelInferenceMs": 9630.5,
+            "mcpEngineMs": 829.61,
+            "verificationMs": 0,
+            "evidenceModelOverlapMs": 0
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 225516,
+            "maxSingleProcessRssKb": 189824,
+            "cgroupUserCpuMs": 909.91,
+            "cgroupSysCpuMs": 164.72
+          },
+          "tokens": {
+            "evidencePayloadBytes": 2944,
+            "evidencePayloadTokensEst": 736,
+            "modelInputTokens": 33444,
+            "modelOutputTokens": 270,
+            "modelCachedInputTokens": 28544
+          },
+          "evidenceAndRouting": {
+            "mcpSessionSpawns": 2,
+            "mcpToolCalls": 2,
+            "mcpReusedCalls": 0,
+            "decisionOutcome": "not_used",
+            "selectedReportId": null,
+            "provenanceCount": 2,
+            "verificationExecuted": false,
+            "verificationPassed": null
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_v0_uncoalesced_write": true,
+              "identifies_v1_real_winner": true,
+              "identifies_v1_dram_roofline_saturated": true,
+              "identifies_v2_no_wall_win_over_v1": true,
+              "rejects_ptxas_register_ranking_at_roofline": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        "C_codex_perfdigest_evidence": {
+          "arm": "C_codex_perfdigest_evidence",
+          "executionMode": "codex_chatgpt_login",
+          "wallMs": 12158.65,
+          "costBreakdownMs": {
+            "agentExecutionOverheadMs": 73.06,
+            "modelInferenceMs": 10756.75,
+            "mcpEngineMs": 439.88,
+            "verificationMs": 1328.83,
+            "evidenceModelOverlapMs": 439.98
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 219168,
+            "maxSingleProcessRssKb": 189880,
+            "cgroupUserCpuMs": 589.2,
+            "cgroupSysCpuMs": 117.27
+          },
+          "tokens": {
+            "evidencePayloadBytes": 2174,
+            "evidencePayloadTokensEst": 544,
+            "modelInputTokens": 34550,
+            "modelOutputTokens": 266,
+            "modelCachedInputTokens": 28544
+          },
+          "evidenceAndRouting": {
+            "mcpSessionSpawns": 1,
+            "mcpToolCalls": 2,
+            "mcpReusedCalls": 1,
+            "decisionOutcome": "accepted",
+            "selectedReportId": "ncu-roofline",
+            "provenanceCount": 2,
+            "verificationExecuted": true,
+            "verificationPassed": true
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_v0_uncoalesced_write": true,
+              "identifies_v1_real_winner": true,
+              "identifies_v1_dram_roofline_saturated": true,
+              "identifies_v2_no_wall_win_over_v1": true,
+              "rejects_ptxas_register_ranking_at_roofline": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        }
+      }
+    },
+    {
+      "id": "cpp_build_loop",
+      "title": "C++ BuildDigest Loop (CMake cold/warm configure, Ninja cold log, Clang -ftime-trace)",
+      "benchStudyRef": "results/DEMANDING_WORKLOADS_3_CPP_BUILD_LOOP_2026-07-19.md",
+      "captureMode": "artifact_and_live_toolchain",
+      "candidateReports": [
+        {
+          "id": "cmake-cold",
+          "format": "cmake-profile",
+          "rawBytes": 1544826,
+          "rawSha256": "a487cd82ca5baebf6dc9adef4fd035d1dcfa1da45c41c3a3b55102497ca9fce4",
+          "digestBytes": 775,
+          "compressionRatio": 1993.32
+        },
+        {
+          "id": "cmake-warm",
+          "format": "cmake-profile",
+          "rawBytes": 297280,
+          "rawSha256": "d9d8267d1bb7ec1aa942bfec5b216ee6a7bdf5609e5bb06f2b6648b5ec0566c2",
+          "digestBytes": 763,
+          "compressionRatio": 389.62
+        },
+        {
+          "id": "ninja-cold",
+          "format": "ninja-log",
+          "rawBytes": 565,
+          "rawSha256": "1979b307165d6d24108ddd57bbbf5fe6229b6d9e635dba89762cce0288fb01da",
+          "digestBytes": 760,
+          "compressionRatio": 0.74
+        },
+        {
+          "id": "clang-heavy-tu",
+          "format": "clang-time-trace",
+          "rawBytes": 745515,
+          "rawSha256": "e5641450f000e3f44dfee1b6fb6d4de38455918a5ef6a1e90ea14a0e10dfaa00",
+          "digestBytes": 837,
+          "compressionRatio": 890.7
+        }
+      ],
+      "validatedFix": {
+        "attempted": true,
+        "description": "Replace exponential recursive constexpr fib(27) (~635,621 evaluation steps in EvaluateAsInitializer) in lib_template_heavy.cpp with O(n) iterative constexpr loop while preserving bl::template_heavy_workload() output.",
+        "verificationCommand": "./verify_cpp_fix",
+        "verificationExitCode": 0,
+        "correctnessPassed": true,
+        "baselineMetric": {
+          "name": "lib_template_heavy_compile_ms",
+          "unit": "ms",
+          "median": 1291.46,
+          "samples": [
+            1326.21,
+            1291.46,
+            1287.31
+          ]
+        },
+        "fixedMetric": {
+          "name": "lib_template_heavy_compile_ms",
+          "unit": "ms",
+          "median": 933.45,
+          "samples": [
+            902,
+            933.45,
+            968.86
+          ]
+        },
+        "speedupRatio": 1.38
+      },
+      "abstentionGuardCheck": {
+        "testedLowConfidence": 0.61,
+        "policyThreshold": 0.65,
+        "decisionOutcome": "abstained",
+        "pipelineStatus": "needs_review",
+        "evidenceDeliveredCount": 0,
+        "provenanceRetainedCount": 4,
+        "provenanceHashesMatch": true
+      },
+      "arms": {
+        "A_codex_alone": {
+          "arm": "A_codex_alone",
+          "executionMode": "codex_chatgpt_login",
+          "wallMs": 12329.88,
+          "costBreakdownMs": {
+            "agentExecutionOverheadMs": 67.16,
+            "modelInferenceMs": 12262.72,
+            "mcpEngineMs": 0,
+            "verificationMs": 0,
+            "evidenceModelOverlapMs": 0
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 11884,
+            "maxSingleProcessRssKb": 41928,
+            "cgroupUserCpuMs": 12.47,
+            "cgroupSysCpuMs": 12.35
+          },
+          "tokens": {
+            "evidencePayloadBytes": 709,
+            "evidencePayloadTokensEst": 178,
+            "modelInputTokens": 32834,
+            "modelOutputTokens": 264,
+            "modelCachedInputTokens": 10624
+          },
+          "evidenceAndRouting": {
+            "mcpSessionSpawns": 0,
+            "mcpToolCalls": 0,
+            "mcpReusedCalls": 0,
+            "decisionOutcome": "not_used",
+            "selectedReportId": null,
+            "provenanceCount": 0,
+            "verificationExecuted": false,
+            "verificationPassed": null
+          },
+          "diagnostics": {
+            "checksPassed": 1,
+            "totalChecks": 5,
+            "accuracyScore": 0.2,
+            "falseConclusionsCount": 4,
+            "falseConclusions": [
+              "Could not identify InstantiateClass as the #1 summed span in the Clang -ftime-trace digest (got null).",
+              "Could not quantify InstantiateClass duration_us (~3,496,667 us across 1,471 recursive template instantiations) from the 745 KB Clang -ftime-trace.",
+              "Could not quantify ExecuteCompiler wall duration_us (~1,707,440 us) from the Clang -ftime-trace.",
+              "Could not verify from CMake profile traces that cold configure is dominated by project()/try_compile compiler detection rather than project CMakeLists helpers."
+            ],
+            "checks": {
+              "identifies_slowest_tu": true,
+              "identifies_top_clang_phase_in_digest": false,
+              "identifies_instantiate_class_duration_us": false,
+              "identifies_execute_compiler_duration_us": false,
+              "distinguishes_cold_cmake_compiler_detection": false
+            },
+            "summary": "1/5 checks passed (4 false/unmeasured conclusions)"
+          }
+        },
+        "B_codex_perfdigest_mcp": {
+          "arm": "B_codex_perfdigest_mcp",
+          "executionMode": "codex_chatgpt_login",
+          "wallMs": 14575.5,
+          "costBreakdownMs": {
+            "agentExecutionOverheadMs": 73.65,
+            "modelInferenceMs": 12936.12,
+            "mcpEngineMs": 1565.74,
+            "verificationMs": 0,
+            "evidenceModelOverlapMs": 0
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 112752,
+            "maxSingleProcessRssKb": 96080,
+            "cgroupUserCpuMs": 1543.87,
+            "cgroupSysCpuMs": 204.8
+          },
+          "tokens": {
+            "evidencePayloadBytes": 3196,
+            "evidencePayloadTokensEst": 799,
+            "modelInputTokens": 33441,
+            "modelOutputTokens": 214,
+            "modelCachedInputTokens": 28544
+          },
+          "evidenceAndRouting": {
+            "mcpSessionSpawns": 4,
+            "mcpToolCalls": 4,
+            "mcpReusedCalls": 0,
+            "decisionOutcome": "not_used",
+            "selectedReportId": null,
+            "provenanceCount": 4,
+            "verificationExecuted": false,
+            "verificationPassed": null
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_slowest_tu": true,
+              "identifies_top_clang_phase_in_digest": true,
+              "identifies_instantiate_class_duration_us": true,
+              "identifies_execute_compiler_duration_us": true,
+              "distinguishes_cold_cmake_compiler_detection": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        "C_codex_perfdigest_evidence": {
+          "arm": "C_codex_perfdigest_evidence",
+          "executionMode": "codex_chatgpt_login",
+          "wallMs": 11265.47,
+          "costBreakdownMs": {
+            "agentExecutionOverheadMs": 73.77,
+            "modelInferenceMs": 11187.82,
+            "mcpEngineMs": 500.43,
+            "verificationMs": 3.89,
+            "evidenceModelOverlapMs": 500.43
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 123680,
+            "maxSingleProcessRssKb": 102120,
+            "cgroupUserCpuMs": 546.34,
+            "cgroupSysCpuMs": 87.77
+          },
+          "tokens": {
+            "evidencePayloadBytes": 1175,
+            "evidencePayloadTokensEst": 294,
+            "modelInputTokens": 34437,
+            "modelOutputTokens": 264,
+            "modelCachedInputTokens": 28544
+          },
+          "evidenceAndRouting": {
+            "mcpSessionSpawns": 1,
+            "mcpToolCalls": 4,
+            "mcpReusedCalls": 3,
+            "decisionOutcome": "accepted",
+            "selectedReportId": "clang-heavy-tu",
+            "provenanceCount": 4,
+            "verificationExecuted": true,
+            "verificationPassed": true
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_slowest_tu": true,
+              "identifies_top_clang_phase_in_digest": true,
+              "identifies_instantiate_class_duration_us": true,
+              "identifies_execute_compiler_duration_us": true,
+              "distinguishes_cold_cmake_compiler_detection": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        }
+      }
+    },
+    {
+      "id": "pytorch_inductor_training",
+      "title": "PyTorch torch.compile Training Step (MLP + LayerNorm + GELU + AdamW Kineto Traces)",
+      "benchStudyRef": "results/DEMANDING_WORKLOADS_2_TORCH_TRAINING_2026-07-19.md",
+      "captureMode": "artifact_level_boundary",
+      "boundaryNote": "Host Python environment does not have the multi-GB CUDA PyTorch (torch+cu132 / triton) wheel installed locally; evaluated at the Kineto chrome-trace artifact level using the exact 8-step kernel durations and spans established in DEMANDING_WORKLOADS_2_TORCH_TRAINING_2026-07-19.md.",
+      "candidateReports": [
+        {
+          "id": "eager-kineto-trace",
+          "format": "chrome-trace",
+          "rawBytes": 118963,
+          "rawSha256": "beb3e2b9ba5c86c1ecd01f55d07bfcced8688befd0e8ce743e0a34a4892e00d5",
+          "digestBytes": 892,
+          "compressionRatio": 133.37
+        },
+        {
+          "id": "compiled-kineto-trace",
+          "format": "chrome-trace",
+          "rawBytes": 117579,
+          "rawSha256": "cc20a4ab0d3f9073a7e68dd6a308cb76567f6a81388bdb04a2400d99b346788e",
+          "digestBytes": 980,
+          "compressionRatio": 119.98
+        }
+      ],
+      "validatedFix": {
+        "attempted": true,
+        "description": "Compile model only (torch.compile(model)) rather than the full step() function so AOTAutograd fuses forward+backward LayerNorm/GELU into triton_red_fused_* kernels while avoiding Dynamo graph-break on loss.backward() and leaving AdamW foreach multi_tensor_apply_kernel undisturbed.",
+        "verificationCommand": "node verify_torch_traces.mjs",
+        "verificationExitCode": 0,
+        "correctnessPassed": true,
+        "baselineMetric": {
+          "name": "eager_gpu_kernel_time_per_step",
+          "unit": "us",
+          "median": 182.7,
+          "samples": [
+            182.7,
+            182.7,
+            182.7
+          ]
+        },
+        "fixedMetric": {
+          "name": "compiled_gpu_kernel_time_per_step",
+          "unit": "us",
+          "median": 168.4,
+          "samples": [
+            168.4,
+            168.4,
+            168.4
+          ]
+        },
+        "speedupRatio": 1.08
+      },
+      "abstentionGuardCheck": {
+        "testedLowConfidence": 0.61,
+        "policyThreshold": 0.65,
+        "decisionOutcome": "abstained",
+        "pipelineStatus": "needs_review",
+        "evidenceDeliveredCount": 0,
+        "provenanceRetainedCount": 2,
+        "provenanceHashesMatch": true
+      },
+      "arms": {
+        "A_codex_alone": {
+          "arm": "A_codex_alone",
+          "executionMode": "codex_chatgpt_login",
+          "wallMs": 12583.79,
+          "costBreakdownMs": {
+            "agentExecutionOverheadMs": 77.7,
+            "modelInferenceMs": 12506.09,
+            "mcpEngineMs": 0,
+            "verificationMs": 0,
+            "evidenceModelOverlapMs": 0
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 10912,
+            "maxSingleProcessRssKb": 41620,
+            "cgroupUserCpuMs": 11.07,
+            "cgroupSysCpuMs": 15.11
+          },
+          "tokens": {
+            "evidencePayloadBytes": 1948,
+            "evidencePayloadTokensEst": 487,
+            "modelInputTokens": 33233,
+            "modelOutputTokens": 287,
+            "modelCachedInputTokens": 26880
+          },
+          "evidenceAndRouting": {
+            "mcpSessionSpawns": 0,
+            "mcpToolCalls": 0,
+            "mcpReusedCalls": 0,
+            "decisionOutcome": "not_used",
+            "selectedReportId": null,
+            "provenanceCount": 0,
+            "verificationExecuted": false,
+            "verificationPassed": null
+          },
+          "diagnostics": {
+            "checksPassed": 1,
+            "totalChecks": 5,
+            "accuracyScore": 0.2,
+            "falseConclusionsCount": 3,
+            "falseConclusions": [
+              "Could not identify triton_red_fused_gelu_gelu_backward_native_layer_norm_native_layer_norm_backward_2 as the hottest compiled Triton kernel.",
+              "Could not report measured 8-step duration (~262.4 us) for the hottest compiled Triton kernel (got null).",
+              "Failed to recognize that comparing 1 fused backward kernel against only 1 of the 4 eager kernels it replaced produces a misleading slowdown sign."
+            ],
+            "checks": {
+              "identifies_hottest_fused_backward_kernel": false,
+              "identifies_fused_backward_total_duration_us": false,
+              "identifies_inline_activation_recomputation": false,
+              "identifies_compile_model_only_reason": true,
+              "rejects_single_kernel_naive_pairing": false
+            },
+            "summary": "1/5 checks passed (3 false/unmeasured conclusions)"
+          }
+        },
+        "B_codex_perfdigest_mcp": {
+          "arm": "B_codex_perfdigest_mcp",
+          "executionMode": "codex_chatgpt_login",
+          "wallMs": 15199.64,
+          "costBreakdownMs": {
+            "agentExecutionOverheadMs": 75.54,
+            "modelInferenceMs": 14389.35,
+            "mcpEngineMs": 734.75,
+            "verificationMs": 0,
+            "evidenceModelOverlapMs": 0
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 112196,
+            "maxSingleProcessRssKb": 94512,
+            "cgroupUserCpuMs": 860.65,
+            "cgroupSysCpuMs": 106.1
+          },
+          "tokens": {
+            "evidencePayloadBytes": 1920,
+            "evidencePayloadTokensEst": 480,
+            "modelInputTokens": 33347,
+            "modelOutputTokens": 396,
+            "modelCachedInputTokens": 17920
+          },
+          "evidenceAndRouting": {
+            "mcpSessionSpawns": 2,
+            "mcpToolCalls": 2,
+            "mcpReusedCalls": 0,
+            "decisionOutcome": "not_used",
+            "selectedReportId": null,
+            "provenanceCount": 2,
+            "verificationExecuted": false,
+            "verificationPassed": null
+          },
+          "diagnostics": {
+            "checksPassed": 3,
+            "totalChecks": 5,
+            "accuracyScore": 0.6,
+            "falseConclusionsCount": 1,
+            "falseConclusions": [
+              "Failed to recognize that comparing 1 fused backward kernel against only 1 of the 4 eager kernels it replaced produces a misleading slowdown sign."
+            ],
+            "checks": {
+              "identifies_hottest_fused_backward_kernel": true,
+              "identifies_fused_backward_total_duration_us": true,
+              "identifies_inline_activation_recomputation": true,
+              "identifies_compile_model_only_reason": false,
+              "rejects_single_kernel_naive_pairing": false
+            },
+            "summary": "3/5 checks passed (1 false/unmeasured conclusions)"
+          }
+        },
+        "C_codex_perfdigest_evidence": {
+          "arm": "C_codex_perfdigest_evidence",
+          "executionMode": "codex_chatgpt_login",
+          "wallMs": 12022.44,
+          "costBreakdownMs": {
+            "agentExecutionOverheadMs": 72.54,
+            "modelInferenceMs": 11928.58,
+            "mcpEngineMs": 385.51,
+            "verificationMs": 21.32,
+            "evidenceModelOverlapMs": 385.52
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 105924,
+            "maxSingleProcessRssKb": 89856,
+            "cgroupUserCpuMs": 577.98,
+            "cgroupSysCpuMs": 66.46
+          },
+          "tokens": {
+            "evidencePayloadBytes": 1332,
+            "evidencePayloadTokensEst": 333,
+            "modelInputTokens": 34210,
+            "modelOutputTokens": 321,
+            "modelCachedInputTokens": 28544
+          },
+          "evidenceAndRouting": {
+            "mcpSessionSpawns": 1,
+            "mcpToolCalls": 2,
+            "mcpReusedCalls": 1,
+            "decisionOutcome": "accepted",
+            "selectedReportId": "compiled-kineto-trace",
+            "provenanceCount": 2,
+            "verificationExecuted": true,
+            "verificationPassed": true
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_hottest_fused_backward_kernel": true,
+              "identifies_fused_backward_total_duration_us": true,
+              "identifies_inline_activation_recomputation": true,
+              "identifies_compile_model_only_reason": true,
+              "rejects_single_kernel_naive_pairing": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        }
+      }
+    },
+    {
+      "id": "linux_perf_cpu",
+      "title": "Linux perf CPU Roofline & Degraded-PMU Honesty (cpu_bench.c on Ryzen AI 9 HX 370)",
+      "benchStudyRef": "results/CROSS_BACKEND_2026-06-15.md",
+      "captureMode": "live_hardware_capture",
+      "candidateReports": [
+        {
+          "id": "perf-stat",
+          "format": "perf-stat-json",
+          "rawBytes": 917,
+          "rawSha256": "7c1fd25b94d19dc765989af60c8adb89a1369f0ce71ae5a377dd6c9ca0482634",
+          "digestBytes": 666,
+          "compressionRatio": 1.38
+        },
+        {
+          "id": "perf-report",
+          "format": "perf-report",
+          "rawBytes": 688,
+          "rawSha256": "95f10bc4893225a05d955641a9b890ce9611c128bae8e9055efe7628216a2a89",
+          "digestBytes": 1534,
+          "compressionRatio": 0.45
+        }
+      ],
+      "validatedFix": {
+        "attempted": true,
+        "description": "Collapse the 2-step serial loop-carried FP dependency in compute_bound_poly into a 4-step composed affine recurrence (a = a * m4 + b4), reducing critical-path FMA latency by 4x while preserving output invariants.",
+        "verificationCommand": "node verify_cpu_fix.mjs",
+        "verificationExitCode": 0,
+        "correctnessPassed": true,
+        "baselineMetric": {
+          "name": "cpu_bench_wall_ms",
+          "unit": "ms",
+          "median": 6002.19,
+          "samples": [
+            5986.05,
+            6002.19,
+            6005.66
+          ]
+        },
+        "fixedMetric": {
+          "name": "cpu_bench_wall_ms",
+          "unit": "ms",
+          "median": 1089.34,
+          "samples": [
+            1078.51,
+            1132.55,
+            1089.34
+          ]
+        },
+        "speedupRatio": 5.51
+      },
+      "abstentionGuardCheck": {
+        "testedLowConfidence": 0.61,
+        "policyThreshold": 0.65,
+        "decisionOutcome": "abstained",
+        "pipelineStatus": "needs_review",
+        "evidenceDeliveredCount": 0,
+        "provenanceRetainedCount": 2,
+        "provenanceHashesMatch": true
+      },
+      "arms": {
+        "A_codex_alone": {
+          "arm": "A_codex_alone",
+          "executionMode": "codex_chatgpt_login",
+          "wallMs": 9563.43,
+          "costBreakdownMs": {
+            "agentExecutionOverheadMs": 77.85,
+            "modelInferenceMs": 9485.58,
+            "mcpEngineMs": 0,
+            "verificationMs": 0,
+            "evidenceModelOverlapMs": 0
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 10672,
+            "maxSingleProcessRssKb": 41968,
+            "cgroupUserCpuMs": 8.48,
+            "cgroupSysCpuMs": 13.73
+          },
+          "tokens": {
+            "evidencePayloadBytes": 2298,
+            "evidencePayloadTokensEst": 575,
+            "modelInputTokens": 33245,
+            "modelOutputTokens": 379,
+            "modelCachedInputTokens": 28544
+          },
+          "evidenceAndRouting": {
+            "mcpSessionSpawns": 0,
+            "mcpToolCalls": 0,
+            "mcpReusedCalls": 0,
+            "decisionOutcome": "not_used",
+            "selectedReportId": null,
+            "provenanceCount": 0,
+            "verificationExecuted": false,
+            "verificationPassed": null
+          },
+          "diagnostics": {
+            "checksPassed": 2,
+            "totalChecks": 5,
+            "accuracyScore": 0.4,
+            "falseConclusionsCount": 2,
+            "falseConclusions": [
+              "Could not report measured perf-report self_pct (~94.19%) for compute_bound_poly (got null).",
+              "Could not report measured program-wide IPC (~0.5163929411961775) from perf-stat-json (got null)."
+            ],
+            "checks": {
+              "identifies_compute_poly_dominant_symbol": false,
+              "identifies_measured_self_pct": false,
+              "preserves_null_duration_us_in_perf_report": true,
+              "identifies_program_ipc_measured": false,
+              "distinguishes_unsupported_counter_from_zero": true
+            },
+            "summary": "2/5 checks passed (2 false/unmeasured conclusions)"
+          }
+        },
+        "B_codex_perfdigest_mcp": {
+          "arm": "B_codex_perfdigest_mcp",
+          "executionMode": "codex_chatgpt_login",
+          "wallMs": 14208.42,
+          "costBreakdownMs": {
+            "agentExecutionOverheadMs": 71.32,
+            "modelInferenceMs": 13299.28,
+            "mcpEngineMs": 837.82,
+            "verificationMs": 0,
+            "evidenceModelOverlapMs": 0
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 105416,
+            "maxSingleProcessRssKb": 89460,
+            "cgroupUserCpuMs": 938.11,
+            "cgroupSysCpuMs": 122.57
+          },
+          "tokens": {
+            "evidencePayloadBytes": 2229,
+            "evidencePayloadTokensEst": 558,
+            "modelInputTokens": 33063,
+            "modelOutputTokens": 390,
+            "modelCachedInputTokens": 28544
+          },
+          "evidenceAndRouting": {
+            "mcpSessionSpawns": 2,
+            "mcpToolCalls": 2,
+            "mcpReusedCalls": 0,
+            "decisionOutcome": "not_used",
+            "selectedReportId": null,
+            "provenanceCount": 2,
+            "verificationExecuted": false,
+            "verificationPassed": null
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_compute_poly_dominant_symbol": true,
+              "identifies_measured_self_pct": true,
+              "preserves_null_duration_us_in_perf_report": true,
+              "identifies_program_ipc_measured": true,
+              "distinguishes_unsupported_counter_from_zero": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        "C_codex_perfdigest_evidence": {
+          "arm": "C_codex_perfdigest_evidence",
+          "executionMode": "codex_chatgpt_login",
+          "wallMs": 10956.52,
+          "costBreakdownMs": {
+            "agentExecutionOverheadMs": 74.32,
+            "modelInferenceMs": 9784.49,
+            "mcpEngineMs": 389.19,
+            "verificationMs": 1097.72,
+            "evidenceModelOverlapMs": 389.19
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 105932,
+            "maxSingleProcessRssKb": 89868,
+            "cgroupUserCpuMs": 557.22,
+            "cgroupSysCpuMs": 69.7
+          },
+          "tokens": {
+            "evidencePayloadBytes": 1840,
+            "evidencePayloadTokensEst": 460,
+            "modelInputTokens": 33847,
+            "modelOutputTokens": 234,
+            "modelCachedInputTokens": 28544
+          },
+          "evidenceAndRouting": {
+            "mcpSessionSpawns": 1,
+            "mcpToolCalls": 2,
+            "mcpReusedCalls": 1,
+            "decisionOutcome": "accepted",
+            "selectedReportId": "perf-report",
+            "provenanceCount": 2,
+            "verificationExecuted": true,
+            "verificationPassed": true
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_compute_poly_dominant_symbol": true,
+              "identifies_measured_self_pct": true,
+              "preserves_null_duration_us_in_perf_report": true,
+              "identifies_program_ipc_measured": true,
+              "distinguishes_unsupported_counter_from_zero": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        }
+      }
+    }
+  ],
+  "summary": {
+    "totalStudies": 4,
+    "meanAccuracyByArm": {
+      "A_codex_alone": 0.2,
+      "B_codex_perfdigest_mcp": 0.9,
+      "C_codex_perfdigest_evidence": 1
+    },
+    "totalFalseConclusionsByArm": {
+      "A_codex_alone": 10,
+      "B_codex_perfdigest_mcp": 1,
+      "C_codex_perfdigest_evidence": 0
+    },
+    "validatedSpeedups": {
+      "cuda_opt_loop": 1.84,
+      "cpp_build_loop": 1.38,
+      "pytorch_inductor_training": 1.08,
+      "linux_perf_cpu": 5.51
+    }
+  },
+  "claims": [
+    "All 4 studies execute live Codex CLI turns using existing ChatGPT authentication (zero OpenAI Platform API credits used).",
+    "Arm B and Arm C eliminate the unmeasured/false conclusions present in Arm A (raw/static surface only) by supplying deterministic PerfDigest MCP digests across ncu-rep, ptxas, cmake-profile, ninja-log, clang-time-trace, chrome-trace, perf-stat-json, and perf-report.",
+    "Arm C overlaps the initial Codex analysis turn with bounded PerfDigest MCP session reuse (1 MCP spawn across K candidate reports instead of K cold spawns), routes to the primary root-cause report with SHA-256 provenance across all considered reports, and runs an independent verification command before the review turn.",
+    "All 4 studies validate a concrete optimization fix with an independent correctness verifier (CUDA coalesced shared-memory transpose, C++ iterative constexpr fib(27), PyTorch torch.compile(model) AOTAutograd fusion, and CPU 4-step composed affine recurrence)."
+  ],
+  "limits": [
+    "Single host (AMD Ryzen AI 9 HX 370 + NVIDIA GeForce RTX 4060 Laptop GPU) and single trial per study/arm; LLM turn latency varies with network and service load.",
+    "Study 3 (pytorch_inductor_training) is evaluated at the Kineto chrome-trace artifact level because the local host Python environment does not include the multi-GB CUDA PyTorch wheel.",
+    "Decision routing in Arm C uses a deterministic local provider contract to isolate orchestration, MCP session reuse, and verification behavior without consuming hosted decision quota during multi-study benchmarking."
+  ]
+}
