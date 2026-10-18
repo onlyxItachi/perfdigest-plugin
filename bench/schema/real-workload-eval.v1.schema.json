@@ -1,0 +1,1317 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "perfdigest.real-workload-eval.v1"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+    },
+    "subject": {
+      "type": "object",
+      "properties": {
+        "repo": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gitSha": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "dirty": {
+          "type": "boolean"
+        },
+        "ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "repo",
+        "gitSha",
+        "dirty"
+      ],
+      "additionalProperties": false
+    },
+    "host": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "os": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kernel": {
+          "type": "string",
+          "minLength": 1
+        },
+        "arch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cpuModel": {
+          "type": "string",
+          "minLength": 1
+        },
+        "logicalCpus": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "memTotalKb": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "gpuModel": {
+          "type": "string",
+          "minLength": 1
+        },
+        "loadavg1AtStart": {
+          "type": "number",
+          "minimum": 0
+        },
+        "node": {
+          "type": "string",
+          "minLength": 1
+        },
+        "codexCli": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "label",
+        "os",
+        "kernel",
+        "arch",
+        "cpuModel",
+        "logicalCpus",
+        "memTotalKb",
+        "gpuModel",
+        "loadavg1AtStart",
+        "node",
+        "codexCli"
+      ],
+      "additionalProperties": false
+    },
+    "studies": {
+      "minItems": 4,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "benchStudyRef": {
+            "type": "string",
+            "minLength": 1
+          },
+          "captureMode": {
+            "type": "string",
+            "enum": [
+              "live_hardware_capture",
+              "artifact_and_live_toolchain",
+              "artifact_level_boundary"
+            ]
+          },
+          "boundaryNote": {
+            "type": "string"
+          },
+          "candidateReports": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "format": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "rawBytes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "rawSha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "digestBytes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "compressionRatio": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "id",
+                "format",
+                "rawBytes",
+                "rawSha256",
+                "digestBytes",
+                "compressionRatio"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "validatedFix": {
+            "type": "object",
+            "properties": {
+              "attempted": {
+                "type": "boolean"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1
+              },
+              "verificationCommand": {
+                "type": "string",
+                "minLength": 1
+              },
+              "verificationExitCode": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "correctnessPassed": {
+                "type": "boolean"
+              },
+              "baselineMetric": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "unit": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "median": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "samples": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    }
+                  }
+                },
+                "required": [
+                  "name",
+                  "unit",
+                  "median",
+                  "samples"
+                ],
+                "additionalProperties": false
+              },
+              "fixedMetric": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "unit": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "median": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "samples": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    }
+                  }
+                },
+                "required": [
+                  "name",
+                  "unit",
+                  "median",
+                  "samples"
+                ],
+                "additionalProperties": false
+              },
+              "speedupRatio": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            "required": [
+              "attempted",
+              "description",
+              "verificationCommand",
+              "verificationExitCode",
+              "correctnessPassed",
+              "baselineMetric",
+              "fixedMetric",
+              "speedupRatio"
+            ],
+            "additionalProperties": false
+          },
+          "abstentionGuardCheck": {
+            "type": "object",
+            "properties": {
+              "testedLowConfidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "policyThreshold": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "decisionOutcome": {
+                "type": "string",
+                "const": "abstained"
+              },
+              "pipelineStatus": {
+                "type": "string",
+                "const": "needs_review"
+              },
+              "evidenceDeliveredCount": {
+                "type": "number",
+                "const": 0
+              },
+              "provenanceRetainedCount": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "provenanceHashesMatch": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "testedLowConfidence",
+              "policyThreshold",
+              "decisionOutcome",
+              "pipelineStatus",
+              "evidenceDeliveredCount",
+              "provenanceRetainedCount",
+              "provenanceHashesMatch"
+            ],
+            "additionalProperties": false
+          },
+          "arms": {
+            "type": "object",
+            "properties": {
+              "A_codex_alone": {
+                "type": "object",
+                "properties": {
+                  "arm": {
+                    "type": "string",
+                    "enum": [
+                      "A_codex_alone",
+                      "B_codex_perfdigest_mcp",
+                      "C_codex_perfdigest_evidence"
+                    ]
+                  },
+                  "executionMode": {
+                    "type": "string",
+                    "enum": [
+                      "codex_chatgpt_login",
+                      "deterministic_offline_fallback"
+                    ]
+                  },
+                  "wallMs": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "costBreakdownMs": {
+                    "type": "object",
+                    "properties": {
+                      "agentExecutionOverheadMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "modelInferenceMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mcpEngineMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "verificationMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "evidenceModelOverlapMs": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "agentExecutionOverheadMs",
+                      "modelInferenceMs",
+                      "mcpEngineMs",
+                      "verificationMs",
+                      "evidenceModelOverlapMs"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "resources": {
+                    "type": "object",
+                    "properties": {
+                      "memoryCoverage": {
+                        "type": "string",
+                        "enum": [
+                          "cgroup_v2_tree_peak",
+                          "max_single_process_only_incomplete_tree",
+                          "none"
+                        ]
+                      },
+                      "cgroupTreePeakKb": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "maxSingleProcessRssKb": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "cgroupUserCpuMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "cgroupSysCpuMs": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "memoryCoverage",
+                      "maxSingleProcessRssKb"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "tokens": {
+                    "type": "object",
+                    "properties": {
+                      "evidencePayloadBytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "evidencePayloadTokensEst": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "modelInputTokens": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "modelOutputTokens": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "modelCachedInputTokens": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "evidencePayloadBytes",
+                      "evidencePayloadTokensEst",
+                      "modelInputTokens",
+                      "modelOutputTokens",
+                      "modelCachedInputTokens"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "evidenceAndRouting": {
+                    "type": "object",
+                    "properties": {
+                      "mcpSessionSpawns": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "mcpToolCalls": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "mcpReusedCalls": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "decisionOutcome": {
+                        "type": "string",
+                        "enum": [
+                          "not_used",
+                          "accepted",
+                          "abstained",
+                          "rejected",
+                          "failed"
+                        ]
+                      },
+                      "selectedReportId": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "provenanceCount": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "verificationExecuted": {
+                        "type": "boolean"
+                      },
+                      "verificationPassed": {
+                        "anyOf": [
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "mcpSessionSpawns",
+                      "mcpToolCalls",
+                      "mcpReusedCalls",
+                      "decisionOutcome",
+                      "selectedReportId",
+                      "provenanceCount",
+                      "verificationExecuted",
+                      "verificationPassed"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "diagnostics": {
+                    "type": "object",
+                    "properties": {
+                      "checksPassed": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "totalChecks": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "accuracyScore": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "falseConclusionsCount": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "falseConclusions": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "checks": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {
+                          "type": "boolean"
+                        }
+                      },
+                      "summary": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "checksPassed",
+                      "totalChecks",
+                      "accuracyScore",
+                      "falseConclusionsCount",
+                      "falseConclusions",
+                      "checks",
+                      "summary"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "arm",
+                  "executionMode",
+                  "wallMs",
+                  "costBreakdownMs",
+                  "resources",
+                  "tokens",
+                  "evidenceAndRouting",
+                  "diagnostics"
+                ],
+                "additionalProperties": false
+              },
+              "B_codex_perfdigest_mcp": {
+                "type": "object",
+                "properties": {
+                  "arm": {
+                    "type": "string",
+                    "enum": [
+                      "A_codex_alone",
+                      "B_codex_perfdigest_mcp",
+                      "C_codex_perfdigest_evidence"
+                    ]
+                  },
+                  "executionMode": {
+                    "type": "string",
+                    "enum": [
+                      "codex_chatgpt_login",
+                      "deterministic_offline_fallback"
+                    ]
+                  },
+                  "wallMs": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "costBreakdownMs": {
+                    "type": "object",
+                    "properties": {
+                      "agentExecutionOverheadMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "modelInferenceMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mcpEngineMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "verificationMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "evidenceModelOverlapMs": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "agentExecutionOverheadMs",
+                      "modelInferenceMs",
+                      "mcpEngineMs",
+                      "verificationMs",
+                      "evidenceModelOverlapMs"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "resources": {
+                    "type": "object",
+                    "properties": {
+                      "memoryCoverage": {
+                        "type": "string",
+                        "enum": [
+                          "cgroup_v2_tree_peak",
+                          "max_single_process_only_incomplete_tree",
+                          "none"
+                        ]
+                      },
+                      "cgroupTreePeakKb": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "maxSingleProcessRssKb": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "cgroupUserCpuMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "cgroupSysCpuMs": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "memoryCoverage",
+                      "maxSingleProcessRssKb"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "tokens": {
+                    "type": "object",
+                    "properties": {
+                      "evidencePayloadBytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "evidencePayloadTokensEst": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "modelInputTokens": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "modelOutputTokens": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "modelCachedInputTokens": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "evidencePayloadBytes",
+                      "evidencePayloadTokensEst",
+                      "modelInputTokens",
+                      "modelOutputTokens",
+                      "modelCachedInputTokens"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "evidenceAndRouting": {
+                    "type": "object",
+                    "properties": {
+                      "mcpSessionSpawns": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "mcpToolCalls": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "mcpReusedCalls": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "decisionOutcome": {
+                        "type": "string",
+                        "enum": [
+                          "not_used",
+                          "accepted",
+                          "abstained",
+                          "rejected",
+                          "failed"
+                        ]
+                      },
+                      "selectedReportId": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "provenanceCount": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "verificationExecuted": {
+                        "type": "boolean"
+                      },
+                      "verificationPassed": {
+                        "anyOf": [
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "mcpSessionSpawns",
+                      "mcpToolCalls",
+                      "mcpReusedCalls",
+                      "decisionOutcome",
+                      "selectedReportId",
+                      "provenanceCount",
+                      "verificationExecuted",
+                      "verificationPassed"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "diagnostics": {
+                    "type": "object",
+                    "properties": {
+                      "checksPassed": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "totalChecks": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "accuracyScore": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "falseConclusionsCount": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "falseConclusions": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "checks": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {
+                          "type": "boolean"
+                        }
+                      },
+                      "summary": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "checksPassed",
+                      "totalChecks",
+                      "accuracyScore",
+                      "falseConclusionsCount",
+                      "falseConclusions",
+                      "checks",
+                      "summary"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "arm",
+                  "executionMode",
+                  "wallMs",
+                  "costBreakdownMs",
+                  "resources",
+                  "tokens",
+                  "evidenceAndRouting",
+                  "diagnostics"
+                ],
+                "additionalProperties": false
+              },
+              "C_codex_perfdigest_evidence": {
+                "type": "object",
+                "properties": {
+                  "arm": {
+                    "type": "string",
+                    "enum": [
+                      "A_codex_alone",
+                      "B_codex_perfdigest_mcp",
+                      "C_codex_perfdigest_evidence"
+                    ]
+                  },
+                  "executionMode": {
+                    "type": "string",
+                    "enum": [
+                      "codex_chatgpt_login",
+                      "deterministic_offline_fallback"
+                    ]
+                  },
+                  "wallMs": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "costBreakdownMs": {
+                    "type": "object",
+                    "properties": {
+                      "agentExecutionOverheadMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "modelInferenceMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mcpEngineMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "verificationMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "evidenceModelOverlapMs": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "agentExecutionOverheadMs",
+                      "modelInferenceMs",
+                      "mcpEngineMs",
+                      "verificationMs",
+                      "evidenceModelOverlapMs"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "resources": {
+                    "type": "object",
+                    "properties": {
+                      "memoryCoverage": {
+                        "type": "string",
+                        "enum": [
+                          "cgroup_v2_tree_peak",
+                          "max_single_process_only_incomplete_tree",
+                          "none"
+                        ]
+                      },
+                      "cgroupTreePeakKb": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "maxSingleProcessRssKb": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "cgroupUserCpuMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "cgroupSysCpuMs": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "memoryCoverage",
+                      "maxSingleProcessRssKb"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "tokens": {
+                    "type": "object",
+                    "properties": {
+                      "evidencePayloadBytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "evidencePayloadTokensEst": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "modelInputTokens": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "modelOutputTokens": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "modelCachedInputTokens": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "evidencePayloadBytes",
+                      "evidencePayloadTokensEst",
+                      "modelInputTokens",
+                      "modelOutputTokens",
+                      "modelCachedInputTokens"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "evidenceAndRouting": {
+                    "type": "object",
+                    "properties": {
+                      "mcpSessionSpawns": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "mcpToolCalls": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "mcpReusedCalls": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "decisionOutcome": {
+                        "type": "string",
+                        "enum": [
+                          "not_used",
+                          "accepted",
+                          "abstained",
+                          "rejected",
+                          "failed"
+                        ]
+                      },
+                      "selectedReportId": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "provenanceCount": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "verificationExecuted": {
+                        "type": "boolean"
+                      },
+                      "verificationPassed": {
+                        "anyOf": [
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "mcpSessionSpawns",
+                      "mcpToolCalls",
+                      "mcpReusedCalls",
+                      "decisionOutcome",
+                      "selectedReportId",
+                      "provenanceCount",
+                      "verificationExecuted",
+                      "verificationPassed"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "diagnostics": {
+                    "type": "object",
+                    "properties": {
+                      "checksPassed": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "totalChecks": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "accuracyScore": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "falseConclusionsCount": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "falseConclusions": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "checks": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {
+                          "type": "boolean"
+                        }
+                      },
+                      "summary": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "checksPassed",
+                      "totalChecks",
+                      "accuracyScore",
+                      "falseConclusionsCount",
+                      "falseConclusions",
+                      "checks",
+                      "summary"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "arm",
+                  "executionMode",
+                  "wallMs",
+                  "costBreakdownMs",
+                  "resources",
+                  "tokens",
+                  "evidenceAndRouting",
+                  "diagnostics"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "A_codex_alone",
+              "B_codex_perfdigest_mcp",
+              "C_codex_perfdigest_evidence"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "benchStudyRef",
+          "captureMode",
+          "candidateReports",
+          "validatedFix",
+          "abstentionGuardCheck",
+          "arms"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "summary": {
+      "type": "object",
+      "properties": {
+        "totalStudies": {
+          "type": "integer",
+          "minimum": 4,
+          "maximum": 9007199254740991
+        },
+        "meanAccuracyByArm": {
+          "type": "object",
+          "properties": {
+            "A_codex_alone": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "B_codex_perfdigest_mcp": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "C_codex_perfdigest_evidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "required": [
+            "A_codex_alone",
+            "B_codex_perfdigest_mcp",
+            "C_codex_perfdigest_evidence"
+          ],
+          "additionalProperties": false
+        },
+        "totalFalseConclusionsByArm": {
+          "type": "object",
+          "properties": {
+            "A_codex_alone": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "B_codex_perfdigest_mcp": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "C_codex_perfdigest_evidence": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "A_codex_alone",
+            "B_codex_perfdigest_mcp",
+            "C_codex_perfdigest_evidence"
+          ],
+          "additionalProperties": false
+        },
+        "validatedSpeedups": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        }
+      },
+      "required": [
+        "totalStudies",
+        "meanAccuracyByArm",
+        "totalFalseConclusionsByArm",
+        "validatedSpeedups"
+      ],
+      "additionalProperties": false
+    },
+    "claims": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "limits": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "required": [
+    "schema",
+    "createdAt",
+    "subject",
+    "host",
+    "studies",
+    "summary",
+    "claims",
+    "limits"
+  ],
+  "additionalProperties": false,
+  "$id": "https://github.com/onlyxItachi/perfdigest-plugin/bench/schema/real-workload-eval.v1.schema.json",
+  "title": "PerfDigest real workload A/B/C evaluation result v1"
+}
