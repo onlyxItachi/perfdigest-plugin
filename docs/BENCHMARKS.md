@@ -1,18 +1,40 @@
-# Runtime & build benchmark foundations (Stage 3)
+# Runtime, build & external-agent benchmark consolidation (Stage 3 + Stage 6)
 
-This document summarizes the reproducible, credential-free benchmark harness in [`bench/`](../bench/README.md) and the recorded session in [`bench/results/2026-10-18-amd-ryzen-ai-9-hx-370-x64.json`](../bench/results/2026-10-18-amd-ryzen-ai-9-hx-370-x64.json).
+This document summarizes the reproducible, credential-free benchmark harness in [`bench/`](../bench/README.md), the 3-layer schema coordination with [`PerfDigest-MCP-Bench`](https://github.com/onlyxItachi/PerfDigest-MCP-Bench), and the recorded 18-cell session in [`bench/results/2026-10-18-amd-ryzen-ai-9-hx-370-x64.json`](../bench/results/2026-10-18-amd-ryzen-ai-9-hx-370-x64.json).
 
 > **Reference baseline**: **Node.js v22.22.1 + TypeScript 6.0.3 (`tsc`)** remains the production build and runtime baseline. Nothing in `bench/` modifies `src/`, `test/`, or the published package (`bench/` is excluded from `package.json#files`).
 
 ---
 
-## 1. Methodology, host & tool provenance
+## 1. Methodology, 3-layer architecture & `PerfDigest-MCP-Bench` coordination
+
+### Three-layer metric separation (`engine` | `orchestration` | `agent_e2e`)
+
+To prevent conflating upstream Python MCP digest latency with TypeScript plugin orchestration or external agent turn overhead, every cell in `perfdigest.benchmark-manifest.v1` and `perfdigest.benchmark-result.v1` carries both an architectural `layer` (`engine` | `orchestration` | `agent_e2e`) and a functional `group` (`build` | `runtime` | `worker` | `agent`), summarized at the top level in `layerSummary`:
+
+| Layer (`cell.layer`) | Scope | Cells in `bench/manifests/default.json` | Recorded `layerSummary` (`total` / `measured` / `notRun` / `parityPass`) |
+| --- | --- | --- | --- |
+| **`engine`** | Upstream PerfDigest MCP server session startup & tool surface (`uvx perfdigest-mcp`) | `runtime.uvx.perfdigest-mcp` (1 cell) | `1` total / `1` measured / `0` not-run (`parityNotApplicable: 1`) |
+| **`orchestration`** | Compiler build (`tsc` vs `tsgo`), CLI startup, agentless offline demo (`--agent none`), plugin MCP server discovery, child-process spawn loop, and worker receipt hashing (`node` vs `go`) | `build.*` (2), `runtime.*.{help,demo,mcp,spawn}` (12), `worker.*.receipt` (2) (16 cells) | `16` total / `15` measured / `1` not-run (`parityPass: 12`, `parityFail: 1`, `parityNotApplicable: 3`) |
+| **`agent_e2e`** | End-to-end offline investigation orchestrated with a genuine compiled Go `perfdigest-agent/v1` CLI agent (`--agent generic --agent-sessions`: `analysis` turn overlapped with capture + MCP digest, followed by independent verification and `same_session_next_turn` `review` turn) | `agent.generic.go-cli.e2e` (1 cell) | `1` total / `1` measured / `0` not-run (`parityPass: 1`) |
+
+### Schema coordination with `PerfDigest-MCP-Bench` (`benchCompatibility`)
+
+The JSON Schemas in [`bench/schema/benchmark-result.v1.schema.json`](../bench/schema/benchmark-result.v1.schema.json) and [`bench/schema/benchmark-manifest.v1.schema.json`](../bench/schema/benchmark-manifest.v1.schema.json) (generated from [`bench/schema/formats.mjs`](../bench/schema/formats.mjs) via `node bench/schema/build-schema.mjs`) include a top-level `benchCompatibility` block documenting deterministic mapping between `onlyxItachi/PerfDigest-MCP-Bench` raw artifacts (`results/interpreter_matrix_raw`, `results/cpp_build_loop_raw`, `results/cuda_opt_bench_raw`) and `perfdigest.benchmark-result.v1`:
+
+| `PerfDigest-MCP-Bench` raw artifact | Raw field shape | Mapping in `perfdigest.benchmark-result.v1` |
+| --- | --- | --- |
+| `results/interpreter_matrix_raw/*_latency.json` | `results["<backend>:<format>"].{median_us, q1_us, q3_us, iqr_us, n}` | `cells[layer="engine"].wall.{unit: "us", median, q1, q3, n}` |
+| `results/interpreter_matrix_raw/*_identity.json` | `results["<backend>:<format>"].{sha256, bytes, total_units}` | `cells[layer="engine"].parity.checks[name="digest-sha256:<backend>:<format>"]` |
+| `results/interpreter_matrix_raw/*_startup.json` | `{median_startup_s}` | `cells[layer="engine", scenario="interpreter-startup"].wall.{unit: "s", median}` |
+| `results/interpreter_matrix_raw/*_concurrency.json` | `{same_path_1thread, same_path_nthreads, mixed_paths_nthreads}.{wall_time_s, throughput_calls_per_s, correct}` | `cells[layer="engine"].extra.concurrency` |
+| `results/interpreter_matrix_raw/latency_loadavg.json` | `{start_1m, end_1m}` | `host.loadavg1AtStart` |
 
 ### Experimental rules
 
-1. **Build vs. runtime separation**: Build cells (`tsc` 6.0.3 vs. `tsgo` TS 7 native preview) are measured and gated separately from runtime cells (Node 22, Bun, Deno executing the production `tsc`-emitted `dist/`).
-2. **Contract-parity gate before interpretation**: Every cell records a structured `parity` block (`pass`, `fail`, `not-checked`, or `not-applicable`). If a runtime or build backend fails contract parity before timing (such as hanging on exit or emitting broken artifacts), timing is skipped (`status: "not-run"`) and no performance comparison or superiority claim is made.
-3. **Credential-free offline isolation**: Every child process executes with a minimal allowlisted environment (`PATH`, `HOME`, `TMPDIR`, `USER`, `XDG_CACHE_HOME`, `LANG=C`, `LC_ALL=C`, `NO_COLOR=1`, `DENO_NO_UPDATE_CHECK=1`), a throwaway `XDG_CONFIG_HOME` in `/tmp`, offline routing (`--provider offline`), and `--agent none`. Zero credentials, model turns, or external network requests are used.
+1. **Build vs. runtime vs. agent E2E separation**: Build cells (`tsc` 6.0.3 vs. `tsgo` TS 7 native preview), runtime orchestration cells, upstream MCP engine cells, and external CLI agent E2E cells are measured and gated separately.
+2. **Contract-parity gate before interpretation**: Every cell records a structured `parity` block (`pass`, `fail`, `not-checked`, or `not-applicable`). If a backend fails contract parity before timing, timing is skipped (`status: "not-run"`) and no performance comparison or superiority claim is made.
+3. **Credential-free offline isolation**: Every child process executes with a minimal allowlisted environment (`PATH`, `HOME`, `TMPDIR`, `USER`, `XDG_CACHE_HOME`, `LANG=C`, `LC_ALL=C`, `NO_COLOR=1`, `DENO_NO_UPDATE_CHECK=1`), a throwaway `XDG_CONFIG_HOME` in `/tmp`, and offline routing (`--provider offline`). Zero credentials, hosted model turns, or external network requests are used.
 4. **Measurement primitives**:
    - Process-level wall time uses `hyperfine -N` (no shell wrapper) with explicit warmup runs and `--prepare` cleanup where state is written.
    - Process-tree CPU (`userMedian`, `sysMedian`) and `peakRssKb` use GNU `/usr/bin/time -f '%U %S %M'` in separate un-timed runs (`rssRuns = 5`) so resource instrumentation does not perturb wall-time samples.
@@ -22,13 +44,13 @@ This document summarizes the reproducible, credential-free benchmark harness in 
 
 | Property | Recorded value |
 | --- | --- |
-| Session timestamp (`createdAt`) | `2026-10-18T17:12:21.870Z` |
-| Subject commit (`gitSha`) | `04de22a5b36ad1c9dc538673f718a44a62dc4ee4` (`dirty: false`) |
-| Manifest (`id` / `sha256`) | `stage3-runtime-build-foundations` / `b3f0eb9bfe4c542e51c85dea4f57e4923ff99e87fb74ac97bac62505cd0f2d17` |
+| Session timestamp (`createdAt`) | `2026-10-18T17:55:05.324Z` |
+| Subject commit (`gitSha`) | `6d628f532975604c567ec5efc9f95fb92b6bfcbd` (`dirty: false`) |
+| Manifest (`id` / `sha256`) | `stage3-runtime-build-foundations` / `e1f5a55575d899cca83dbcf1bcf81319d17f94d52ccbc56bd288f40dec227283` |
 | OS / Kernel | `Linux 7.0.0-27-generic` (`x64`) |
 | CPU model | `AMD Ryzen AI 9 HX 370 w/ Radeon 890M` (24 logical CPUs) |
 | Memory (`memTotalKb`) | `14,927,160 KB` (~14.24 GiB) |
-| 1-min loadavg at start | `1.71` |
+| 1-min loadavg at start | `2.21` |
 
 ### Tool versions & binary SHA-256 digests
 
@@ -47,86 +69,103 @@ This document summarizes the reproducible, credential-free benchmark harness in 
 
 ---
 
-## 2. Build matrix results (`tsc` 6.0.3 vs. `tsgo` TS 7 preview)
+## 2. Build matrix results (`layer: "orchestration"`, `group: "build"`)
 
 Each build cell runs a cold type-check and emit of `tsconfig.json` (`--prepare` removes the output directory before every run; no `.tsbuildinfo` or incremental state is used; OS page cache is warm).
 
-| Cell ID | Backend | Status | Parity | N (warmup) | Wall median (ms) | Wall IQR `[Q1..Q3]` (ms) | Wall `[min..max]` (ms) | Wall stdev (ms) | User / Sys CPU median (ms) | Peak RSS median (KB) |
-| --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `build.tsc6.cold` *(baseline)* | `tsc-6.0.3` | `measured` | `pass` | 10 (3) | **1,160.78** | `1,155.73..1,189.05` | `1,124.10..1,230.51` | 32.19 | 3,090 / 110 | 334,908 |
-| `build.tsgo.cold` | `tsgo-7-preview` | `measured` | `pass` | 10 (3) | **147.38** | `139.50..158.00` | `134.40..183.54` | 15.67 | 660 / 150 | 185,320 |
+| Cell ID | Layer | Backend | Status | Parity | N (warmup) | Wall median (ms) | Wall IQR `[Q1..Q3]` (ms) | Wall `[min..max]` (ms) | Wall stdev (ms) | User / Sys CPU median (ms) | Peak RSS median (KB) |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `build.tsc6.cold` *(baseline)* | `orchestration` | `tsc-6.0.3` | `measured` | `pass` | 10 (3) | **1,290.25** | `1,251.32..1,298.59` | `1,184.37..1,368.16` | 59.29 | 3,310 / 120 | 335,428 |
+| `build.tsgo.cold` | `orchestration` | `tsgo-7-preview` | `measured` | `pass` | 10 (3) | **135.77** | `132.03..139.42` | `128.42..145.76` | 5.28 | 760 / 150 | 186,916 |
 
 ### Build parity verification
 
 Both `tsc-6.0.3` and `tsgo-7-preview` passed all 10 gating parity checks in isolated scratch trees:
 - Clean emit of both `tsconfig.json` (`emit-dist`) and `tsconfig.test.json` (`emit-test-build`).
-- Full test suite execution under Node 22 (`node --test .test-build/test/*.test.js`).
+- Full test suite execution under Node 22 (`node --test .test-build/test/*.test.js`), including external Go + Python CLI agent tests (`test/generic-agent-external.test.ts`).
 - End-to-end offline demo execution against the emitted `dist/cli.js` (`demo-exit-0`, `status=complete`, `verifier-exit-0`, `evidence-count=1`, `report-sha256:traversal-timing`, `digest-units=column_major,row_major`).
 - MCP stdio discovery against the emitted `dist/cli.js` (`cancel_evidence_job,get_evidence_job,launch_evidence_prefetch`).
 - Informational check (`info:js-byte-identical-to-repo-dist`): `tsgo` emitted **16/16** `.js` files byte-identical (SHA-256) to `tsc` 6.0.3 for the current `src/` tree.
 
 ---
 
-## 3. Runtime & worker prototype matrix results
+## 3. Engine, orchestration & external-agent E2E matrix results (16 cells)
 
-All runtime cells execute the production `tsc`-emitted `dist/cli.js` (or `bench/probes/spawn-loop.mjs`).
+All runtime and agent cells execute the production `tsc`-emitted `dist/cli.js` (or `bench/probes/spawn-loop.mjs`).
 
-| Cell ID | Scenario | Backend | Status | Parity | N (warmup) | Wall median (ms) | Wall IQR `[Q1..Q3]` (ms) | Wall `[min..max]` (ms) | Wall stdev (ms) | User / Sys CPU median (ms) | Peak RSS median (KB) |
-| --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `runtime.node22.help` *(baseline)* | `cli-help` | `node22` | `measured` | `pass` | 20 (3) | **134.36** | `129.26..139.63` | `120.69..165.00` | 11.25 | 180 / 20 | 93,896 |
-| `runtime.bun.help` | `cli-help` | `bun` | `measured` | `pass` | 20 (3) | **69.13** | `63.84..72.08` | `58.31..77.92` | 5.70 | 90 / 10 | 63,388 |
-| `runtime.deno.help` | `cli-help` | `deno` | `measured` | `pass` | 20 (3) | **86.77** | `82.72..93.07` | `79.90..124.54` | 10.23 | 90 / 20 | 86,808 |
-| `runtime.node22.demo` *(baseline)* | `offline-demo` | `node22` | `measured` | `pass` | 15 (3) | **582.59** | `577.12..592.72` | `565.05..612.97` | 13.36 | 590 / 70 | 93,692 |
-| `runtime.bun.demo` | `offline-demo` | `bun` | `measured` | `pass` | 15 (3) | **502.37** | `495.35..524.74` | `465.11..536.23` | 21.59 | 530 / 70 | 66,300 |
-| `runtime.deno.demo` | `offline-demo` | `deno` | `not-run` | **`fail`** | — | — | — | — | — | — | — |
-| `runtime.node22.mcp` *(baseline)* | `mcp-tools-list` | `node22` | `measured` | `pass` | 20 (3) | **131.08** | `125.95..149.97` | `124.66..203.17` | 19.07 | — | 94,156 |
-| `runtime.bun.mcp` | `mcp-tools-list` | `bun` | `measured` | `pass` | 20 (3) | **80.21** | `77.88..86.26` | `72.28..109.27` | 8.94 | — | 67,044 |
-| `runtime.deno.mcp` | `mcp-tools-list` | `deno` | `measured` | `pass` | 20 (3) | **97.62** | `94.06..104.48` | `88.41..145.41` | 13.14 | — | 89,736 |
-| `runtime.node22.spawn` *(baseline)* | `spawn-overhead` | `node22` | `measured` | `not-applicable` | 199 (3) | **0.49** | `0.48..0.52` | `0.46..0.96` | 0.08 | 70 / 60 | 46,736 |
-| `runtime.bun.spawn` | `spawn-overhead` | `bun` | `measured` | `not-applicable` | 199 (3) | **0.25** | `0.24..0.27` | `0.22..0.65` | 0.05 | 60 / 10 | 30,684 |
-| `runtime.deno.spawn` | `spawn-overhead` | `deno` | `measured` | `not-applicable` | 199 (3) | **0.26** | `0.26..0.27` | `0.24..0.87` | 0.06 | 70 / 30 | 46,344 |
-| `runtime.uvx.perfdigest-mcp` | `perfdigest-mcp-session-start` | `uvx` | `measured` | `not-applicable` | 20 (0) | **282.53** | `276.96..291.44` | `271.53..311.87` | 11.46 | — | 62,644 |
-| `worker.node.receipt` *(baseline)* | `exec-and-hash-receipt` | `node-worker` | `measured` | `pass` | 20 (3) | **152.96** | `150.75..161.05` | `145.65..165.55` | 6.43 | 90 / 70 | 69,568 |
-| `worker.go.receipt` | `exec-and-hash-receipt` | `go-worker-prototype` | `measured` | `pass` | 20 (3) | **64.47** | `62.96..65.41` | `59.54..66.34` | 2.05 | 40 / 10 | 3,908 |
+| Cell ID | Layer | Scenario | Backend | Status | Parity | N (warmup) | Wall median (ms) | Wall IQR `[Q1..Q3]` (ms) | Wall `[min..max]` (ms) | Wall stdev (ms) | User / Sys CPU median (ms) | Peak RSS median (KB) |
+| --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `runtime.uvx.perfdigest-mcp` | **`engine`** | `perfdigest-mcp-session-start` | `uvx` | `measured` | `not-applicable` | 20 (0) | **276.80** | `273.45..282.30` | `266.17..313.24` | 12.05 | — | 62,844 |
+| `runtime.node22.help` *(baseline)* | `orchestration` | `cli-help` | `node22` | `measured` | `pass` | 20 (3) | **125.66** | `120.64..128.99` | `118.15..135.48` | 5.15 | 170 / 20 | 89,600 |
+| `runtime.bun.help` | `orchestration` | `cli-help` | `bun` | `measured` | `pass` | 20 (3) | **65.02** | `60.85..68.88` | `57.19..80.98` | 6.46 | 90 / 20 | 61,996 |
+| `runtime.deno.help` | `orchestration` | `cli-help` | `deno` | `measured` | `pass` | 20 (3) | **84.91** | `82.93..88.01` | `79.51..91.68` | 3.51 | 80 / 20 | 85,160 |
+| `runtime.node22.demo` *(baseline)* | `orchestration` | `offline-demo` | `node22` | `measured` | `pass` | 15 (3) | **580.81** | `563.64..596.01` | `546.02..661.49` | 28.67 | 610 / 70 | 93,560 |
+| `runtime.bun.demo` | `orchestration` | `offline-demo` | `bun` | `measured` | `pass` | 15 (3) | **514.03** | `498.43..531.93` | `466.28..549.35` | 24.49 | 520 / 70 | 65,620 |
+| `runtime.deno.demo` | `orchestration` | `offline-demo` | `deno` | `not-run` | **`fail`** | — | — | — | — | — | — | — |
+| `runtime.node22.mcp` *(baseline)* | `orchestration` | `mcp-tools-list` | `node22` | `measured` | `pass` | 20 (3) | **133.09** | `129.19..139.73` | `124.20..147.69` | 7.31 | — | 93,160 |
+| `runtime.bun.mcp` | `orchestration` | `mcp-tools-list` | `bun` | `measured` | `pass` | 20 (3) | **78.95** | `74.72..83.85` | `70.53..95.59` | 7.50 | — | 66,264 |
+| `runtime.deno.mcp` | `orchestration` | `mcp-tools-list` | `deno` | `measured` | `pass` | 20 (3) | **94.17** | `88.82..95.95` | `86.81..109.47` | 6.90 | — | 88,020 |
+| `runtime.node22.spawn` *(baseline)* | `orchestration` | `spawn-overhead` | `node22` | `measured` | `not-applicable` | 199 (3) | **0.50** | `0.48..0.54` | `0.46..0.90` | 0.07 | 60 / 60 | 46,680 |
+| `runtime.bun.spawn` | `orchestration` | `spawn-overhead` | `bun` | `measured` | `not-applicable` | 199 (3) | **0.24** | `0.23..0.26` | `0.22..0.63` | 0.06 | 50 / 10 | 29,596 |
+| `runtime.deno.spawn` | `orchestration` | `spawn-overhead` | `deno` | `measured` | `not-applicable` | 199 (3) | **0.27** | `0.26..0.28` | `0.25..0.59` | 0.04 | 60 / 20 | 45,588 |
+| `worker.node.receipt` *(baseline)* | `orchestration` | `exec-and-hash-receipt` | `node-worker` | `measured` | `pass` | 20 (3) | **151.53** | `147.62..152.68` | `142.88..167.47` | 5.29 | 90 / 60 | 69,756 |
+| `worker.go.receipt` | `orchestration` | `exec-and-hash-receipt` | `go-worker-prototype` | `measured` | `pass` | 20 (3) | **62.81** | `60.21..65.33` | `57.61..69.34` | 3.54 | 40 / 10 | 3,908 |
+| `agent.generic.go-cli.e2e` *(baseline)* | **`agent_e2e`** | `offline-demo-agent-e2e` | `go-generic-cli` | `measured` | `pass` | 15 (3) | **589.24** | `585.20..602.61` | `557.80..679.29` | 30.54 | 600 / 80 | 94,236 |
 
 *Note on `spawn-overhead`*: Wall-time statistics are per-spawn (`N = 199` warm sequential spawns of `/bin/true` inside one process after dropping the first cold spawn), whereas CPU and peak RSS are measured by GNU time for the entire 200-spawn loop process.
 
 ---
 
-## 4. Contract-parity gate findings (including Deno `offline-demo` hang)
+## 4. Contract-parity gate findings & Deno 2.9.7 root-cause analysis
 
-| Cell / Group | Parity status | Key findings |
-| --- | --- | --- |
-| `build.tsc6.cold`, `build.tsgo.cold` | `pass` | Both compilers emit `dist/` and `.test-build/`, pass the full `node --test` suite, and pass `offline-demo` + `mcp-tools-list` under Node 22. |
-| `runtime.{node22,bun,deno}.help` | `pass` | All three runtimes print the expected CLI help banner and exit `0`. |
-| `runtime.{node22,bun}.demo` | `pass` | Both exit `0` within budget, write `run.json` (`status: "complete"`, `verification: 0`), match recomputed SHA-256 and byte length for `traversal-timing`, and produce the expected `column_major,row_major` digest units. |
-| `runtime.deno.demo` | **`fail`** (`not-run`) | **Process-exit hang under Deno 2.9.7**: Deno executes the capture child, the `uvx perfdigest-mcp` stdio digest session, and the verifier child, writes a complete `run.json` (`status: "complete"`, `verification: 0`, matching `report-sha256:traversal-timing` `f859e14b9f2d` and `digest-units=column_major,row_major`), and prints the JSON summary to stdout in ~460 ms—all five artifact checks pass—but the Deno process **never exits** after `StdioClientTransport.close()` because Deno's Node compatibility layer retains an active handle on the closed child stdio transport. It fails `demo-exit-0` at the 15,000 ms gate timeout and is excluded from timing. |
-| `runtime.{node22,bun,deno}.mcp` | `pass` | When Deno runs as the MCP **server** (`cli.js mcp`) and the Node client closes the transport, all three runtimes return the exact 3 expected tools (`cancel_evidence_job,get_evidence_job,launch_evidence_prefetch`) and exit cleanly. |
-| `worker.{node,go}.receipt` | `pass` | Both prototypes execute 200 × `/bin/true` without a shell under an allowlisted environment (`PATH`, `LANG`) and stream-hash a 16 MiB synthetic payload plus `examples/*.mjs`, producing byte-identical receipts (`argv`, `exitCode`, `sha256`, `bytes`). |
+| Cell / Group | Layer | Parity status | Key findings |
+| --- | --- | --- | --- |
+| `build.tsc6.cold`, `build.tsgo.cold` | `orchestration` | `pass` | Both compilers emit `dist/` and `.test-build/`, pass the full `node --test` suite, and pass `offline-demo` + `mcp-tools-list` under Node 22. |
+| `runtime.{node22,bun,deno}.help` | `orchestration` | `pass` | All three runtimes print the expected CLI help banner and exit `0`. |
+| `runtime.{node22,bun}.demo` | `orchestration` | `pass` | Both exit `0` within budget, write `run.json` (`status: "complete"`, `verification: 0`), match recomputed SHA-256 and byte length for `traversal-timing`, and produce the expected `column_major,row_major` digest units. |
+| `runtime.deno.demo` | `orchestration` | **`fail`** (`not-run`) | **Process-exit hang under Deno 2.9.7** (exact 4-line root cause documented below): all 5 artifact checks pass (`status=complete`, `verifier-exit-0`, `evidence-count=1`, `report-sha256:traversal-timing`, `digest-units=column_major,row_major`), but Deno stays alive on the 240,000 ms `AbortSignal.timeout` timer and fails `demo-exit-0` at the 15,000 ms gate timeout. |
+| `runtime.{node22,bun,deno}.mcp` | `orchestration` | `pass` | When Deno runs as the MCP **server** (`cli.js mcp`) and the Node client closes the transport, all three runtimes return the exact 3 expected tools (`cancel_evidence_job,get_evidence_job,launch_evidence_prefetch`) and exit cleanly. |
+| `worker.{node,go}.receipt` | `orchestration` | `pass` | Both prototypes execute 200 × `/bin/true` without a shell under an allowlisted environment (`PATH`, `LANG`) and stream-hash a 16 MiB synthetic payload plus `examples/*.mjs`, producing byte-identical receipts (`argv`, `exitCode`, `sha256`, `bytes`). |
+| `agent.generic.go-cli.e2e` | `agent_e2e` | `pass` | Compiled Go `perfdigest-agent/v1` binary passes all 8 E2E parity checks (`demo-exit-0`, `status=complete`, `verifier-exit-0`, `agent-error-null`, `evidence-delivery=same_session_next_turn`, `session-continuation:go-bench-sess-1`, `evidence-count=1`, `report-sha256:traversal-timing`, `digest-units=column_major,row_major`). |
+
+### Root-cause analysis: Deno 2.9.7 `offline-demo` process-exit hang
+
+Investigation of `runtime.deno.demo` isolated the exact 4-line root cause of the Deno 2.9.7 process-exit hang on the `825f735` baseline:
+
+1. **`@modelcontextprotocol/sdk` leaves a `{ once: true }` `abort` listener on `signal`**: `Protocol.request` in `@modelcontextprotocol/sdk` registers `options.signal?.addEventListener('abort', abortHandler, { once: true })` on every `connect()` and `callTool()` call, and does **not** call `removeEventListener` when the request resolves normally.
+2. **`src/run.ts` combines `controller.signal` with `AbortSignal.timeout(240_000)`**: At the start of `investigate()`, `src/run.ts` constructs `const deadline = AbortSignal.timeout(240_000)` and `const signal = AbortSignal.any([controller.signal, deadline, ...])`, passing `signal` down into `gatherEvidence()` -> `digestReportWithMcp()`.
+3. **Deno 2.9.7 keeps `AbortSignal.timeout(ms)` ref'd when a composite `AbortSignal.any` retains an active `abort` listener**: In Node 22 and Bun 1.4.3, `AbortSignal.timeout(240_000)` uses an unref'd timer that allows the process to exit as soon as `main()` finishes. In Deno 2.9.7, `AbortSignal.timeout(ms)` keeps its internal timer `unref`'d *only while no active `abort` listener is attached*; an unremoved `{ once: true }` listener on `AbortSignal.any([..., AbortSignal.timeout(240_000)])` keeps Deno's event loop ref'd for the full 240 seconds even after `controller.abort()` runs in `finally` and `run.json` + `stdout` are flushed.
+4. **Minimal 4-line reproduction** (exits `124` under `timeout 2 deno eval`, exits `0` immediately under Node 22 and Bun 1.4.3):
+   ```js
+   const c = new AbortController();
+   const s = AbortSignal.any([c.signal, AbortSignal.timeout(240_000)]);
+   s.addEventListener('abort', () => {}, { once: true });
+   ```
+   *(Note: Stage 5 replaces uncancelled `AbortSignal.timeout` signals with explicitly cleared and `.unref()`'d timeout helpers so that completed runs do not leave live timers on the event loop; in this pre-fix baseline snapshot, `runtime.deno.demo` remains recorded honestly as `status: "not-run"`, `parity.status: "fail"`.)*
 
 ---
 
-## 5. PerfDigest MCP optimization opportunities (measured)
+## 5. Layer-by-layer performance analysis
 
-The benchmark matrix isolates the cost of the plugin's interaction with the upstream Python `perfdigest-mcp` server (`v1.2.0` via `uvx`):
+Separating the 18 cells into `engine`, `orchestration`, and `agent_e2e` isolates where wall time is spent:
 
-1. **Per-report MCP session startup dominates local evidence collection (~48.5% of Node `offline-demo`)**:
-   - `runtime.uvx.perfdigest-mcp` measures **282.53 ms** median (`[271.53..311.87]` ms, peak RSS **62,644 KB**) just to spawn `uvx perfdigest-mcp`, complete the MCP `initialize` handshake, list tools, and close—before `summarize_report` is even invoked.
-   - Compare this with the full `runtime.node22.demo` median of **582.59 ms** (or `runtime.bun.demo` at **502.37 ms**), which includes parent CLI startup (~134 ms on Node / ~69 ms on Bun), running the capture child (`examples/capture-transpose.mjs`), running the `uvx perfdigest-mcp` session + `summarize_report`, and running the verifier child (`examples/verify-transpose.mjs`).
-   - Switching the outer TypeScript runtime from Node 22 to Bun reduces `offline-demo` median wall time by **80.22 ms** (`582.59 ms -> 502.37 ms`, -13.8%), roughly matching the sum of Bun's faster CLI startup and child-process spawn overhead, while the ~283 ms Python `uvx perfdigest-mcp` floor remains unchanged across runtimes.
-
-2. **Actionable optimization levers (ranked by measured impact)**:
-   - **Session reuse across multiple reports in a manifest (high impact for multi-report runs)**: `src/perfdigest.ts` currently opens and closes a fresh `StdioClientTransport` subprocess for every digested report (`digestReportWithMcp`). For a manifest with $K$ digested reports, reusing one MCP client session per run eliminates $(K - 1) \times 282.5\text{ ms}$ of cold `uvx` + Python MCP initialization overhead.
-   - **Direct tool binary invocation vs. `uvx` wrapper resolution**: When `perfdigest-mcp` is already installed in `uv tool list`, resolving and invoking the installed tool executable directly (or keeping a warm stdio worker) avoids repeated `uvx` ephemeral environment resolution on every run.
-   - **Subprocess + SHA-256 worker overhead is small unless command counts are high**: For 200 sequential spawns plus 16 MiB SHA-256 hashing (`worker.node.receipt` vs. `worker.go.receipt`), the Go prototype reduces median wall time from **152.96 ms** to **64.47 ms** (-88.49 ms) and peak RSS from **69,568 KB** to **3,908 KB**. For typical PerfDigest manifests (1–5 capture/verify commands and kilobyte-scale JSON traces), Node's per-spawn overhead (**0.49 ms** median) is negligible compared to the **282.53 ms** `uvx perfdigest-mcp` session start.
-   - **Developer build loop (`tsgo`)**: For local development and CI type-checking/emit experiments, `tsgo` (`@typescript/native-preview`) reduces cold build median wall time from **1,160.78 ms** to **147.38 ms** (7.88× faster, 44.7% lower peak RSS) with 16/16 byte-identical JS emit on the current codebase.
+1. **`engine` layer (`runtime.uvx.perfdigest-mcp`: 276.80 ms median)** dominates single-report local runs:
+   - Spawning `uvx perfdigest-mcp`, completing the MCP `initialize` handshake, listing tools, and closing takes **276.80 ms** median (`[266.17..313.24]` ms, peak RSS **62,844 KB**)—roughly **47.7%** of the entire `runtime.node22.demo` (`580.81 ms`) and **47.0%** of the full external-agent E2E run (`agent.generic.go-cli.e2e`, `589.24 ms`).
+2. **`agent_e2e` layer (`agent.generic.go-cli.e2e`: 589.24 ms median vs. `runtime.node22.demo`: 580.81 ms median)**:
+   - Orchestrating a two-turn external Go CLI agent (`perfdigest-agent/v1` over JSONL stdio with `--agent-sessions`) adds only **+8.43 ms** (+1.45%) to the median wall time of `--agent none` (`580.81 ms -> 589.24 ms`, peak RSS `93,560 KB -> 94,236 KB`).
+   - Because `investigate()` launches `evidence.prefetch` concurrently with the `analysis` turn (`Promise.all([worker, agent])`), the external Go agent's `analysis` turn executes completely inside the shadow of capture + `uvx perfdigest-mcp` digestion, leaving only the post-verification `review` turn spawn on the critical path.
+3. **`orchestration` layer levers (ranked by measured impact)**:
+   - **MCP session reuse across multi-report manifests**: Reusing a single `StdioClientTransport` session across $K$ reports in `src/perfdigest.ts` saves $(K - 1) \times 276.8\text{ ms}$ of cold `uvx` + Python MCP initialization overhead.
+   - **Outer JS runtime (`node22` vs. `bun`)**: Bun reduces `cli-help` median wall time from **125.66 ms** to **65.02 ms** (-60.64 ms) and `offline-demo` from **580.81 ms** to **514.03 ms** (-66.78 ms, -11.5%).
+   - **Developer build loop (`tsc` 6.0.3 vs. `tsgo` TS 7 preview)**: `tsgo` reduces cold build median wall time from **1,290.25 ms** to **135.77 ms** (9.50× faster, 44.3% lower peak RSS) with 16/16 byte-identical JS emit.
+   - **Worker subprocess + SHA-256 receipt prototype (`node-worker` vs. `go-worker-prototype`)**: For 200 sequential spawns + 16 MiB SHA-256 hashing, Go reduces median wall time from **151.53 ms** to **62.81 ms** and peak RSS from **69,756 KB** to **3,908 KB**, though for typical 1–5 command manifests Node's **0.50 ms** per-spawn overhead is negligible relative to the **276.80 ms** `engine` floor.
 
 ---
 
 ## 6. Explicit scope & limitations
 
-- **Single host, single session**: All medians, IQRs, and resource figures apply strictly to `amd-ryzen-ai-9-hx-370-x64` (`Linux 7.0.0-27-generic`) at commit `04de22a` and do not generalize to other CPUs, OS kernels, filesystems, or shared CI runners.
-- **Unpinned host scheduling**: CPU frequency scaling, turbo boost, and core isolation were not pinned; runs executed sequentially with starting 1-minute load average `1.71`.
+- **Single host, single session**: All medians, IQRs, and resource figures apply strictly to `amd-ryzen-ai-9-hx-370-x64` (`Linux 7.0.0-27-generic`) at commit `6d628f5` and do not generalize to other CPUs, OS kernels, filesystems, or shared CI runners.
+- **Unpinned host scheduling**: CPU frequency scaling, turbo boost, and core isolation were not pinned; runs executed sequentially with starting 1-minute load average `2.21`.
 - **Warm OS page cache**: "Cold build" means the output directory is deleted before every run and incremental `.tsbuildinfo` state is absent; the OS filesystem cache and `node_modules/` remain warm.
-- **Node-compatibility surface**: Bun and Deno were exercised only on `cli-help`, `offline-demo`, `mcp-tools-list`, and `spawn-overhead` against the `tsc`-emitted ESM bundle. Live Codex SDK sessions, live Decisions HTTP providers, and interactive TUI flows were not benchmarked under Bun or Deno.
+- **Deterministic local CLI agent in `agent_e2e`**: `agent.generic.go-cli.e2e` measures the full `perfdigest-agent/v1` stdio JSONL protocol, concurrent `analysis`/evidence overlap, session-continuation verification, and `review` evidence delivery using a compiled Go binary with zero network or LLM API calls; live LLM inference latency is intentionally excluded.
 - **Prototype boundary**: `bench/go-worker/` measures only `os/exec` + streaming `crypto/sha256` receipt generation and is not a replacement for the TypeScript evidence runner.
