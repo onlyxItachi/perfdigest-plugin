@@ -24,8 +24,8 @@ const spec = (name: string, media: string[], liveQualified: string | null): Clou
 });
 export const cloudflareModels = {
   'clef-flash': spec('clef-flash', [], '2026-10-18'),
-  clef: spec('clef', ['image'], null),
-  'clef-omni': spec('clef-omni', ['image', 'audio', 'video'], null),
+  clef: spec('clef', ['image'], '2026-10-18'),
+  'clef-omni': spec('clef-omni', ['image', 'audio', 'video'], '2026-10-18'),
 } as const satisfies Record<string, CloudflareModelSpec>;
 export type CloudflareModelName = keyof typeof cloudflareModels;
 export const defaultCloudflareModel: CloudflareModelName = 'clef-flash';

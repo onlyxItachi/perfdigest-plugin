@@ -8,7 +8,7 @@ import { gatherEvidence } from '../src/evidence.js';
 import { openPerfDigestSession, withPerfDigestSession, type PerfDigestSessionStats } from '../src/perfdigest.js';
 import type { DecisionProvider } from '../src/providers.js';
 import type { EvidenceProvenance, ReportSpec } from '../src/config.js';
-import { executable } from '../src/environment.js';
+import { childEnvironment, executable } from '../src/environment.js';
 import { fixtureUv, testDirectory } from './helpers.js';
 
 const execFileAsync = promisify(execFile);
@@ -228,7 +228,10 @@ test('real PerfDigest MCP session reuse works across multiple reports on baselin
     const uvxBin = executable('uvx');
     let has130 = false;
     try {
-      await execFileAsync(uvxBin, ['--offline', '--from', 'perfdigest-mcp==1.3.0', 'python', '-c', 'import perfdigest'], { timeout: 5000 });
+      await execFileAsync(uvxBin, ['--offline', '--from', 'perfdigest-mcp==1.3.0', 'python', '-c', 'import perfdigest'], {
+        env: childEnvironment(),
+        timeout: 5000,
+      });
       has130 = true;
     } catch {
       has130 = false;

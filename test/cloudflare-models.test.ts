@@ -36,8 +36,8 @@ test('registry lists exactly the documented Clef family with shared SystemOne se
   }
   assert.deepEqual(cloudflareModels['clef-omni'].documentedMediaInputs, ['image', 'audio', 'video']);
   assert.equal(cloudflareModels['clef-flash'].liveQualified, '2026-10-18');
-  assert.equal(cloudflareModels.clef.liveQualified, null, 'documented but not exercised live by this project');
-  assert.equal(cloudflareModels['clef-omni'].liveQualified, null);
+  assert.equal(cloudflareModels.clef.liveQualified, '2026-10-18');
+  assert.equal(cloudflareModels['clef-omni'].liveQualified, '2026-10-18');
   assert.equal(cloudflareModel().name, 'clef-flash', 'default is unchanged');
   for (const bad of ['clef-pro', 'CLEF', '__proto__', '@cf/cloudflare/clef', '']) {
     assert.throws(() => cloudflareModel(bad), (e: unknown) => e instanceof ProviderError && e.kind === 'schema');

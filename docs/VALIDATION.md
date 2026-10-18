@@ -77,3 +77,20 @@ A separate single request used real PerfDigest CPU evidence captured before mode
 | Diagnostic process exit | 1, because the success gate requires `complete` |
 
 No threshold was lowered, retry made or provider fallback used to force a successful route. This qualifies real local inference and the abstention path; it does not qualify an accepted local evidence route. The hosted Cloudflare run above remains the completed demo. These runs use different captures and warmup conditions and do not establish a provider performance comparison. The localhost-only diagnostic deliberately leaves identity unqualified on its own; the independent process, runtime and pinned model-hash receipts provide that additional evidence.
+
+## Cloudflare Workers AI Clef family qualification — 18 October 2026
+
+Following the post-hackathon credential security preflight, each of the three documented Cloudflare Workers AI Clef models (`@cf/cloudflare/clef-flash`, `@cf/cloudflare/clef`, and `@cf/cloudflare/clef-omni`) was exercised with a single opt-in authenticated TLS request (`PERFDIGEST_RUN_CLEF_INTEGRATION=1 node --env-file="$HOME/.config/perfdigest/cloudflare.env" scripts/check-clef-live.mjs --provider cloudflare --decision-model <model>`, `--agent none`, no retries, no provider or model fallback):
+
+| Requested Model | Advertised Model | Requests | Decision Latency | Input / Output Tokens | `traversal-timing` Prob | `__human_review__` Prob | Confidence (`systemone_uniform_zero`) | Policy (`0.65`) Outcome | Independent Verifier | Artifact SHA-256 (`cpu.chrome-trace.json`) | Bounded State SHA-256 (`inputSha256`) |
+| --- | --- | ---: | ---: | --- | ---: | ---: | ---: | --- | --- | --- | --- |
+| `@cf/cloudflare/clef-flash` | `clef-flash` | 1 | 280 ms | 669 / 0 | 0.9037 | 0.0963 | 0.6468 | `abstained` (`needs_review`; `0.6468 < 0.65`) | Not run on abstention (by design) | `0b144ef303bf2b19cf6df5111dc9fa356b1747f0a695da166f73e9a3d0df0aa0` | `781eb696de3463bb4c66c87382735ec0f81878dc529b503846dc5b3233ffbe42` |
+| `@cf/cloudflare/clef` | `clef` | 1 | 1,316 ms | 654 / 0 | 0.9876 | 0.0124 | 0.9511 | `accepted` (`complete`; selected `traversal-timing`) | Exit 0 (`wallMs: 1,841`) | `af3d4ab4ff61f9d5c3ad4ad119774e0996facab176f45bb60463c7980a13897a` | `124a872e42e417dbc073be5a58c52bfd85eb9af2d1bc3115fdab37d7d42a789c` |
+| `@cf/cloudflare/clef-omni` | `clef-omni` | 1 | 269 ms | 621 / 0 | 0.9712 | 0.0288 | 0.8881 | `accepted` (`complete`; selected `traversal-timing`) | Exit 0 (`wallMs: 828`) | `74ecd2c04e7e064491a737f42aae8494c938181cf622c73da44964ff7b744ee0` | `d7cdad8a4330df670287c0ef178328d390701e25530a074d8e3a2709419c1699` |
+
+Key observations:
+- All three models share the SystemOne/Jev typed-question contract (`noul`, `choice`, `score`) and `systemone_uniform_zero` confidence semantics. Even though `clef` (`image`) and `clef-omni` (`image`, `audio`, `video`) document additional media modalities, `perfdigest-plugin` sends text state only (`pluginInputs: ['text']`).
+- The unchanged `0.65` policy threshold properly gated the `0.6468` `clef-flash` run (`decisionOutcome: 'abstained'`, `status: 'needs_review'`, `considered` provenance retained with SHA-256) and accepted the `0.9511` (`clef`) and `0.8881` (`clef-omni`) runs, both of which passed the independent verifier (`exitCode: 0`).
+- Single-request qualification verifies contract compatibility and endpoint identity; it does not establish comparative latency or accuracy across models.
+- For runtime/build matrix benchmarks and MCP session reuse measurements, see [docs/BENCHMARKS.md](BENCHMARKS.md). For multi-study real profiler evaluations across CUDA, C++ build, PyTorch Kineto traces, and Linux `perf`, see [docs/REAL_WORKLOAD_EVALUATION.md](REAL_WORKLOAD_EVALUATION.md).
+
