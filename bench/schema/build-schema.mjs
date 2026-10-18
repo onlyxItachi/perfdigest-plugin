@@ -1,11 +1,12 @@
 // Generate (default) or verify (--check) the committed JSON Schema files from formats.mjs.
 import { readFile, writeFile } from 'node:fs/promises';
 import { z } from 'zod';
-import { manifestSchema, resultSchema } from './formats.mjs';
+import { manifestSchema, mcpReuseResultSchema, resultSchema } from './formats.mjs';
 
 const targets = [
   ['benchmark-result.v1.schema.json', resultSchema, 'PerfDigest benchmark result v1'],
   ['benchmark-manifest.v1.schema.json', manifestSchema, 'PerfDigest benchmark manifest v1'],
+  ['mcp-reuse-result.v1.schema.json', mcpReuseResultSchema, 'PerfDigest MCP session reuse benchmark result v1'],
 ];
 const check = process.argv.includes('--check');
 let stale = 0;
