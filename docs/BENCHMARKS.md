@@ -1,8 +1,8 @@
 # Runtime, build, MCP session reuse & external-agent benchmark consolidation
 
-This document summarizes the reproducible, credential-free benchmark suite in [`bench/`](../bench/README.md), the 3-layer schema coordination with [`PerfDigest-MCP-Bench`](https://github.com/onlyxItachi/PerfDigest-MCP-Bench), the 18-cell matrix session in [`bench/results/2026-10-18-amd-ryzen-ai-9-hx-370-x64.json`](../bench/results/2026-10-18-amd-ryzen-ai-9-hx-370-x64.json), and the controlled Stage 5 MCP session-reuse benchmark in [`bench/results/2026-10-18-mcp-session-reuse.json`](../bench/results/2026-10-18-mcp-session-reuse.json).
+This document summarizes the reproducible, credential-free benchmark suite in [`bench/`](../bench/README.md), the 3-layer schema coordination with [`PerfDigest-MCP-Bench`](https://github.com/onlyxItachi/PerfDigest-MCP-Bench), the 18-cell matrix session in [`bench/results/2026-10-18-amd-ryzen-ai-9-hx-370-x64.json`](../bench/results/2026-10-18-amd-ryzen-ai-9-hx-370-x64.json), the controlled Stage 5 MCP session-reuse benchmark in [`bench/results/2026-10-18-mcp-session-reuse.json`](../bench/results/2026-10-18-mcp-session-reuse.json), and the full 4-backend (`node22`, `bun`, `deno`, `go`) equivalent-lifecycle and end-to-end benchmark in [`bench/results/2026-10-18-lifecycle-and-orchestration.json`](../bench/results/2026-10-18-lifecycle-and-orchestration.json).
 
-> **Reference baseline**: **Node.js v22.22.1 + TypeScript 6.0.3 (`tsc`)** remains the production build and runtime baseline. `bench/` is excluded from `package.json#files`.
+> **Default CLI & MCP binary (`dist/perfdigest-plugin`) + TypeScript library (`dist/*.js`)**: Following the complete Go 1.26 end-to-end parity implementation (`cmd/perfdigest-plugin` + `internal/perfdigest/*.go`, zero external Go dependencies) and 4-backend lifecycle evaluation (Section 6), **`dist/perfdigest-plugin` (compiled Go 1.26 binary)** is the default CLI & MCP binary (`package.json#bin.perfdigest-plugin`), while **`dist/*.js` (compiled by `tsc 6.0.3` from `src/*.ts`)** remains the preserved ESM library export for Node.js, Bun, and Deno consumers. `bench/` is excluded from `package.json#files`.
 
 ---
 
@@ -152,88 +152,135 @@ To guarantee an apples-to-apples comparison, [`bench/mcp-reuse-bench.mjs`](../be
 
 ---
 
-## 7. Stage 7 — Equivalent-Lifecycle (`One-Shot` vs. `Persistent`) & Orchestration-Cost Separation
+## 6. Full Go 1.26 End-to-End Backend Parity, Default Binary Migration & 4-Backend Lifecycle Benchmarks
 
-The Stage 7 benchmark in [`bench/bench-lifecycle.mjs`](../bench/bench-lifecycle.mjs) and [`bench/results/2026-10-18-lifecycle-and-orchestration.json`](../bench/results/2026-10-18-lifecycle-and-orchestration.json) addresses the two methodological weaknesses identified in our audit of earlier benchmarks (`bench/run-matrix.mjs`):
-1. **Cold-start conflation in worker comparison**: Earlier runs compared `worker.go.receipt` (`5.14 ms`) against `worker.node.receipt` (`39.00 ms`) only under one-shot cold process start, conflating ~26–30 ms V8/ESM process initialization with actual orchestration work.
-2. **Unseparated bundle in runtime demo**: Earlier measurements of `runtime.*.demo` (~404–606 ms) measured an unseparated bundle mixing runtime startup, capture subprocesses, Python `uvx perfdigest-mcp` cold start (~268 ms), and verification subprocesses.
+The Stage 7 benchmark in [`bench/bench-lifecycle.mjs`](../bench/bench-lifecycle.mjs) and [`bench/results/2026-10-18-lifecycle-and-orchestration.json`](../bench/results/2026-10-18-lifecycle-and-orchestration.json) evaluates **all 4 complete end-to-end backends (`node22`, `bun`, `deno`, `go`)** across both **`one_shot`** and **`persistent`** lifecycles under identical workloads.
 
-Stage 7 establishes an **Equivalent-Lifecycle & Orchestration-Only Benchmark** comparing **Node.js 22.22.1**, **Bun 1.4.3**, **Deno 2.9.7**, and **Go 1.26.8** under strictly identical lifecycle conditions (`one_shot` vs `persistent` stdio daemons) and explicit cost separation.
+### Complete Go 1.26 Production Implementation (`cmd/perfdigest-plugin` + `internal/perfdigest/*.go`)
 
-### Table A: Worker Receipt Prototype Benchmark (Identical Workload: 4 reports, 1 cmd)
+Unlike the earlier `bench/go-worker` receipt prototype, `dist/perfdigest-plugin` (`cmd/perfdigest-plugin/main.go` and `internal/perfdigest/*.go`, built with **Go 1.26.8 standard library only** and zero external Go module dependencies) implements **100% of the plugin surface**:
+1. **CLI subcommands & persistent daemon modes**: `init`, `demo`, `run`, `mcp`, `--serve-jsonl`, `--bench-investigate`, and `--zero-cost-mcp`, matching all CLI flags (`--workspace`, `--manifest`, `--config-dir`, `--provider`, `--agent`, `--agent-command`, `--agent-args-json`, `--agent-sessions`, `--no-agent-sessions`, `--json`).
+2. **Manifest validation, workspace path containment & streaming SHA-256 provenance**: Rejects unknown fields, path escapes (`../` or symlink escapes via `filepath.EvalSymlinks`), non-regular files, and empty reports; enforces `0700` directory and `0600` file permissions via atomic temp-file + `os.Rename` writes.
+3. **Bounded PerfDigest MCP stdio session client (`internal/perfdigest/mcpclient.go`)**: Speaks newline-delimited MCP JSON-RPC 2.0 (`initialize`, `notifications/initialized`, `tools/call` for `summarize_report`), enforcing `maxCalls` per child process and `validateDigest` schema checks (`total_units`, `returned_units`, `truncated`, `units[]`).
+4. **Routing & synthesis providers (`internal/perfdigest/providers.go`)**: Full HTTP client support for **Cloudflare SystemOne** (`/v1/systemone` routing choices + probabilities), **OpenAI Responses API** (`json_schema` structured outputs), **MiniMax M2.7** (`chat/completions` + `<think>` stripping), and deterministic **offline** heuristic fallback.
+5. **External CLI agent runners (`internal/perfdigest/agents.go`)**: Full `perfdigest-agent/v1` generic JSONL runner (`sessionId` continuation across `analysis` and `review` turns) and `codex exec` / `codex exec resume` runner, with `Promise.allSettled`-equivalent concurrent execution overlapping the initial `analysis` turn with evidence capture + MCP digest.
+6. **Plugin MCP stdio server (`internal/perfdigest/mcpserver.go`)**: Full MCP server exposing `launch_evidence_prefetch` and `get_evidence_job` with workspace-isolated background job queues (`queued` -> `running` -> `complete` / `abstained` / `failed`).
+7. **Parity test suites**: Verified by both `go test ./...` ([`internal/perfdigest/perfdigest_test.go`](../internal/perfdigest/perfdigest_test.go)) and the 90-test Node.js test suite including [`test/go-backend-parity.test.ts`](../test/go-backend-parity.test.ts) and `npm run test:package` (`npx perfdigest-plugin` tarball check).
 
-All 4 backends execute the exact same workload over a 4-report workspace (3 small profile reports + 1 `256 KB` trace file to exercise streaming SHA-256 + 1 allowlisted `/bin/true` verification command):
-- **`one_shot` lifecycle ($N = 15$)**: Spawns a fresh worker process per run, measuring cold startup + execution + teardown.
-- **`persistent` lifecycle ($N = 25$ warm requests after 3 warmup requests)**: Runs a long-lived worker daemon reading newline-delimited JSON requests over `stdin` and writing JSON receipts on `stdout`.
+---
 
-| Backend | Lifecycle | N (warmup) | Wall median (ms) | Wall IQR `[Q1..Q3]` (ms) | Wall p95 (ms) | cgroup Tree Peak (KB) | Max Single-Proc RSS (KB) | cgroup User / Sys CPU (ms) | Parity (`sha256` + exit 0) |
+### Table A: Worker Receipt & 64 KB Streaming SHA-256 Benchmark (`node22`, `bun`, `deno`, `go`)
+
+All 4 backends execute the exact same workload over a 4-report workspace (3 profile reports + 1 `256 KB` trace file to exercise 64 KB chunked streaming SHA-256 + 1 allowlisted `/bin/true` verification command) under `one_shot` ($N = 15$, warmup $= 2$) and `persistent` stdio JSONL daemon ($N = 25$, warmup $= 3$) lifecycles:
+
+| Backend | Lifecycle | N (warmup) | Wall median (ms) | Wall IQR `[Q1..Q3]` (ms) | Wall max (ms) | cgroup Tree Peak (KB) | Max Single-Proc RSS (KB) | cgroup User / Sys CPU (ms) | Parity (`sha256` + exit 0) |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| `node22` *(baseline)* | `one_shot` | 15 (2) | **30.68** | `25.51..41.28` | 47.28 | 12,304 | 48,400 | 23.8 / 13.3 | `pass` (all 4 byte-identical) |
-| `node22` *(baseline)* | `persistent` | 25 (3) | **2.13** | `1.92..2.32` | 3.36 | 19,532 | 58,820 | 42.4 / 31.0 | `pass` (all 4 byte-identical) |
-| `bun` | `one_shot` | 15 (2) | **23.63** | `23.05..24.72` | 30.17 | 21,296 | 25,564 | 14.8 / 11.2 | `pass` (all 4 byte-identical) |
-| `bun` | `persistent` | 25 (3) | **1.05** | `1.01..1.12` | 2.63 | 23,540 | 41,604 | 18.4 / 15.6 | `pass` (all 4 byte-identical) |
-| `deno` | `one_shot` | 15 (2) | **52.12** | `36.66..55.25` | 61.01 | 38,420 | 46,624 | 34.1 / 20.8 | `pass` (all 4 byte-identical) |
-| `deno` | `persistent` | 25 (3) | **1.32** | `1.19..1.53` | 1.91 | 40,116 | 58,188 | 28.2 / 21.0 | `pass` (all 4 byte-identical) |
-| `go` *(prototype)* | `one_shot` | 15 (2) | **3.69** | `3.66..3.86` | 4.34 | 8,140 | 3,356 | 2.1 / 3.4 | `pass` (all 4 byte-identical) |
-| `go` *(prototype)* | `persistent` | 25 (3) | **0.97** | `0.85..1.02` | 1.64 | 8,776 | 6,092 | 8.4 / 11.6 | `pass` (all 4 byte-identical) |
-
-> **Key Takeaway**: Under a persistent daemon model, the Go prototype (`0.97 ms`) is only **1.08× faster than Bun (`1.05 ms`)**, **1.36× faster than Deno (`1.32 ms`)**, and **2.20× faster than Node 22 (`2.13 ms`)**. The earlier apparent 7.6×–12.7× gap was almost entirely an artifact of V8 process startup cold start, not core execution overhead.
+| `node22` *(baseline)* | `one_shot` | 15 (2) | **23.20** | `22.69..23.80` | 31.34 | 12,064 | 48,200 | 16.2 / 17.2 | `pass` (all 4 byte-identical) |
+| `node22` *(baseline)* | `persistent` | 25 (3) | **1.29** | `1.19..1.36` | 2.04 | 12,688 | 58,212 | 15.7 / 10.1 | `pass` (all 4 byte-identical) |
+| `bun` | `one_shot` | 15 (2) | **19.93** | `18.54..20.60` | 20.98 | 10,560 | 24,376 | 11.8 / 13.6 | `pass` (all 4 byte-identical) |
+| `bun` | `persistent` | 25 (3) | **0.85** | `0.73..0.91` | 2.05 | 9,808 | 40,336 | 15.7 / 4.5 | `pass` (all 4 byte-identical) |
+| `deno` | `one_shot` | 15 (2) | **33.40** | `30.12..36.56` | 42.33 | 18,344 | 44,884 | 25.7 / 15.6 | `pass` (all 4 byte-identical) |
+| `deno` | `persistent` | 25 (3) | **0.87** | `0.76..0.94` | 1.36 | 19,304 | 56,056 | 41.8 / 9.7 | `pass` (all 4 byte-identical) |
+| **`go`** | `one_shot` | 15 (2) | **2.32** | `2.26..2.42` | 2.65 | **3,832** | **3,548** | 2.1 / 7.4 | `pass` (all 4 byte-identical) |
+| **`go`** | `persistent` | 25 (3) | **0.50** | `0.49..0.54` | 1.13 | **3,312** | **6,012** | 2.0 / 2.0 | `pass` (all 4 byte-identical) |
 
 ---
 
-### Table B: Full Plugin `investigate()` Orchestration-Only Benchmark
+### Table B (Workload 1): Full `investigate()` Service Orchestration-Isolated (`node22`, `bun`, `deno`, `go`)
 
-Table B isolates pure TypeScript plugin orchestration by replacing `uvx perfdigest-mcp` with an in-process deterministic zero-latency mock `DecisionProvider` (`routing: "cloudflare"`) and a local zero-cost MCP stdio responder. This completely eliminates Python runtime startup (~268 ms) and model inference (~2–5 s), measuring exclusively:
-- Manifest schema validation (`manifestSchema.parse`)
-- Child process environment allowlisting (`childEnvironment`)
-- Pre- and post-digest artifact `realpath`, `stat`, and streaming SHA-256 hashing across 4 reports (including the `256 KB` trace file)
-- Bounded MCP JSON-RPC `initialize` + 4 `tools/call` (`summarize_report`) round-trips + `validateDigest`
+To compare all 4 backends on the **full `investigate()` orchestration service** without conflating child responder startup differences, all 4 backends (`node22`, `bun`, `deno`, `go`) spawn the **exact same compiled zero-cost MCP stdio responder (`dist/perfdigest-plugin --zero-cost-mcp`)** and talk over loopback TCP to the **exact same external SystemOne HTTP server (`/v1/systemone`)**, while executing:
+- Full manifest validation & workspace symlink/containment verification
+- Pre- and post-digest `realpath`, `stat`, and streaming SHA-256 across 4 reports (including the `256 KB` trace file)
+- Bounded MCP JSON-RPC `initialize` + 4 `tools/call` (`summarize_report`) round-trips + `validateDigest` (`reuseMcpSession: false` = 4 MCP child spawns; `reuseMcpSession: true` = 1 MCP child spawn + 3 warm reused calls)
+- Loopback HTTP `POST /v1/systemone` routing decision (`choice: "r2"`, `confidence: 0.91`) + synthesis
 - Verification command subprocess spawn (`/bin/true`)
-- Atomic run receipt and report write (`run.json` + `report.md` with `0600` permissions)
+- Atomic `run.json` and `report.md` artifact generation (`0600` permissions)
 
-| Backend | Lifecycle | MCP Session Reuse | Runs (warmup) | Wall median (ms) | Wall IQR `[Q1..Q3]` (ms) | cgroup Tree Peak (KB) | Max Single-Proc RSS (KB) | Parity |
-| --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |
-| `node22` *(baseline)* | `one_shot` | `false` (1 spawn/rep) | 10 (2) | **256.67** | `251.64..263.85` | 63,174 | 96,384 | `pass` (`complete`, exit 0) |
-| `node22` *(baseline)* | `persistent` | `false` (1 spawn/rep) | 20 (2) | **96.21** | `95.23..97.54` | 121,400 | 122,096 | `pass` (`complete`, exit 0) |
-| `node22` *(baseline)* | `one_shot` | `true` (bounded reuse) | 10 (2) | **171.19** | `165.67..184.56` | 63,200 | 96,176 | `pass` (`complete`, exit 0) |
-| `node22` *(baseline)* | `persistent` | `true` (bounded reuse) | 20 (2) | **29.36** | `25.46..32.07` | 123,800 | 124,536 | `pass` (`complete`, exit 0) |
-| `bun` | `one_shot` | `false` (1 spawn/rep) | 10 (2) | **151.37** | `148.17..159.00` | 55,800 | 69,960 | `pass` (`complete`, exit 0) |
-| `bun` | `persistent` | `false` (1 spawn/rep) | 20 (2) | **68.97** | `67.28..70.54` | 86,400 | 88,540 | `pass` (`complete`, exit 0) |
-| `bun` | `one_shot` | `true` (bounded reuse) | 10 (2) | **101.87** | `97.15..104.92` | 55,200 | 69,244 | `pass` (`complete`, exit 0) |
-| `bun` | `persistent` | `true` (bounded reuse) | 20 (2) | **21.43** | `19.73..21.96` | 82,900 | 85,200 | `pass` (`complete`, exit 0) |
-| `deno` | `one_shot` | `false` (1 spawn/rep) | 10 (2) | **232.07** | `221.67..234.73` | 81,032 | 94,404 | `pass` (`complete`, exit 0) |
-| `deno` | `persistent` | `false` (1 spawn/rep) | 20 (2) | **108.29** | `104.20..111.65` | 111,190 | 119,184 | `pass` (`complete`, exit 0) |
-| `deno` | `one_shot` | `true` (bounded reuse) | 10 (2) | **139.45** | `133.84..147.03` | 70,288 | 94,096 | `pass` (`complete`, exit 0) |
-| `deno` | `persistent` | `true` (bounded reuse) | 20 (2) | **31.96** | `29.91..36.55` | 107,624 | 119,542 | `pass` (`complete`, exit 0) |
+| Backend | Lifecycle | MCP Session Reuse | Runs (warmup) | Wall median (ms) | Wall IQR `[Q1..Q3]` (ms) | cgroup Tree Peak (KB) | Max Single-Proc RSS (KB) | cgroup User / Sys CPU (ms) | Parity |
+| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| `node22` *(baseline)* | `one_shot` | `false` (4 spawns) | 10 (2) | **180.44** | `173.81..186.60` | 65,030 | 98,008 | 254.4 / 42.3 | `pass` (`complete`, `r2`, exit 0) |
+| `node22` *(baseline)* | `persistent` | `false` (4 spawns) | 15 (2) | **27.36** | `26.36..27.89` | 110,548 | 129,974 | 579.6 / 296.4 | `pass` (`complete`, `r2`, exit 0) |
+| `node22` *(baseline)* | `one_shot` | `true` (1 spawn + 3 reuse) | 10 (2) | **169.20** | `165.21..171.38` | 57,778 | 97,408 | 232.3 / 44.7 | `pass` (`complete`, `r2`, exit 0) |
+| `node22` *(baseline)* | `persistent` | `true` (1 spawn + 3 reuse) | 15 (2) | **14.10** | `13.59..15.34` | 94,350 | 125,342 | 435.9 / 135.4 | `pass` (`complete`, `r2`, exit 0) |
+| `bun` | `one_shot` | `false` (4 spawns) | 10 (2) | **106.55** | `102.73..117.63` | 56,372 | 66,768 | 136.3 / 45.8 | `pass` (`complete`, `r2`, exit 0) |
+| `bun` | `persistent` | `false` (4 spawns) | 15 (2) | **18.89** | `17.84..19.65` | 95,032 | 90,344 | 445.6 / 199.4 | `pass` (`complete`, `r2`, exit 0) |
+| `bun` | `one_shot` | `true` (1 spawn + 3 reuse) | 10 (2) | **88.32** | `87.85..91.28` | 47,322 | 66,836 | 134.0 / 44.4 | `pass` (`complete`, `r2`, exit 0) |
+| `bun` | `persistent` | `true` (1 spawn + 3 reuse) | 15 (2) | **8.84** | `8.53..9.38` | 75,662 | 84,622 | 261.6 / 113.0 | `pass` (`complete`, `r2`, exit 0) |
+| `deno` | `one_shot` | `false` (4 spawns) | 10 (2) | **140.00** | `138.08..143.26` | 67,328 | 91,676 | 151.7 / 48.5 | `pass` (`complete`, `r2`, exit 0) |
+| `deno` | `persistent` | `false` (4 spawns) | 15 (2) | **27.59** | `25.54..28.38` | 101,036 | 115,002 | 518.8 / 229.9 | `pass` (`complete`, `r2`, exit 0) |
+| `deno` | `one_shot` | `true` (1 spawn + 3 reuse) | 10 (2) | **128.65** | `125.36..130.17` | 60,826 | 91,788 | 130.3 / 36.0 | `pass` (`complete`, `r2`, exit 0) |
+| `deno` | `persistent` | `true` (1 spawn + 3 reuse) | 15 (2) | **15.69** | `14.68..16.68` | 89,232 | 114,636 | 392.6 / 129.0 | `pass` (`complete`, `r2`, exit 0) |
+| **`go` (`dist/perfdigest-plugin`)** | `one_shot` | `false` (4 spawns) | 10 (2) | **16.65** | `16.45..16.81` | **18,936** | **11,044** | 9.7 / 18.2 | `pass` (`complete`, `r2`, exit 0) |
+| **`go` (`dist/perfdigest-plugin`)** | `persistent` | `false` (4 spawns) | 15 (2) | **13.08** | `12.85..13.34` | **51,232** | **14,748** | 141.3 / 139.1 | `pass` (`complete`, `r2`, exit 0) |
+| **`go` (`dist/perfdigest-plugin`)** | `one_shot` | `true` (1 spawn + 3 reuse) | 10 (2) | **10.79** | `10.76..10.93` | **11,082** | **11,138** | 7.9 / 12.9 | `pass` (`complete`, `r2`, exit 0) |
+| **`go` (`dist/perfdigest-plugin`)** | `persistent` | `true` (1 spawn + 3 reuse) | 15 (2) | **6.88** | `6.70..7.07` | **31,370** | **14,554** | 88.8 / 62.6 | `pass` (`complete`, `r2`, exit 0) |
+
+> **Workload 1 Takeaway**: On the full `investigate()` orchestration service with `reuseMcpSession: true`, **`go` (`dist/perfdigest-plugin`)** completes `one_shot` CLI invocation in **10.79 ms** (**15.7× faster** than Node 22 `169.20 ms`, **8.2× faster** than Bun `88.32 ms`, **11.9× faster** than Deno `128.65 ms`) with **11.1 MB cgroup peak memory** (**4.3×–5.5× lower** than Bun `47.3 MB`, Node 22 `57.8 MB`, and Deno `60.8 MB`). Even in the **persistent warm daemon** lifecycle (`reuseMcpSession: true`), Go (**6.88 ms**, **14.6 MB RSS**) is **2.05× faster than Node 22 (`14.10 ms`, `125.3 MB RSS`)**, **1.28× faster than Bun (`8.84 ms`, `84.6 MB RSS`)**, and **2.28× faster than Deno (`15.69 ms`, `114.6 MB RSS`)** while using **5.8×–8.6× less resident memory**.
 
 ---
 
-### Table C: End-to-End Cost Separation & Pipeline Decomposition
+### Table B2 (Workload 2): Full `investigate()` Live E2E Service with Real Python `uvx perfdigest-mcp` Engine (`node22`, `bun`, `deno`, `go`)
 
-By combining the pure orchestration latencies from Table B with the measured Stage 5 single-call engine costs (`268.00 ms` cold spawn, `8.00 ms` marginal cost per reused report), we decompose a full 4-report investigation into its exact structural constituents:
+Table B2 replaces the zero-cost MCP responder with the **real Python `uvx perfdigest-mcp` engine** (`reuseMcpSession: true`), measuring the complete end-to-end 4-report investigation (`uvx perfdigest-mcp` session startup + 4 real `summarize_report` digests + loopback SystemOne HTTP routing + `/bin/true` verification + `run.json`/`report.md`) across all 4 backends:
+
+| Backend | Lifecycle | MCP Session Reuse | Runs (warmup) | Wall median (ms) | Wall IQR `[Q1..Q3]` (ms) | cgroup Tree Peak (KB) | Max Single-Proc RSS (KB) | cgroup User / Sys CPU (ms) | Parity |
+| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| `node22` *(baseline)* | `one_shot` | `true` (live `uvx`) | 5 (1) | **540.62** | `533.52..545.71` | 114,150 | 97,794 | 568.5 / 79.2 | `pass` (`complete`, `r2`, exit 0) |
+| `node22` *(baseline)* | `persistent` | `true` (live `uvx`) | 8 (1) | **384.21** | `374.15..390.49` | 132,582 | 114,982 | 3,325.6 / 408.5 | `pass` (`complete`, `r2`, exit 0) |
+| `bun` | `one_shot` | `true` (live `uvx`) | 5 (1) | **456.23** | `455.54..465.51` | 98,916 | 64,718 | 481.2 / 86.5 | `pass` (`complete`, `r2`, exit 0) |
+| `bun` | `persistent` | `true` (live `uvx`) | 8 (1) | **370.33** | `368.96..377.57` | 106,022 | 68,280 | 3,276.5 / 426.5 | `pass` (`complete`, `r2`, exit 0) |
+| `deno` | `one_shot` | `true` (live `uvx`) | 5 (1) | **502.79** | `495.77..507.03` | 116,542 | 91,730 | 469.5 / 76.4 | `pass` (`complete`, `r2`, exit 0) |
+| `deno` | `persistent` | `true` (live `uvx`) | 8 (1) | **387.43** | `380.73..394.53` | 139,618 | 114,272 | 3,304.7 / 400.2 | `pass` (`complete`, `r2`, exit 0) |
+| **`go` (`dist/perfdigest-plugin`)** | `one_shot` | `true` (live `uvx`) | 5 (1) | **300.88** | `290.86..302.66` | **66,090** | **65,014** | 251.5 / 60.2 | `pass` (`complete`, `r2`, exit 0) |
+| **`go` (`dist/perfdigest-plugin`)** | `persistent` | `true` (live `uvx`) | 8 (1) | **292.89** | `287.87..300.25` | **72,692** | **65,072** | 2,289.1 / 356.3 | `pass` (`complete`, `r2`, exit 0) |
+
+> **Workload 2 Takeaway**: Even when the real Python `uvx perfdigest-mcp` engine (`~268 ms` cold start + `3 × 8 ms` warm calls = `~292 ms` engine floor) is included in the critical path, **`go` (`dist/perfdigest-plugin`)** completes a cold 4-report end-to-end investigation in **300.88 ms** (**239.7 ms / 1.80× faster than Node 22 `540.62 ms`**, **155.3 ms / 1.52× faster than Bun `456.23 ms`**, **201.9 ms / 1.67× faster than Deno `502.79 ms`**) and reduces the concurrent process-tree cgroup memory peak from **98.9–116.5 MB** down to **66.1 MB** (eliminating the entire JS runtime heap overhead on top of Python `uvx`).
+
+---
+
+### Table C: End-to-End Cost Separation & Pipeline Decomposition (`node22`, `bun`, `deno`, `go`)
+
+Combining the measured runtime cold start ($\text{Table B}_{\text{one\_shot, reuse}} - \text{Table B}_{\text{persistent, reuse}}$) and warm orchestration latency ($\text{Table B}_{\text{persistent, reuse}}$) with the Stage 5 Python `uvx perfdigest-mcp` engine costs (`268.00 ms` cold spawn, `8.00 ms` warm reuse per report):
 
 $$\text{Latency}_{\text{reuse}} = \text{ColdStart} + \text{Orchestration} + \text{MCPEngine}_{\text{cold}} + 3 \times \text{MCPEngine}_{\text{warm}}$$
 $$\text{Latency}_{\text{noreuse}} = \text{ColdStart} + \text{Orchestration} + 4 \times \text{MCPEngine}_{\text{cold}}$$
 
 | Runtime | Runtime Cold Start (ms) | Orchestration Only (ms) | Real Python MCP Cold Start (ms) | Warm MCP Reuse / Report (ms) | E2E with Session Reuse (ms) | E2E without Session Reuse (ms) | End-to-End Speedup Ratio |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| **Node.js 22** *(baseline)* | 141.83 | **29.36** | 268.00 | 8.00 | **463.19** | 1,243.19 | **2.68×** |
-| **Bun 1.4.3** | 80.44 | **21.43** | 268.00 | 8.00 | **393.87** | 1,173.87 | **2.98×** |
-| **Deno 2.9.7** | 107.49 | **31.96** | 268.00 | 8.00 | **431.45** | 1,211.45 | **2.81×** |
-
-### Architectural Takeaways:
-1. **Local Orchestration is Negligible**: In all three runtimes, warm plugin orchestration (manifest validation, streaming SHA-256 over 256 KB, stdio JSON-RPC tool roundtrips, subprocess execution, atomic receipt writes) requires only **21.43 ms (Bun)**, **29.36 ms (Node 22)**, and **31.96 ms (Deno)**.
-2. **Python MCP Startup Dominates**: Unoptimized cold investigations spend >80% of their total wall time spawning Python `uvx perfdigest-mcp` processes (`268 ms` per report $\times$ 4 reports = `1,072 ms`).
-3. **Session Reuse Amortization**: Bounded MCP session reuse consolidates the 4 cold Python spawns into 1 spawn + 3 warm stdio calls (`268 ms + 24 ms = 292 ms`), eliminating ~780 ms of unnecessary engine startup overhead.
-4. **Where Backends Actually Differ**: Go's true advantage is cold CLI startup (3.69 ms cold vs 23–52 ms) and minimal memory footprint (3.3–6.1 MB RSS vs 25–96 MB). When running warm services or daemons, Node 22, Bun, and Deno achieve virtually identical orchestration latency (~21–32 ms).
+| **Node.js 22** *(baseline)* | 155.10 | **14.10** | 268.00 | 8.00 | **461.20** *(measured: 540.62)* | 1,241.20 | **2.69×** |
+| **Bun 1.4.3** | 79.48 | **8.84** | 268.00 | 8.00 | **380.32** *(measured: 456.23)* | 1,160.32 | **3.05×** |
+| **Deno 2.9.7** | 112.96 | **15.69** | 268.00 | 8.00 | **420.65** *(measured: 502.79)* | 1,200.65 | **2.85×** |
+| **Go 1.26.8 (`dist/perfdigest-plugin`)** | **3.91** | **6.88** | 268.00 | 8.00 | **302.79** *(measured: 300.88)* | 1,082.79 | **3.58×** |
 
 ---
 
-## 8. Explicit scope & limitations
+### Table D (Workload 3): Full Plugin MCP Stdio Server (`mcp`) Job Lifecycle (`node22`, `bun`, `deno`, `go`)
+
+Table D benchmarks the plugin's own **MCP stdio server mode (`perfdigest-plugin mcp`)** across a full client session (`initialize` -> `notifications/initialized` -> `tools/list` -> `tools/call(launch_evidence_prefetch)` -> polling `tools/call(get_evidence_job)` until `complete`) backed by the live Python `uvx perfdigest-mcp` engine and loopback SystemOne HTTP routing:
+
+| Backend | Lifecycle | Runs (warmup) | Wall median (ms) | Wall IQR `[Q1..Q3]` (ms) | Wall max (ms) | cgroup Tree Peak (KB) | MCP Server Process `VmHWM` (KB) | cgroup User / Sys CPU (ms) | Parity |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| `node22` *(baseline)* | `one_shot` | 5 (1) | **535.81** | `530.54..540.53` | 571.11 | 111,528 | 99,288 | 546.8 / 62.6 | `pass` (`2 tools`, `complete`, `r2`) |
+| `node22` *(baseline)* | `persistent` | 8 (1) | **379.04** | `375.16..384.11` | 409.66 | 111,576 | 116,888 | 546.7 / 67.2 | `pass` (`2 tools`, `complete`, `r2`) |
+| `bun` | `one_shot` | 5 (1) | **477.15** | `469.12..486.28` | 507.54 | 98,176 | 66,428 | 482.3 / 72.8 | `pass` (`2 tools`, `complete`, `r2`) |
+| `bun` | `persistent` | 8 (1) | **366.31** | `364.96..371.28` | 378.64 | 98,184 | 71,320 | 493.1 / 58.7 | `pass` (`2 tools`, `complete`, `r2`) |
+| `deno` | `one_shot` | 5 (1) | **494.16** | `491.27..499.87` | 510.03 | 116,548 | 94,364 | 454.6 / 58.4 | `pass` (`2 tools`, `complete`, `r2`) |
+| `deno` | `persistent` | 8 (1) | **377.57** | `374.61..383.49` | 403.82 | 116,464 | 110,648 | 453.5 / 69.6 | `pass` (`2 tools`, `complete`, `r2`) |
+| **`go` (`dist/perfdigest-plugin mcp`)** | `one_shot` | 5 (1) | **289.49** | `288.89..290.56` | 291.55 | **65,756** | **11,516** | 258.0 / 40.6 | `pass` (`2 tools`, `complete`, `r2`) |
+| **`go` (`dist/perfdigest-plugin mcp`)** | `persistent` | 8 (1) | **291.29** | `289.34..293.56` | 300.86 | **66,068** | **14,732** | 266.2 / 39.3 | `pass` (`2 tools`, `complete`, `r2`) |
+
+> **Workload 3 & Default Binary Migration Takeaway**:
+> 1. **Instantaneous MCP Server & CLI Cold Start (`3.91 ms` vs `79–155 ms`)**: In `perfdigest-plugin mcp`, Go `one_shot` (**289.49 ms**) matches Go `persistent` (**291.29 ms**) and is **1.85× faster than Node 22 `one_shot` (`535.81 ms`)** and **1.30× faster than Node 22 `persistent` (`379.04 ms`)**.
+> 2. **4.8×–8.6× Lower Long-Lived MCP Server Memory (`11.5–14.7 MB` vs `66.4–116.9 MB`)**: Because IDE and agent hosts (Claude Code, Cursor, Codex, Antigravity) keep MCP stdio servers running in the background for the duration of a developer session, migrating `"bin": { "perfdigest-plugin": "dist/perfdigest-plugin" }` reduces idle/active MCP server resident memory from **99–117 MB (Node 22)** down to **11.5–14.7 MB (Go)** while cutting cgroup tree peak memory (server + Python `uvx` child) from **111.6 MB** to **65.8 MB**.
+> 3. **Dual-Surface Packaging**: `npm run build` compiles both `dist/*.js` (`tsc -p tsconfig.json`) for programmatic ESM library imports and `dist/perfdigest-plugin` (`go build -trimpath -ldflags="-s -w"`) as the default CLI/MCP binary.
+
+---
+
+## 7. Explicit scope & limitations
 
 - **Single host, single session**: All medians, IQRs, and resource figures apply strictly to `amd-ryzen-ai-9-hx-370-x64` (`Linux 7.0.0-27-generic`) and do not generalize to other CPUs, OS kernels, filesystems, or shared CI runners.
-- **1-report floor**: Single-report investigations (`K = 1`) still pay one initial `uvx perfdigest-mcp` startup (~288–404 ms); bounded session reuse eliminates $K - 1$ redundant Python/MCP startups when $K \ge 2$ candidate reports are summarized in a single investigation (such as multi-artifact CMake/Ninja/Clang or `ptxas` + `ncu` manifests).
+- **1-report floor**: Single-report investigations (`K = 1`) still pay one initial `uvx perfdigest-mcp` startup (~268–404 ms); bounded session reuse eliminates $K - 1$ redundant Python/MCP startups when $K \ge 2$ candidate reports are summarized in a single investigation (such as multi-artifact CMake/Ninja/Clang or `ptxas` + `ncu` manifests).
 - **Warm OS page cache**: "Cold build" means the output directory is deleted before every run and incremental `.tsbuildinfo` state is absent; the OS filesystem cache and `node_modules/` remain warm.
 - **Deterministic local CLI agent in `agent_e2e`**: `agent.generic.go-cli.e2e` measures the full `perfdigest-agent/v1` stdio JSONL protocol, concurrent `analysis`/evidence overlap, session-continuation verification, and `review` evidence delivery using a compiled Go binary with zero network or LLM API calls; real workload evaluation with live Codex CLI turns is reported separately in `docs/REAL_WORKLOAD_EVALUATION.md`.
-- **Prototype boundary**: `bench/go-worker/` measures only `os/exec` + streaming `crypto/sha256` receipt generation and is not a replacement for the TypeScript evidence runner.
+
 

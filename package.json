@@ -12,7 +12,7 @@
     "node": ">=22"
   },
   "bin": {
-    "perfdigest-plugin": "dist/cli.js"
+    "perfdigest-plugin": "dist/perfdigest-plugin"
   },
   "exports": {
     ".": {
@@ -32,9 +32,9 @@
     "docs"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && go build -trimpath -ldflags=\"-s -w\" -o dist/perfdigest-plugin ./cmd/perfdigest-plugin",
     "test": "tsc -p tsconfig.test.json && node --test .test-build/test/*.test.js",
-    "demo": "node dist/cli.js demo",
+    "demo": "./dist/perfdigest-plugin demo",
     "prepack": "npm run build",
     "test:local": "npm run build && node scripts/check-local.mjs",
     "test:package": "npm run build && node scripts/check-package.mjs",

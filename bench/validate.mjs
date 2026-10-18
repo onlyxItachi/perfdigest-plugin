@@ -113,6 +113,16 @@ for (const file of files) {
         problems.push(`tableB_investigateOrchestration.${cell.id}: parity.status must be "pass"`);
       }
     }
+    for (const cell of doc.tableB2_liveMcpEndToEnd ?? []) {
+      if (cell.parity?.status !== 'pass') {
+        problems.push(`tableB2_liveMcpEndToEnd.${cell.id}: parity.status must be "pass"`);
+      }
+    }
+    for (const cell of doc.tableD_mcpServerLifecycle ?? []) {
+      if (cell.parity?.status !== 'pass') {
+        problems.push(`tableD_mcpServerLifecycle.${cell.id}: parity.status must be "pass"`);
+      }
+    }
   }
   if (problems.length) {
     failures++;
@@ -125,7 +135,7 @@ for (const file of files) {
         : kind === 'real-workload-eval'
           ? `real-workload-eval, ${doc.studies.length} studies`
           : kind === 'lifecycle-benchmark'
-            ? `lifecycle-benchmark, Table A: ${doc.tableA_workerReceipt.length} cells, Table B: ${doc.tableB_investigateOrchestration.length} cells, Table C: ${doc.tableC_costSeparation.length} entries`
+            ? `lifecycle-benchmark, Table A: ${doc.tableA_workerReceipt.length} cells, Table B: ${doc.tableB_investigateOrchestration.length} cells, Table B2: ${(doc.tableB2_liveMcpEndToEnd ?? []).length} cells, Table C: ${doc.tableC_costSeparation.length} entries, Table D: ${(doc.tableD_mcpServerLifecycle ?? []).length} cells`
             : `result, ${doc.cells.length} cells`;
     console.log(`ok   ${file} (${summary})`);
   }

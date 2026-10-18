@@ -459,7 +459,7 @@ export const workerReceiptCellSchema = z.object({
 
 export const investigateOrchestrationCellSchema = z.object({
   id: nonEmpty,
-  backend: z.enum(['node22', 'bun', 'deno']),
+  backend: z.enum(['node22', 'bun', 'deno', 'go']),
   lifecycle: z.enum(['one_shot', 'persistent']),
   reuseMcpSession: z.boolean(),
   runs: z.int().min(1),
@@ -478,8 +478,27 @@ export const investigateOrchestrationCellSchema = z.object({
   mcpReusedCalls: z.int().min(0),
 }).strict();
 
+export const mcpServerLifecycleCellSchema = z.object({
+  id: nonEmpty,
+  backend: z.enum(['node22', 'bun', 'deno', 'go']),
+  lifecycle: z.enum(['one_shot', 'persistent']),
+  runs: z.int().min(1),
+  warmup: z.int().min(0),
+  wallMs: statsSchema,
+  resources: z.object({
+    memoryCoverage: memoryCoverageSchema,
+    cgroupTreePeakKb: z.number().optional(),
+    maxSingleProcessRssKb: z.number().optional(),
+    cgroupUserCpuMs: z.number().optional(),
+    cgroupSysCpuMs: z.number().optional(),
+  }).strict(),
+  parity: paritySchema,
+  toolsCount: z.int().min(1),
+  reportsCount: z.int().min(1),
+}).strict();
+
 export const costSeparationEntrySchema = z.object({
-  backend: z.enum(['node22', 'bun', 'deno']),
+  backend: z.enum(['node22', 'bun', 'deno', 'go']),
   runtimeColdStartMs: z.number(),
   orchestrationOnlyMs: z.number(),
   mcpEngineColdSpawnMs: z.number(),
@@ -525,8 +544,10 @@ export const lifecycleBenchmarkResultSchema = z.object({
     verificationCommand: z.array(z.string()),
   }).strict(),
   tableA_workerReceipt: z.array(workerReceiptCellSchema).min(8),
-  tableB_investigateOrchestration: z.array(investigateOrchestrationCellSchema).min(6),
-  tableC_costSeparation: z.array(costSeparationEntrySchema).min(3),
+  tableB_investigateOrchestration: z.array(investigateOrchestrationCellSchema).min(16),
+  tableB2_liveMcpEndToEnd: z.array(investigateOrchestrationCellSchema).min(8),
+  tableC_costSeparation: z.array(costSeparationEntrySchema).min(4),
+  tableD_mcpServerLifecycle: z.array(mcpServerLifecycleCellSchema).min(8),
   claims: z.array(nonEmpty).min(1),
   limits: z.array(nonEmpty).min(1),
 }).strict();
