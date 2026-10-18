@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Validate benchmark result / manifest documents against the v1 formats.
+// Validate benchmark result / manifest / MCP-reuse documents against the v1 formats.
 //   node bench/validate.mjs [FILE...]   (default: bench/manifests/*.json + bench/results/*.json)
 // Beyond the zod schema it enforces the reporting rules from bench/README.md:
 //   - not-run / failed cells carry a reason;
@@ -9,7 +9,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { manifestSchema, resultSchema } from './schema/formats.mjs';
+import { manifestSchema, mcpReuseResultSchema, resultSchema } from './schema/formats.mjs';
 
 const benchDir = dirname(fileURLToPath(import.meta.url));
 const listJson = async (dir) => (await readdir(join(benchDir, dir)).catch(() => [])).filter((f) => f.endsWith('.json')).map((f) => join(benchDir, dir, f));
@@ -21,19 +21,32 @@ function expectedLayer(c) {
   return 'orchestration';
 }
 
+function selectSchema(doc) {
+  switch (doc.schema) {
+    case 'perfdigest.benchmark-manifest.v1':
+      return { kind: 'manifest', schema: manifestSchema };
+    case 'perfdigest.benchmark-result.v1':
+      return { kind: 'result', schema: resultSchema };
+    case 'perfdigest.mcp-reuse-result.v1':
+      return { kind: 'mcp-reuse', schema: mcpReuseResultSchema };
+    default:
+      return { kind: 'unknown', schema: resultSchema };
+  }
+}
+
 let failures = 0;
 for (const file of files) {
   const doc = JSON.parse(await readFile(file, 'utf8'));
-  const isManifest = doc.schema === 'perfdigest.benchmark-manifest.v1';
-  const parsed = (isManifest ? manifestSchema : resultSchema).safeParse(doc);
+  const { kind, schema } = selectSchema(doc);
+  const parsed = schema.safeParse(doc);
   const problems = parsed.success ? [] : parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`);
-  if (parsed.success) {
+  if (parsed.success && (kind === 'manifest' || kind === 'result')) {
     for (const c of doc.cells) {
       const exp = expectedLayer(c);
       if (c.layer !== exp) problems.push(`${c.id}: layer is ${c.layer}, expected ${exp}`);
     }
   }
-  if (parsed.success && !isManifest) {
+  if (parsed.success && kind === 'result') {
     for (const c of doc.cells) {
       if (c.status !== 'measured' && !c.reason) problems.push(`${c.id}: ${c.status} cell without reason`);
       if (c.status === 'measured' && !c.wall) problems.push(`${c.id}: measured cell without wall stats`);
@@ -61,8 +74,31 @@ for (const file of files) {
       }
     }
   }
-  if (problems.length) { failures++; console.error(`FAIL ${file}\n  ${problems.join('\n  ')}`); }
-  else console.log(`ok   ${file} (${isManifest ? 'manifest' : `result, ${doc.cells.length} cells`})`);
+  if (parsed.success && kind === 'mcp-reuse') {
+    for (const [id, wf] of Object.entries(doc.multiReportWorkflows)) {
+      if (wf.status === 'measured') {
+        if (!wf.beforePerReportSpawn || !wf.afterSessionReuse || !wf.delta) {
+          problems.push(`${id}: measured workflow must include beforePerReportSpawn, afterSessionReuse, and delta`);
+        }
+        if (wf.evidenceParity.status !== 'pass') {
+          problems.push(`${id}: measured workflow must have evidenceParity.status === "pass"`);
+        }
+      } else if (!wf.reason) {
+        problems.push(`${id}: not-run workflow must include reason`);
+      }
+    }
+  }
+  if (problems.length) {
+    failures++;
+    console.error(`FAIL ${file}\n  ${problems.join('\n  ')}`);
+  } else {
+    const summary = kind === 'manifest'
+      ? 'manifest'
+      : kind === 'mcp-reuse'
+        ? `mcp-reuse, ${Object.keys(doc.multiReportWorkflows).length} workflows`
+        : `result, ${doc.cells.length} cells`;
+    console.log(`ok   ${file} (${summary})`);
+  }
 }
 if (!files.length) { console.error('no files to validate'); failures++; }
 process.exitCode = failures ? 1 : 0;

@@ -1,116 +1,188 @@
 {
-  "schemaVersion": "perfdigest-stage5-mcp-reuse.v1",
-  "recordedAt": "2026-10-18T18:11:03.989Z",
+  "schema": "perfdigest.mcp-reuse-result.v1",
+  "createdAt": "2026-10-18T19:23:52.986Z",
+  "subject": {
+    "repo": "onlyxItachi/perfdigest-plugin",
+    "gitSha": "9620c2ac9bf3602bfed6014276121dc226ba21d3",
+    "dirty": true,
+    "ref": "fix/stage1-consolidation-audit"
+  },
   "host": {
-    "hostId": "amd-ryzen-ai-9-hx-370-x64",
-    "cpu": "AMD Ryzen AI 9 HX 370 w/ Radeon 890M",
-    "cores": 24,
-    "arch": "x64",
+    "label": "amd-ryzen-ai-9-hx-370-x64",
+    "os": "Linux 7.0.0-27-generic",
     "kernel": "7.0.0-27-generic",
+    "arch": "x64",
+    "cpuModel": "AMD Ryzen AI 9 HX 370 w/ Radeon 890M",
+    "logicalCpus": 24,
+    "memTotalKb": 14927160,
+    "loadavg1AtStart": 1.76,
     "node": "v22.22.1"
   },
   "singleCallLatencyMs": {
     "perfdigestMcp120": {
+      "command": [
+        "<uvx>",
+        "perfdigest-mcp"
+      ],
+      "reportSequenceCount": 8,
+      "digestParityPass": true,
       "coldSpawn": {
         "unit": "ms",
         "n": 10,
-        "median": 380.166,
-        "min": 355.372,
-        "max": 418.114,
-        "mean": 380.66,
-        "stdev": 16.818,
-        "q1": 374.132,
-        "q3": 385.513
+        "median": 403.865,
+        "min": 382.253,
+        "max": 503.168,
+        "mean": 422.052,
+        "stdev": 36.551,
+        "q1": 400.127,
+        "q3": 442.566
       },
       "warmSessionReuse": {
         "unit": "ms",
         "n": 10,
-        "median": 1.112,
-        "min": 0.973,
-        "max": 1.156,
-        "mean": 1.087,
-        "stdev": 0.072,
-        "q1": 1.027,
-        "q3": 1.145
+        "median": 1.24,
+        "min": 0.977,
+        "max": 1.291,
+        "mean": 1.172,
+        "stdev": 0.122,
+        "q1": 1.06,
+        "q3": 1.267
       },
-      "savedPerReusedCallMs": 379.05
+      "savedPerReusedCallMs": 402.63,
+      "speedupRatio": 325.7
     },
     "perfdigestMcp130": {
+      "command": [
+        "<uvx>",
+        "--offline",
+        "--from",
+        "perfdigest-mcp==1.3.0",
+        "perfdigest-mcp"
+      ],
+      "reportSequenceCount": 8,
+      "digestParityPass": true,
       "coldSpawn": {
         "unit": "ms",
         "n": 10,
-        "median": 485.756,
-        "min": 468.96,
-        "max": 519.9,
-        "mean": 488.233,
-        "stdev": 17.19,
-        "q1": 472.631,
-        "q3": 500.81
+        "median": 542.211,
+        "min": 501.823,
+        "max": 599.866,
+        "mean": 548.593,
+        "stdev": 34.808,
+        "q1": 523.805,
+        "q3": 577.716
       },
       "warmSessionReuse": {
         "unit": "ms",
         "n": 10,
-        "median": 0.565,
-        "min": 0.438,
-        "max": 0.628,
-        "mean": 0.536,
+        "median": 0.437,
+        "min": 0.37,
+        "max": 0.603,
+        "mean": 0.443,
         "stdev": 0.069,
-        "q1": 0.471,
-        "q3": 0.589
+        "q1": 0.399,
+        "q3": 0.471
       },
-      "savedPerReusedCallMs": 485.19
+      "savedPerReusedCallMs": 541.77,
+      "speedupRatio": 1240.76
     }
   },
   "multiReportWorkflows": {
     "reports_1_node22": {
       "reportCount": 1,
-      "runtime": "node22",
+      "runtime": "node-v22.22.1",
+      "status": "measured",
+      "evidenceParity": {
+        "status": "pass",
+        "detail": "sha256_match=true before_spawns=1/1 after_spawns=1/1(reused=0)"
+      },
       "beforePerReportSpawn": {
         "runs": 8,
         "warmup": 2,
         "wallMs": {
           "unit": "ms",
           "n": 8,
-          "median": 522.064,
-          "min": 498.645,
-          "max": 553.927,
-          "mean": 526.999,
-          "stdev": 21.095,
-          "q1": 511.772,
-          "q3": 548.701
+          "median": 583.268,
+          "min": 526.872,
+          "max": 751.565,
+          "mean": 621.736,
+          "stdev": 83.82,
+          "q1": 563.223,
+          "q3": 694.427
         },
         "userCpuMs": {
           "unit": "ms",
-          "n": 8,
-          "median": 545,
-          "min": 520,
-          "max": 570,
-          "mean": 543.75,
-          "stdev": 19.226,
-          "q1": 527.5,
-          "q3": 560
+          "n": 5,
+          "median": 560,
+          "min": 550,
+          "max": 650,
+          "mean": 578,
+          "stdev": 40.866,
+          "q1": 560,
+          "q3": 570
         },
         "sysCpuMs": {
           "unit": "ms",
-          "n": 8,
-          "median": 55,
-          "min": 50,
+          "n": 5,
+          "median": 70,
+          "min": 60,
           "max": 70,
-          "mean": 56.25,
-          "stdev": 7.44,
-          "q1": 50,
-          "q3": 60
+          "mean": 66,
+          "stdev": 5.477,
+          "q1": 60,
+          "q3": 70
         },
-        "peakRssKb": {
-          "unit": "KB",
-          "n": 8,
+        "cgroupUserCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 567.15,
+          "min": 557.33,
+          "max": 656.5,
+          "mean": 583.916,
+          "stdev": 41.015,
+          "q1": 564.54,
+          "q3": 574.06
+        },
+        "cgroupSysCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 78.79,
+          "min": 70.57,
+          "max": 81.68,
+          "mean": 77.188,
+          "stdev": 4.582,
+          "q1": 74.51,
+          "q3": 80.39
+        },
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "maxSingleProcessRssKb": {
+          "unit": "kb",
+          "n": 5,
           "median": 90028,
-          "min": 89748,
-          "max": 93052,
-          "mean": 90416.5,
-          "stdev": 1096.901,
-          "q1": 89841,
-          "q3": 90410
+          "min": 89716,
+          "max": 95232,
+          "mean": 91005.6,
+          "stdev": 2367.312,
+          "q1": 89936,
+          "q3": 90116
+        },
+        "cgroupTreePeakKb": {
+          "unit": "kb",
+          "n": 5,
+          "median": 105016,
+          "min": 104680,
+          "max": 110380,
+          "mean": 106286.4,
+          "stdev": 2379.312,
+          "q1": 104988,
+          "q3": 106368
+        },
+        "sessionStats": {
+          "spawns": 1,
+          "calls": 1,
+          "reusedCalls": 0,
+          "closed": true,
+          "tainted": false
         }
       },
       "afterSessionReuse": {
@@ -119,102 +191,191 @@
         "wallMs": {
           "unit": "ms",
           "n": 8,
-          "median": 498.544,
-          "min": 483.256,
-          "max": 518.523,
-          "mean": 499.294,
-          "stdev": 11.965,
-          "q1": 490.181,
-          "q3": 508.424
+          "median": 582.709,
+          "min": 506.536,
+          "max": 629.001,
+          "mean": 570.08,
+          "stdev": 41.672,
+          "q1": 540.819,
+          "q3": 593.99
         },
         "userCpuMs": {
           "unit": "ms",
-          "n": 8,
-          "median": 505,
-          "min": 490,
-          "max": 530,
-          "mean": 510,
-          "stdev": 15.119,
-          "q1": 500,
-          "q3": 522.5
+          "n": 5,
+          "median": 570,
+          "min": 540,
+          "max": 580,
+          "mean": 566,
+          "stdev": 16.733,
+          "q1": 560,
+          "q3": 580
         },
         "sysCpuMs": {
           "unit": "ms",
-          "n": 8,
-          "median": 60,
-          "min": 50,
-          "max": 70,
-          "mean": 60,
-          "stdev": 7.559,
-          "q1": 57.5,
-          "q3": 62.5
+          "n": 5,
+          "median": 70,
+          "min": 60,
+          "max": 80,
+          "mean": 68,
+          "stdev": 8.367,
+          "q1": 60,
+          "q3": 70
         },
-        "peakRssKb": {
-          "unit": "KB",
-          "n": 8,
-          "median": 90280,
-          "min": 90008,
-          "max": 90520,
-          "mean": 90270.5,
-          "stdev": 155.463,
-          "q1": 90177,
-          "q3": 90356
+        "cgroupUserCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 574.75,
+          "min": 553.04,
+          "max": 590.27,
+          "mean": 572.992,
+          "stdev": 14.86,
+          "q1": 563.88,
+          "q3": 583.02
+        },
+        "cgroupSysCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 79.57,
+          "min": 70.97,
+          "max": 91.37,
+          "mean": 81.046,
+          "stdev": 8.462,
+          "q1": 75.52,
+          "q3": 87.8
+        },
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "maxSingleProcessRssKb": {
+          "unit": "kb",
+          "n": 5,
+          "median": 94504,
+          "min": 91284,
+          "max": 95180,
+          "mean": 94069.6,
+          "stdev": 1589.12,
+          "q1": 94416,
+          "q3": 94964
+        },
+        "cgroupTreePeakKb": {
+          "unit": "kb",
+          "n": 5,
+          "median": 110436,
+          "min": 107140,
+          "max": 111340,
+          "mean": 109916.8,
+          "stdev": 1659.273,
+          "q1": 109760,
+          "q3": 110908
+        },
+        "sessionStats": {
+          "spawns": 1,
+          "calls": 1,
+          "reusedCalls": 0,
+          "closed": true,
+          "tainted": false
         }
       },
       "delta": {
-        "savedWallMs": 23.52,
-        "speedupRatio": 1.05
+        "savedWallMs": 0.56,
+        "speedupRatio": 1,
+        "savedCgroupUserCpuMs": -7.6,
+        "savedCgroupSysCpuMs": -0.78
       }
     },
     "reports_4_node22": {
       "reportCount": 4,
-      "runtime": "node22",
+      "runtime": "node-v22.22.1",
+      "status": "measured",
+      "evidenceParity": {
+        "status": "pass",
+        "detail": "sha256_match=true before_spawns=4/4 after_spawns=1/4(reused=3)"
+      },
       "beforePerReportSpawn": {
         "runs": 8,
         "warmup": 2,
         "wallMs": {
           "unit": "ms",
           "n": 8,
-          "median": 1629.759,
-          "min": 1595.454,
-          "max": 1750.718,
-          "mean": 1645.061,
-          "stdev": 51.501,
-          "q1": 1609.471,
-          "q3": 1665.738
+          "median": 1753.96,
+          "min": 1709.95,
+          "max": 1867.792,
+          "mean": 1771.297,
+          "stdev": 54.285,
+          "q1": 1739.942,
+          "q3": 1799.125
         },
         "userCpuMs": {
           "unit": "ms",
-          "n": 8,
-          "median": 1540,
-          "min": 1480,
-          "max": 1660,
-          "mean": 1553.75,
-          "stdev": 54.232,
-          "q1": 1527.5,
-          "q3": 1575
+          "n": 5,
+          "median": 1730,
+          "min": 1570,
+          "max": 1740,
+          "mean": 1670,
+          "stdev": 86.891,
+          "q1": 1580,
+          "q3": 1730
         },
         "sysCpuMs": {
           "unit": "ms",
-          "n": 8,
+          "n": 5,
           "median": 170,
-          "min": 150,
-          "max": 190,
-          "mean": 170,
-          "stdev": 14.142,
+          "min": 160,
+          "max": 180,
+          "mean": 168,
+          "stdev": 8.367,
           "q1": 160,
-          "q3": 175
+          "q3": 170
         },
-        "peakRssKb": {
-          "unit": "KB",
-          "n": 8,
-          "median": 92850,
-          "min": 89976,
-          "max": 93624,
-          "mean": 92604,
-          "stdev": 1133.631,
-          "q1": 92590,
-          "q3": 93137
+        "cgroupUserCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 1734.1,
+          "min": 1583.29,
+          "max": 1740.85,
+          "mean": 1676.274,
+          "stdev": 84.307,
+          "q1": 1584.63,
+          "q3": 1738.5
+        },
+        "cgroupSysCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 179.86,
+          "min": 166.47,
+          "max": 193.13,
+          "mean": 179.766,
+          "stdev": 9.853,
+          "q1": 175.63,
+          "q3": 183.74
+        },
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "maxSingleProcessRssKb": {
+          "unit": "kb",
+          "n": 5,
+          "median": 92580,
+          "min": 90608,
+          "max": 95760,
+          "mean": 92569.6,
+          "stdev": 2000.313,
+          "q1": 91172,
+          "q3": 92728
+        },
+        "cgroupTreePeakKb": {
+          "unit": "kb",
+          "n": 5,
+          "median": 108716,
+          "min": 105964,
+          "max": 112284,
+          "mean": 108750.4,
+          "stdev": 2483.159,
+          "q1": 106952,
+          "q3": 109836
+        },
+        "sessionStats": {
+          "spawns": 4,
+          "calls": 4,
+          "reusedCalls": 0,
+          "closed": true,
+          "tainted": false
         }
       },
       "afterSessionReuse": {
@@ -223,102 +384,191 @@
         "wallMs": {
           "unit": "ms",
           "n": 8,
-          "median": 521.739,
-          "min": 501.369,
-          "max": 533.916,
-          "mean": 519.566,
-          "stdev": 11.017,
-          "q1": 513.222,
-          "q3": 526.897
+          "median": 567.072,
+          "min": 510.422,
+          "max": 658.104,
+          "mean": 565.226,
+          "stdev": 44.909,
+          "q1": 537.343,
+          "q3": 575.255
         },
         "userCpuMs": {
           "unit": "ms",
-          "n": 8,
-          "median": 540,
-          "min": 520,
-          "max": 550,
-          "mean": 537.5,
-          "stdev": 10.351,
-          "q1": 530,
-          "q3": 542.5
+          "n": 5,
+          "median": 580,
+          "min": 550,
+          "max": 610,
+          "mean": 578,
+          "stdev": 23.875,
+          "q1": 560,
+          "q3": 590
         },
         "sysCpuMs": {
           "unit": "ms",
-          "n": 8,
-          "median": 50,
-          "min": 50,
-          "max": 60,
-          "mean": 53.75,
-          "stdev": 5.175,
-          "q1": 50,
+          "n": 5,
+          "median": 60,
+          "min": 60,
+          "max": 80,
+          "mean": 64,
+          "stdev": 8.944,
+          "q1": 60,
           "q3": 60
         },
-        "peakRssKb": {
-          "unit": "KB",
-          "n": 8,
-          "median": 90206,
-          "min": 89264,
-          "max": 92648,
-          "mean": 90347.5,
-          "stdev": 1013.767,
-          "q1": 89881,
-          "q3": 90359
+        "cgroupUserCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 587.56,
+          "min": 559.89,
+          "max": 618.52,
+          "mean": 586.92,
+          "stdev": 23.115,
+          "q1": 570.28,
+          "q3": 598.35
+        },
+        "cgroupSysCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 68.04,
+          "min": 66.57,
+          "max": 88.94,
+          "mean": 72.202,
+          "stdev": 9.475,
+          "q1": 67.03,
+          "q3": 70.43
+        },
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "maxSingleProcessRssKb": {
+          "unit": "kb",
+          "n": 5,
+          "median": 90572,
+          "min": 89588,
+          "max": 94820,
+          "mean": 91314.4,
+          "stdev": 2034.27,
+          "q1": 90484,
+          "q3": 91108
+        },
+        "cgroupTreePeakKb": {
+          "unit": "kb",
+          "n": 5,
+          "median": 105608,
+          "min": 104680,
+          "max": 110428,
+          "mean": 106302.4,
+          "stdev": 2354.945,
+          "q1": 104944,
+          "q3": 105852
+        },
+        "sessionStats": {
+          "spawns": 1,
+          "calls": 4,
+          "reusedCalls": 3,
+          "closed": true,
+          "tainted": false
         }
       },
       "delta": {
-        "savedWallMs": 1108.02,
-        "speedupRatio": 3.12
+        "savedWallMs": 1186.89,
+        "speedupRatio": 3.09,
+        "savedCgroupUserCpuMs": 1146.54,
+        "savedCgroupSysCpuMs": 111.82
       }
     },
     "reports_8_node22": {
       "reportCount": 8,
-      "runtime": "node22",
+      "runtime": "node-v22.22.1",
+      "status": "measured",
+      "evidenceParity": {
+        "status": "pass",
+        "detail": "sha256_match=true before_spawns=8/8 after_spawns=1/8(reused=7)"
+      },
       "beforePerReportSpawn": {
         "runs": 8,
         "warmup": 2,
         "wallMs": {
           "unit": "ms",
           "n": 8,
-          "median": 3081.867,
-          "min": 3018.067,
-          "max": 3315.068,
-          "mean": 3108.777,
-          "stdev": 97.766,
-          "q1": 3052.623,
-          "q3": 3122.36
+          "median": 3707.842,
+          "min": 3459.527,
+          "max": 3984.545,
+          "mean": 3708.164,
+          "stdev": 182.471,
+          "q1": 3605.143,
+          "q3": 3838.438
         },
         "userCpuMs": {
           "unit": "ms",
-          "n": 8,
-          "median": 2875,
-          "min": 2770,
-          "max": 3090,
-          "mean": 2887.5,
-          "stdev": 94.378,
-          "q1": 2850,
-          "q3": 2892.5
+          "n": 5,
+          "median": 3130,
+          "min": 2980,
+          "max": 3550,
+          "mean": 3214,
+          "stdev": 227.002,
+          "q1": 3080,
+          "q3": 3330
         },
         "sysCpuMs": {
           "unit": "ms",
-          "n": 8,
-          "median": 300,
-          "min": 290,
-          "max": 320,
-          "mean": 301.25,
-          "stdev": 12.464,
-          "q1": 290,
-          "q3": 305
+          "n": 5,
+          "median": 320,
+          "min": 320,
+          "max": 340,
+          "mean": 328,
+          "stdev": 10.954,
+          "q1": 320,
+          "q3": 340
         },
-        "peakRssKb": {
-          "unit": "KB",
-          "n": 8,
-          "median": 93852,
-          "min": 92964,
-          "max": 95004,
-          "mean": 93882.5,
-          "stdev": 617.53,
-          "q1": 93595,
-          "q3": 94052
+        "cgroupUserCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 3133.3,
+          "min": 2989.27,
+          "max": 3556.42,
+          "mean": 3219.084,
+          "stdev": 227.361,
+          "q1": 3080.61,
+          "q3": 3335.82
+        },
+        "cgroupSysCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 339.96,
+          "min": 336.99,
+          "max": 354.74,
+          "mean": 345.122,
+          "stdev": 8.803,
+          "q1": 339.28,
+          "q3": 354.64
+        },
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "maxSingleProcessRssKb": {
+          "unit": "kb",
+          "n": 5,
+          "median": 94164,
+          "min": 92592,
+          "max": 95660,
+          "mean": 94274.4,
+          "stdev": 1236.837,
+          "q1": 93680,
+          "q3": 95276
+        },
+        "cgroupTreePeakKb": {
+          "unit": "kb",
+          "n": 5,
+          "median": 110612,
+          "min": 109936,
+          "max": 112084,
+          "mean": 111037.6,
+          "stdev": 959.519,
+          "q1": 110544,
+          "q3": 112012
+        },
+        "sessionStats": {
+          "spawns": 8,
+          "calls": 8,
+          "reusedCalls": 0,
+          "closed": true,
+          "tainted": false
         }
       },
       "afterSessionReuse": {
@@ -327,157 +577,492 @@
         "wallMs": {
           "unit": "ms",
           "n": 8,
-          "median": 529.338,
-          "min": 508.938,
-          "max": 558.05,
-          "mean": 534.437,
-          "stdev": 15.876,
-          "q1": 526.968,
-          "q3": 547.125
+          "median": 550.164,
+          "min": 535.293,
+          "max": 595.457,
+          "mean": 555.432,
+          "stdev": 17.906,
+          "q1": 548.175,
+          "q3": 555.577
         },
         "userCpuMs": {
           "unit": "ms",
-          "n": 8,
-          "median": 545,
-          "min": 530,
-          "max": 570,
-          "mean": 547.5,
-          "stdev": 17.525,
-          "q1": 530,
-          "q3": 562.5
+          "n": 5,
+          "median": 620,
+          "min": 540,
+          "max": 660,
+          "mean": 614,
+          "stdev": 45.607,
+          "q1": 610,
+          "q3": 640
         },
         "sysCpuMs": {
           "unit": "ms",
-          "n": 8,
-          "median": 60,
-          "min": 50,
-          "max": 60,
-          "mean": 57.5,
-          "stdev": 4.629,
-          "q1": 57.5,
-          "q3": 60
+          "n": 5,
+          "median": 70,
+          "min": 60,
+          "max": 80,
+          "mean": 72,
+          "stdev": 8.367,
+          "q1": 70,
+          "q3": 80
         },
-        "peakRssKb": {
-          "unit": "KB",
-          "n": 8,
-          "median": 91464,
-          "min": 89960,
-          "max": 93632,
-          "mean": 91582.5,
-          "stdev": 1466.714,
-          "q1": 90306,
-          "q3": 92581
+        "cgroupUserCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 628.26,
+          "min": 541.9,
+          "max": 664.18,
+          "mean": 621.294,
+          "stdev": 48.038,
+          "q1": 618.7,
+          "q3": 653.43
+        },
+        "cgroupSysCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 83.58,
+          "min": 74.75,
+          "max": 89.74,
+          "mean": 83.104,
+          "stdev": 6.205,
+          "q1": 79.3,
+          "q3": 88.15
+        },
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "maxSingleProcessRssKb": {
+          "unit": "kb",
+          "n": 5,
+          "median": 91784,
+          "min": 91512,
+          "max": 96612,
+          "mean": 93451.2,
+          "stdev": 2475.802,
+          "q1": 91688,
+          "q3": 95660
+        },
+        "cgroupTreePeakKb": {
+          "unit": "kb",
+          "n": 5,
+          "median": 106272,
+          "min": 106080,
+          "max": 112632,
+          "mean": 108520,
+          "stdev": 3226.576,
+          "q1": 106204,
+          "q3": 111412
+        },
+        "sessionStats": {
+          "spawns": 1,
+          "calls": 8,
+          "reusedCalls": 7,
+          "closed": true,
+          "tainted": false
         }
       },
       "delta": {
-        "savedWallMs": 2552.53,
-        "speedupRatio": 5.82
+        "savedWallMs": 3157.68,
+        "speedupRatio": 6.74,
+        "savedCgroupUserCpuMs": 2505.04,
+        "savedCgroupSysCpuMs": 256.38
       }
     },
     "reports_4_bun": {
       "reportCount": 4,
       "runtime": "bun-1.4.3",
+      "status": "measured",
+      "evidenceParity": {
+        "status": "pass",
+        "detail": "sha256_match=true before_spawns=4/4 after_spawns=1/4(reused=3)"
+      },
+      "beforePerReportSpawn": {
+        "runs": 8,
+        "warmup": 2,
+        "wallMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 1710.669,
+          "min": 1578.806,
+          "max": 2568.051,
+          "mean": 1820.069,
+          "stdev": 317.346,
+          "q1": 1657.498,
+          "q3": 1841.155
+        },
+        "userCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 1650,
+          "min": 1500,
+          "max": 1660,
+          "mean": 1616,
+          "stdev": 68.044,
+          "q1": 1610,
+          "q3": 1660
+        },
+        "sysCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 190,
+          "min": 180,
+          "max": 200,
+          "mean": 190,
+          "stdev": 7.071,
+          "q1": 190,
+          "q3": 190
+        },
+        "cgroupUserCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 1652.9,
+          "min": 1512.02,
+          "max": 1668.45,
+          "mean": 1623.708,
+          "stdev": 65.163,
+          "q1": 1620.86,
+          "q3": 1664.31
+        },
+        "cgroupSysCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 205.87,
+          "min": 197.52,
+          "max": 210.21,
+          "mean": 204.19,
+          "stdev": 5.814,
+          "q1": 198.62,
+          "q3": 208.73
+        },
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "maxSingleProcessRssKb": {
+          "unit": "kb",
+          "n": 5,
+          "median": 63740,
+          "min": 62972,
+          "max": 64128,
+          "mean": 63696,
+          "stdev": 472.085,
+          "q1": 63548,
+          "q3": 64092
+        },
+        "cgroupTreePeakKb": {
+          "unit": "kb",
+          "n": 5,
+          "median": 95940,
+          "min": 94420,
+          "max": 96384,
+          "mean": 95684,
+          "stdev": 745.509,
+          "q1": 95732,
+          "q3": 95944
+        },
+        "sessionStats": {
+          "spawns": 4,
+          "calls": 4,
+          "reusedCalls": 0,
+          "closed": true,
+          "tainted": false
+        }
+      },
       "afterSessionReuse": {
         "runs": 8,
         "warmup": 2,
         "wallMs": {
           "unit": "ms",
           "n": 8,
-          "median": 455.884,
-          "min": 442.395,
-          "max": 474.982,
-          "mean": 459.367,
-          "stdev": 12.734,
-          "q1": 452.196,
-          "q3": 472.035
+          "median": 473.169,
+          "min": 451.672,
+          "max": 523.771,
+          "mean": 479.474,
+          "stdev": 28.286,
+          "q1": 453.661,
+          "q3": 497.894
         },
         "userCpuMs": {
           "unit": "ms",
-          "n": 8,
-          "median": 450,
-          "min": 430,
-          "max": 470,
-          "mean": 448.75,
-          "stdev": 12.464,
-          "q1": 440,
-          "q3": 452.5
+          "n": 5,
+          "median": 470,
+          "min": 460,
+          "max": 530,
+          "mean": 482,
+          "stdev": 29.496,
+          "q1": 460,
+          "q3": 490
         },
         "sysCpuMs": {
           "unit": "ms",
-          "n": 8,
-          "median": 65,
+          "n": 5,
+          "median": 60,
           "min": 50,
           "max": 70,
-          "mean": 61.25,
-          "stdev": 9.91,
-          "q1": 50,
-          "q3": 70
-        },
-        "peakRssKb": {
-          "unit": "KB",
-          "n": 8,
-          "median": 63074,
-          "min": 62984,
-          "max": 63548,
-          "mean": 63168,
-          "stdev": 198.497,
-          "q1": 63044,
-          "q3": 63290
-        }
-      }
-    },
-    "reports_4_deno_post_fix": {
-      "reportCount": 4,
-      "runtime": "deno-2.9.7",
-      "note": "Post-fix measurement after withScopedSignal + clearTimeout(deadlineTimer) resolved the 240s AbortSignal.timeout exit hang; not counted as a performance win over Node 22 reference.",
-      "afterSessionReuse": {
-        "runs": 8,
-        "warmup": 2,
-        "wallMs": {
-          "unit": "ms",
-          "n": 8,
-          "median": 475.859,
-          "min": 447.364,
-          "max": 543.248,
-          "mean": 482.459,
-          "stdev": 27.61,
-          "q1": 472.182,
-          "q3": 484.758
-        },
-        "userCpuMs": {
-          "unit": "ms",
-          "n": 8,
-          "median": 445,
-          "min": 420,
-          "max": 500,
-          "mean": 446.25,
-          "stdev": 24.458,
-          "q1": 430,
-          "q3": 450
-        },
-        "sysCpuMs": {
-          "unit": "ms",
-          "n": 8,
-          "median": 60,
-          "min": 40,
-          "max": 60,
-          "mean": 55,
-          "stdev": 7.559,
+          "mean": 58,
+          "stdev": 8.367,
           "q1": 50,
           "q3": 60
         },
-        "peakRssKb": {
-          "unit": "KB",
-          "n": 8,
-          "median": 90284,
-          "min": 89544,
-          "max": 90536,
-          "mean": 90154,
-          "stdev": 387.053,
-          "q1": 89914,
-          "q3": 90464
+        "cgroupUserCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 474.85,
+          "min": 463.99,
+          "max": 535.84,
+          "mean": 487.7,
+          "stdev": 29.582,
+          "q1": 467.97,
+          "q3": 495.85
+        },
+        "cgroupSysCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 66.06,
+          "min": 60.64,
+          "max": 85.12,
+          "mean": 69.572,
+          "stdev": 9.925,
+          "q1": 62.76,
+          "q3": 73.28
+        },
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "maxSingleProcessRssKb": {
+          "unit": "kb",
+          "n": 5,
+          "median": 63172,
+          "min": 62608,
+          "max": 65084,
+          "mean": 63432,
+          "stdev": 971.107,
+          "q1": 62888,
+          "q3": 63408
+        },
+        "cgroupTreePeakKb": {
+          "unit": "kb",
+          "n": 5,
+          "median": 95068,
+          "min": 94488,
+          "max": 96212,
+          "mean": 95187.2,
+          "stdev": 628.849,
+          "q1": 95024,
+          "q3": 95144
+        },
+        "sessionStats": {
+          "spawns": 1,
+          "calls": 4,
+          "reusedCalls": 3,
+          "closed": true,
+          "tainted": false
         }
+      },
+      "delta": {
+        "savedWallMs": 1237.5,
+        "speedupRatio": 3.62,
+        "savedCgroupUserCpuMs": 1178.05,
+        "savedCgroupSysCpuMs": 139.81
+      }
+    },
+    "reports_4_deno": {
+      "reportCount": 4,
+      "runtime": "deno-2.9.7",
+      "status": "measured",
+      "note": "Measured with both beforePerReportSpawn (reuseMcpSession: false) and afterSessionReuse (reuseMcpSession: true) after withScopedSignal + explicit clearTimeout resolved Deno 2.9.7 AbortSignal.timeout exit retention.",
+      "evidenceParity": {
+        "status": "pass",
+        "detail": "sha256_match=true before_spawns=4/4 after_spawns=1/4(reused=3)"
+      },
+      "beforePerReportSpawn": {
+        "runs": 8,
+        "warmup": 2,
+        "wallMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 1712.402,
+          "min": 1647.595,
+          "max": 1805.051,
+          "mean": 1712.426,
+          "stdev": 49.217,
+          "q1": 1682.904,
+          "q3": 1731.616
+        },
+        "userCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 1530,
+          "min": 1520,
+          "max": 1670,
+          "mean": 1556,
+          "stdev": 63.875,
+          "q1": 1530,
+          "q3": 1530
+        },
+        "sysCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 170,
+          "min": 150,
+          "max": 190,
+          "mean": 172,
+          "stdev": 14.832,
+          "q1": 170,
+          "q3": 180
+        },
+        "cgroupUserCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 1536.61,
+          "min": 1526.48,
+          "max": 1676.97,
+          "mean": 1562.71,
+          "stdev": 64.136,
+          "q1": 1531.44,
+          "q3": 1542.05
+        },
+        "cgroupSysCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 188.06,
+          "min": 172.13,
+          "max": 204.8,
+          "mean": 187.342,
+          "stdev": 11.77,
+          "q1": 183.31,
+          "q3": 188.41
+        },
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "maxSingleProcessRssKb": {
+          "unit": "kb",
+          "n": 5,
+          "median": 90040,
+          "min": 89532,
+          "max": 90252,
+          "mean": 89938.4,
+          "stdev": 341.346,
+          "q1": 89624,
+          "q3": 90244
+        },
+        "cgroupTreePeakKb": {
+          "unit": "kb",
+          "n": 5,
+          "median": 114064,
+          "min": 113724,
+          "max": 114484,
+          "mean": 114108.8,
+          "stdev": 325.348,
+          "q1": 113880,
+          "q3": 114392
+        },
+        "sessionStats": {
+          "spawns": 4,
+          "calls": 4,
+          "reusedCalls": 0,
+          "closed": true,
+          "tainted": false
+        }
+      },
+      "afterSessionReuse": {
+        "runs": 8,
+        "warmup": 2,
+        "wallMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 501.118,
+          "min": 467.698,
+          "max": 545.81,
+          "mean": 500.837,
+          "stdev": 22.518,
+          "q1": 492.518,
+          "q3": 504.269
+        },
+        "userCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 500,
+          "min": 470,
+          "max": 530,
+          "mean": 504,
+          "stdev": 23.022,
+          "q1": 500,
+          "q3": 520
+        },
+        "sysCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 60,
+          "min": 60,
+          "max": 70,
+          "mean": 64,
+          "stdev": 5.477,
+          "q1": 60,
+          "q3": 70
+        },
+        "cgroupUserCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 512.79,
+          "min": 479.6,
+          "max": 534.12,
+          "mean": 513.348,
+          "stdev": 21.743,
+          "q1": 509.42,
+          "q3": 530.81
+        },
+        "cgroupSysCpuMs": {
+          "unit": "ms",
+          "n": 5,
+          "median": 76.42,
+          "min": 70.28,
+          "max": 84.81,
+          "mean": 75.742,
+          "stdev": 5.967,
+          "q1": 70.38,
+          "q3": 76.82
+        },
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "maxSingleProcessRssKb": {
+          "unit": "kb",
+          "n": 5,
+          "median": 89980,
+          "min": 89296,
+          "max": 90532,
+          "mean": 90017.6,
+          "stdev": 514.514,
+          "q1": 89792,
+          "q3": 90488
+        },
+        "cgroupTreePeakKb": {
+          "unit": "kb",
+          "n": 5,
+          "median": 112904,
+          "min": 112484,
+          "max": 113636,
+          "mean": 112953.6,
+          "stdev": 427.996,
+          "q1": 112748,
+          "q3": 112996
+        },
+        "sessionStats": {
+          "spawns": 1,
+          "calls": 4,
+          "reusedCalls": 3,
+          "closed": true,
+          "tainted": false
+        }
+      },
+      "delta": {
+        "savedWallMs": 1211.28,
+        "speedupRatio": 3.42,
+        "savedCgroupUserCpuMs": 1023.82,
+        "savedCgroupSysCpuMs": 111.64
       }
     }
-  }
+  },
+  "claims": [
+    "Single-call cold vs warm pairs execute identical uvx commands across the exact same 8-report sequence (`reports8[i % 8]`) and produce byte-identical JSON digests (`digestParityPass: true`).",
+    "Multi-report before (`reuseMcpSession: false`) and after (`reuseMcpSession: true`) workflows execute the identical `gatherEvidence(...)` code path and produce identical SHA-256 report provenance and digest payloads (`evidenceParity.status: \"pass\"`).",
+    "Process-tree memory peak (`cgroupTreePeakKb`) is measured via Linux cgroup v2 `memory.peak` inside a transient `systemd-run --user --scope` unit, kept separate from GNU `/usr/bin/time -f \"%M\"` single-process `ru_maxrss` (`maxSingleProcessRssKb`)."
+  ],
+  "limits": [
+    "Single host, single sequential session: medians apply only to this host (`amd-ryzen-ai-9-hx-370-x64`) and commit.",
+    "1-report workflows still pay one initial `uvx perfdigest-mcp` startup; bounded session reuse saves N-1 cold spawns when N >= 2 candidate reports are summarized within one investigation.",
+    "GNU `/usr/bin/time` `maxSingleProcessRssKb` reflects `ru_maxrss` of only the single highest-RSS process, whereas `cgroupTreePeakKb` reflects the kernel cgroup v2 `memory.peak` across all concurrent processes in the scope."
+  ]
 }

@@ -497,6 +497,12 @@
               },
               "sysMedian": {
                 "type": "number"
+              },
+              "cgroupUserMedianMs": {
+                "type": "number"
+              },
+              "cgroupSysMedianMs": {
+                "type": "number"
               }
             },
             "required": [
@@ -507,7 +513,66 @@
             ],
             "additionalProperties": false
           },
+          "memoryCoverage": {
+            "type": "string",
+            "enum": [
+              "cgroup_v2_tree_peak",
+              "max_single_process_only_incomplete_tree",
+              "none"
+            ]
+          },
           "peakRssKb": {
+            "type": "object",
+            "properties": {
+              "unit": {
+                "type": "string",
+                "enum": [
+                  "ms",
+                  "us",
+                  "s",
+                  "kb"
+                ]
+              },
+              "n": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "median": {
+                "type": "number"
+              },
+              "min": {
+                "type": "number"
+              },
+              "max": {
+                "type": "number"
+              },
+              "mean": {
+                "type": "number"
+              },
+              "stdev": {
+                "type": "number",
+                "minimum": 0
+              },
+              "q1": {
+                "type": "number"
+              },
+              "q3": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "unit",
+              "n",
+              "median",
+              "min",
+              "max",
+              "mean",
+              "stdev"
+            ],
+            "additionalProperties": false
+          },
+          "cgroupTreePeakKb": {
             "type": "object",
             "properties": {
               "unit": {

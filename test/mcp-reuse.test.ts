@@ -228,7 +228,7 @@ test('real PerfDigest MCP session reuse works across multiple reports on baselin
     const uvxBin = executable('uvx');
     let has130 = false;
     try {
-      await execFileAsync(uvxBin, ['--offline', '--from', 'perfdigest-mcp==1.3.0', 'python', '-c', 'import perfdigest_mcp'], { timeout: 5000 });
+      await execFileAsync(uvxBin, ['--offline', '--from', 'perfdigest-mcp==1.3.0', 'python', '-c', 'import perfdigest'], { timeout: 5000 });
       has130 = true;
     } catch {
       has130 = false;
@@ -242,6 +242,210 @@ test('real PerfDigest MCP session reuse works across multiple reports on baselin
         }
         assert.deepEqual(session.stats(), { spawns: 1, calls: 3, reusedCalls: 2, closed: false, tainted: false });
       }, { command: uvxBin, args: ['--offline', '--from', 'perfdigest-mcp==1.3.0', 'perfdigest-mcp'] });
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('gatherEvidence reuseMcpSession=false vs reuseMcpSession=true executes identical evidence pipeline with controlled spawn counts', async () => {
+  const root = await testDirectory('mcp-reuse-baseline-equivalence');
+  const priorPath = process.env.PATH;
+  try {
+    const spawnsFile = join(root, 'spawns.jsonl');
+    const exitsFile = join(root, 'exits.jsonl');
+    process.env.PATH = `${await countingFixtureUv(root, spawnsFile, exitsFile)}${delimiter}${priorPath}`;
+
+    const reports: ReportSpec[] = [];
+    for (let i = 1; i <= 4; i++) {
+      const name = `trace-${i}.json`;
+      await writeFile(join(root, name), JSON.stringify({ reportIndex: i }));
+      reports.push({ id: `r${i}`, path: name, format: 'chrome-trace', description: `Report ${i}` });
+    }
+
+    const provider: DecisionProvider = {
+      name: 'cloudflare',
+      async select(_issue, _reports, _signal, measured) {
+        assert.equal(measured?.length, 4);
+        return {
+          selectedId: 'r2',
+          confidence: 0.91,
+          reason: 'selected',
+          source: 'clef_cloudflare',
+          provider: 'cloudflare',
+          model: 'perfdigest/clef-flash-v1',
+          confidenceSemantics: 'systemone_uniform_zero',
+          transport: 'local_mock',
+          requests: 1,
+          latencyMs: 2,
+          inputTokens: 20,
+          outputTokens: 0,
+          costUsd: null,
+        };
+      },
+    };
+
+    let baselineStats: PerfDigestSessionStats | null = null;
+    const baselineProvenance: EvidenceProvenance[] = [];
+    const baselinePacket = await gatherEvidence({
+      workspace: root,
+      issue: 'Baseline equivalence test',
+      reports,
+      routing: 'cloudflare',
+      provider,
+      reuseMcpSession: false,
+      provenance: baselineProvenance,
+      onMcpSessionStats: s => { baselineStats = s; },
+    });
+
+    let reuseStats: PerfDigestSessionStats | null = null;
+    const reuseProvenance: EvidenceProvenance[] = [];
+    const reusePacket = await gatherEvidence({
+      workspace: root,
+      issue: 'Baseline equivalence test',
+      reports,
+      routing: 'cloudflare',
+      provider,
+      reuseMcpSession: true,
+      provenance: reuseProvenance,
+      onMcpSessionStats: s => { reuseStats = s; },
+    });
+
+    assert.deepEqual(baselineStats, { spawns: 4, calls: 4, reusedCalls: 0, closed: true, tainted: false });
+    assert.deepEqual(reuseStats, { spawns: 1, calls: 4, reusedCalls: 3, closed: true, tainted: false });
+    assert.deepEqual(baselinePacket, reusePacket);
+    assert.deepEqual(baselineProvenance, reuseProvenance);
+  } finally {
+    process.env.PATH = priorPath;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('Deno and Bun runtime verification: normal completion, caller abort, and deadline timeout exit promptly without leaked timer/listener hangs', async () => {
+  const root = await testDirectory('mcp-runtime-deno-bun-lifecycle');
+  try {
+    const repoRoot = join(import.meta.dirname, '..', '..');
+    const distRun = join(repoRoot, 'dist', 'run.js');
+    const distEvidence = join(repoRoot, 'dist', 'evidence.js');
+    const binModUrl = new URL('../../bench/lib/binaries.mjs', import.meta.url).href;
+    const { resolveBenchBinaries } = await import(binModUrl) as {
+      resolveBenchBinaries: (r: string) => { node: string; bun: string | null; deno: string | null };
+    };
+    const bins = resolveBenchBinaries(repoRoot);
+    const binDir = await fixtureUv(root);
+
+    await writeFile(join(root, 'trace-1.json'), '{}');
+    await writeFile(join(root, 'trace-2.json'), '{}');
+    await writeFile(join(root, 'slow.json'), JSON.stringify({ mode: 'slow' }));
+
+    const driverPath = join(root, 'lifecycle-driver.mjs');
+    await writeFile(driverPath, `import { investigate } from ${JSON.stringify(distRun)};
+import { gatherEvidence } from ${JSON.stringify(distEvidence)};
+
+const [scenario, workspace] = process.argv.slice(2);
+
+if (scenario === 'normal-reuse') {
+  const reports = [
+    { id: 'r1', path: 'trace-1.json', format: 'chrome-trace', description: 'R1' },
+    { id: 'r2', path: 'trace-2.json', format: 'chrome-trace', description: 'R2' },
+  ];
+  const provider = {
+    name: 'cloudflare',
+    async select() {
+      return {
+        selectedId: 'r2',
+        confidence: 0.9,
+        reason: 'selected',
+        source: 'clef_cloudflare',
+        provider: 'cloudflare',
+        model: 'perfdigest/clef-flash-v1',
+        confidenceSemantics: 'systemone_uniform_zero',
+        transport: 'local_mock',
+        requests: 1,
+        latencyMs: 1,
+        inputTokens: 10,
+        outputTokens: 0,
+        costUsd: null,
+      };
+    },
+  };
+  let stats = null;
+  const pkt = await gatherEvidence({
+    workspace,
+    issue: 'Deno/Bun reuse',
+    reports,
+    routing: 'cloudflare',
+    provider,
+    reuseMcpSession: true,
+    onMcpSessionStats: (s) => { stats = s; },
+  });
+  if (pkt.status !== 'complete' || stats?.spawns !== 1 || stats?.reusedCalls !== 1) process.exit(2);
+} else if (scenario === 'caller-abort') {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new Error('caller-cancelled')), 40);
+  timer.unref();
+  try {
+    await gatherEvidence({
+      workspace,
+      issue: 'Caller abort test',
+      reports: [{ id: 'slow', path: 'slow.json', format: 'chrome-trace', description: 'Slow' }],
+      routing: 'offline',
+      signal: controller.signal,
+    });
+    process.exit(3);
+  } catch {
+    // Expected abort; process must exit promptly without hanging on leaked listeners
+  }
+} else if (scenario === 'deadline-timeout') {
+  try {
+    await gatherEvidence({
+      workspace,
+      issue: 'Per-call timeout test',
+      reports: [{ id: 'slow', path: 'slow.json', format: 'chrome-trace', description: 'Slow' }],
+      routing: 'offline',
+      mcpSessionOptions: { callTimeoutMs: 60 },
+    });
+    process.exit(4);
+  } catch {
+    // Expected per-call timeout; verify full investigate() also exits cleanly afterwards
+  }
+  const manifest = {
+    version: 1,
+    issue: 'Investigate normal completion after timeout',
+    reports: [{ id: 'r1', path: 'trace-1.json', format: 'chrome-trace', description: 'R1' }],
+    verification: { command: process.execPath, args: ['-e', 'process.exit(0)'] },
+  };
+  const record = await investigate({
+    workspace,
+    manifest,
+    routing: 'offline',
+    agent: 'none',
+  });
+  if (record.status !== 'complete') process.exit(5);
+}
+`);
+
+    const runtimes: Array<{ name: string; prefix: string[] }> = [
+      { name: 'node22', prefix: [bins.node] },
+      ...(bins.bun ? [{ name: 'bun', prefix: [bins.bun] }] : []),
+      ...(bins.deno ? [{ name: 'deno', prefix: [bins.deno, 'run', '-A'] }] : []),
+    ];
+
+    const env = {
+      ...process.env,
+      PATH: `${binDir}${delimiter}${process.env.PATH ?? ''}`,
+      DENO_NO_UPDATE_CHECK: '1',
+      NO_COLOR: '1',
+    };
+
+    for (const rt of runtimes) {
+      for (const scenario of ['normal-reuse', 'caller-abort', 'deadline-timeout']) {
+        const argv = [...rt.prefix, driverPath, scenario, root];
+        const t0 = Date.now();
+        await execFileAsync(argv[0]!, argv.slice(1), { env, timeout: 8000 });
+        const elapsedMs = Date.now() - t0;
+        assert.ok(elapsedMs < 5000, `${rt.name} (${scenario}) should exit promptly (<5000ms), took ${elapsedMs}ms`);
+      }
     }
   } finally {
     await rm(root, { recursive: true, force: true });

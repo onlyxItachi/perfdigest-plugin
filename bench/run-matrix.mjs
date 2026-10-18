@@ -20,6 +20,8 @@ import { delimiter, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs, promisify } from 'node:util';
 import { manifestSchema, resultSchema } from './schema/formats.mjs';
+import { resolveBenchBinaries, sha256File, usable, versionOf, which } from './lib/binaries.mjs';
+import { createResourceRunner } from './lib/cgroup-time.mjs';
 import { stats } from './lib/stats.mjs';
 
 const exec = promisify(execFile);
@@ -37,35 +39,12 @@ const childEnv = Object.fromEntries(Object.entries({
   PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR, USER: process.env.USER,
   XDG_CACHE_HOME: process.env.XDG_CACHE_HOME, LANG: 'C', LC_ALL: 'C', XDG_CONFIG_HOME: xdgConfig,
   NO_COLOR: '1', DENO_NO_UPDATE_CHECK: '1',
+  DBUS_SESSION_BUS_ADDRESS: process.env.DBUS_SESSION_BUS_ADDRESS,
+  XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR,
 }).filter(([, v]) => v !== undefined));
 
-function which(name) {
-  for (const dir of (process.env.PATH ?? '').split(delimiter)) {
-    const p = join(dir, name);
-    try { accessSync(p, constants.X_OK); return p; } catch { /* next */ }
-  }
-  return null;
-}
-function usable(p) { try { if (p) accessSync(p, constants.X_OK); return Boolean(p); } catch { return false; } }
-const sha256File = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
-const version = (cmd, args, re = /(\d+\.\d+\.\d+[^\s]*)/) => {
-  const r = spawnSync(cmd, args, { encoding: 'utf8', env: childEnv });
-  const m = `${r.stdout}${r.stderr}`.match(re); return m ? m[1] : null;
-};
-
-const localTsgo = join(benchDir, 'node_modules/@typescript/native-preview-linux-x64/lib/tsgo');
-const siblingBun = resolve(repo, '../tools/bun-linux-x64/bun');
-const siblingDeno = resolve(repo, '../tools/deno-bin/deno');
-const bin = {
-  node: process.execPath,
-  bun: process.env.PERFDIGEST_BENCH_BUN ?? which('bun') ?? (usable(siblingBun) ? siblingBun : null),
-  deno: process.env.PERFDIGEST_BENCH_DENO ?? which('deno') ?? (usable(siblingDeno) ? siblingDeno : null),
-  tsgo: process.env.PERFDIGEST_BENCH_TSGO ?? (existsSync(localTsgo) ? localTsgo : which('tsgo')),
-  go: process.env.PERFDIGEST_BENCH_GO ?? which('go'),
-  uvx: process.env.PERFDIGEST_BENCH_UVX ?? which('uvx'),
-  hyperfine: which('hyperfine'),
-  time: usable('/usr/bin/time') ? '/usr/bin/time' : null,
-};
+const version = (cmd, args, re) => versionOf(cmd, args, childEnv, re);
+const bin = resolveBenchBinaries(repo);
 const tsc = join(repo, 'node_modules/typescript/bin/tsc');
 const cli = join(repo, 'dist/cli.js');
 if (!existsSync(cli)) throw new Error('dist/cli.js missing: run `npm run build` first');
@@ -73,11 +52,20 @@ if (!existsSync(cli)) throw new Error('dist/cli.js missing: run `npm run build` 
 // the harness falls back to an in-process spawnSync timer and omits CPU/RSS.
 if (!opts.smoke && (!bin.hyperfine || !bin.time)) throw new Error('full runs require hyperfine and GNU /usr/bin/time');
 
+const resourceRunner = createResourceRunner({
+  scratch,
+  env: childEnv,
+  cwd: repo,
+  timeBin: bin.time,
+  systemdRunBin: bin.systemdRun,
+});
+
 const tools = [
   { name: 'node', version: process.version, source: 'system' },
   { name: 'typescript', version: JSON.parse(readFileSync(join(repo, 'node_modules/typescript/package.json'), 'utf8')).version, source: 'repo devDependency' },
   ...(bin.hyperfine ? [{ name: 'hyperfine', version: version(bin.hyperfine, ['--version']), source: 'system' }] : []),
   ...(bin.time ? [{ name: 'gnu-time', version: version(bin.time, ['--version'], /(\d+\.\d+)/), source: '/usr/bin/time' }] : []),
+  ...(resourceRunner.cgroupAvailable ? [{ name: 'systemd-run-cgroup-v2', version: version(bin.systemdRun, ['--version'], /systemd\s+(\d+)/), source: 'user cgroup v2 scope (memory.peak + cpu.stat)' }] : []),
 ];
 const downloaded = (p) => (p && !p.startsWith('/usr/') ? { sha256: sha256File(p) } : {});
 if (usable(bin.bun)) tools.push({ name: 'bun', version: version(bin.bun, ['--version']), ...downloaded(bin.bun), source: 'official release binary' });
@@ -120,20 +108,12 @@ async function hyperfine(argv, { runs, warmup, prepare }) {
   return r.times.map((t) => t * 1000);
 }
 
-/** GNU time for user/sys CPU and peak RSS of the whole process tree's largest member. */
+/**
+ * Measures cgroup v2 process-tree memory peak (`cgroupTreePeakKb` via `memory.peak`) + cgroup v2 `cpu.stat`
+ * alongside GNU `/usr/bin/time` (`peakRssKb` = single largest child process `ru_maxrss`, NOT aggregate tree memory).
+ */
 async function gnuTime(argv, { runs, prepare }) {
-  if (!bin.time) return {};
-  const user = [], sys = [], rss = [];
-  for (let i = 0; i < runs; i++) {
-    if (prepare) spawnSync(prepare[0], prepare.slice(1), { env: childEnv });
-    const out = join(scratch, `time-${i}.txt`);
-    const r = spawnSync(bin.time, ['-f', '%U %S %M', '-o', out, ...argv], { env: childEnv, cwd: repo, stdio: 'ignore' });
-    if (r.status !== 0) throw new Error(`${display(argv).join(' ')} exited ${r.status}`);
-    const [u, s, m] = (await readFile(out, 'utf8')).trim().split('\n').pop().split(/\s+/).map(Number);
-    user.push(u * 1000); sys.push(s * 1000); rss.push(m);
-  }
-  const med = (xs) => stats(xs, 'ms').median;
-  return { cpu: { unit: 'ms', n: runs, userMedian: med(user), sysMedian: med(sys) }, peakRssKb: stats(rss, 'kb') };
+  return resourceRunner.measure(argv, { runs, prepare });
 }
 
 const runtimePrefix = (backend) => ({ node22: [bin.node], bun: [bin.bun], deno: [bin.deno, 'run', '-A'] }[backend]);
@@ -302,6 +282,7 @@ async function buildTree(kind) {
   for (const entry of ['package.json', 'tsconfig.json', 'tsconfig.test.json', 'src', 'test', 'examples', 'scripts']) {
     await cp(join(repo, entry), join(tree, entry), { recursive: true });
   }
+  await cp(join(repo, 'bench/lib'), join(tree, 'bench/lib'), { recursive: true });
   await symlink(join(repo, 'node_modules'), join(tree, 'node_modules'));
   return tree;
 }
@@ -382,10 +363,13 @@ for (const c of selected) {
       const ws = await mkdtemp(join(scratch, 'uvx-'));
       const argv = [bin.uvx, 'perfdigest-mcp'];
       const probe = await mcpProbe(argv, runs, bin.time ? d.rssRuns : 0, ws);
-      cells.push({ ...base, status: 'measured', command: display(argv), method: 'constant Node MCP client: spawn uvx perfdigest-mcp -> initialize -> tools/list -> close, per iteration (the plugin does this once per digested report)',
-        wall: stats(probe.samplesMs, 'ms'), ...(probe.rssKb.length ? { peakRssKb: stats(probe.rssKb, 'kb') } : {}),
+      cells.push({ ...base, status: 'measured', command: display(argv), method: 'constant Node MCP client: spawn uvx perfdigest-mcp -> initialize -> tools/list -> close, per iteration',
+        wall: stats(probe.samplesMs, 'ms'),
+        memoryCoverage: probe.memoryCoverage,
+        ...(probe.rssKb.length ? { peakRssKb: stats(probe.rssKb, 'kb') } : {}),
+        ...(probe.cgroupPeakKb?.length ? { cgroupTreePeakKb: stats(probe.cgroupPeakKb, 'kb') } : {}),
         parity: { status: 'not-applicable', checks: [{ name: 'info:perfdigest-mcp-tools', pass: probe.tools.includes('summarize_report'), detail: probe.tools.join(',') }] },
-        extra: { samplesMs: probe.samplesMs, note: 'Upstream PerfDigest MCP server (independently maintained); measured only to size per-digest session cost.' } });
+        extra: { samplesMs: probe.samplesMs, note: 'Upstream PerfDigest MCP server (independently maintained); measured only to size per-session startup cost.' } });
     } else if (c.group === 'runtime') {
       if (!runtimeAvailable(c.backend)) { notRun(`${c.backend} binary not found (set PERFDIGEST_BENCH_${c.backend.toUpperCase()})`); continue; }
       const prefix = runtimePrefix(c.backend);
@@ -418,8 +402,11 @@ for (const c of selected) {
         const probe = await mcpProbe(argv, runs, bin.time ? d.rssRuns : 0, ws);
         const check = mcpParity(probe.tools);
         cells.push({ ...base, status: 'measured', command: display(argv.map((a) => a.replace(ws, '<workspace>'))), warmup,
-          method: 'constant Node MCP client (SDK StdioClientTransport): spawn server -> initialize -> tools/list -> close, timed per iteration; RSS from separate GNU-time-wrapped iterations',
-          wall: stats(probe.samplesMs, 'ms'), ...(probe.rssKb.length ? { peakRssKb: stats(probe.rssKb, 'kb') } : {}),
+          method: 'constant Node MCP client (SDK StdioClientTransport): spawn server -> initialize -> tools/list -> close, timed per iteration; memory from separate cgroup v2 scope + GNU time iterations',
+          wall: stats(probe.samplesMs, 'ms'),
+          memoryCoverage: probe.memoryCoverage,
+          ...(probe.rssKb.length ? { peakRssKb: stats(probe.rssKb, 'kb') } : {}),
+          ...(probe.cgroupPeakKb?.length ? { cgroupTreePeakKb: stats(probe.cgroupPeakKb, 'kb') } : {}),
           parity: { status: check.pass ? 'pass' : 'fail', checks: [check] }, extra: { samplesMs: probe.samplesMs } });
       } else if (c.scenario === 'spawn-overhead') {
         const iterations = d.spawnIterations;
@@ -428,7 +415,7 @@ for (const c of selected) {
         const r = await exec(argv[0], argv.slice(1), { env: childEnv, cwd: repo, maxBuffer: 1 << 24 });
         const samples = JSON.parse(r.stdout).samplesMs.slice(1); // drop the first (cold) spawn
         cells.push({ ...base, status: 'measured', command: display(argv), warmup,
-          method: `per-spawn latency of node:child_process.spawn('/bin/true') measured in-process, ${iterations} sequential spawns, first dropped; CPU/RSS are for the whole loop process`,
+          method: `per-spawn latency of node:child_process.spawn('/bin/true') measured in-process, ${iterations} sequential spawns, first dropped; CPU/memory are for the whole loop process`,
           wall: stats(samples, 'ms'), ...(await gnuTime(argv, { runs: d.rssRuns })),
           parity: { status: 'not-applicable', checks: [] }, extra: { iterations } });
       }
@@ -561,13 +548,15 @@ const result = {
     `Medians below were measured on ONE host (${label}) in one sequential session; they rank backends only for this host and this commit.`,
     'A non-baseline backend is reported as "accepted for further study" only when its parity status is pass; no superiority claim is made for any cell whose parity is not pass.',
     'Cells are separated into engine (upstream PerfDigest MCP session cost), orchestration (build, CLI startup, offline demo without agent, MCP discovery, spawn loop, worker receipt), and agent_e2e (full offline investigation with a compiled Go perfdigest-agent/v1 CLI process).',
+    'Memory metrics explicitly separate Linux cgroup v2 process-tree peak memory (`cgroupTreePeakKb` via `/sys/fs/cgroup/.../memory.peak` in a transient `systemd-run --user --scope` unit) from GNU `/usr/bin/time -f "%M"` (`peakRssKb` = `ru_maxrss` of the single largest child process, NOT aggregate concurrent tree memory), tagged per cell via `memoryCoverage`.',
   ],
   limits: [
     'Single host, single session: results do not generalize to other CPUs, kernels, filesystems or CI runners.',
     'No CPU frequency pinning, core isolation or turbo control; background load was not controlled beyond sequential execution (loadavg recorded).',
     'Build "cold" means no incremental/tsbuildinfo state; the OS page cache and node_modules are warm.',
     'offline-demo and agent_e2e latencies are dominated by the uvx perfdigest-mcp child (a Python process), which is identical across runtimes; runtime and local CLI agent overhead are small fractions of total wall time.',
-    'Bun/Deno execute the tsc-emitted ESM through their Node-compat layers; incompatibilities outside these four scenarios (Codex SDK, Decisions HTTP, init) were not exercised.',
+    'GNU /usr/bin/time %M (`peakRssKb`) reports `ru_maxrss` of only the single highest-RSS process in `wait4` (`RUSAGE_CHILDREN`), whereas `cgroupTreePeakKb` reports the Linux kernel cgroup v2 `memory.peak` of unique pages charged across all concurrent processes in the scope (excluding read-only shared library pages already resident in parent slices). When `systemd-run --user --scope` is unavailable, `memoryCoverage` is marked `max_single_process_only_incomplete_tree`.',
+    'Bun/Deno execute the tsc-emitted ESM through their Node-compat layers; incompatibilities outside the tested scenarios are not claimed.',
     'The Go worker is a prototype that only mirrors exec + hash + receipt; it is not a functional replacement for the TypeScript runner.',
     ...(opts.smoke ? ['SMOKE mode: tiny N, numbers are for plumbing validation only and must not be compared.'] : []),
   ],
@@ -580,8 +569,9 @@ await mkdir(dirname(out), { recursive: true });
 await writeFile(out, `${JSON.stringify(result, null, 2)}\n`);
 for (const c of cells) {
   const w = c.wall ? `median ${c.wall.median.toFixed(2)} ${c.wall.unit} [${c.wall.min.toFixed(2)}..${c.wall.max.toFixed(2)}] sd ${c.wall.stdev.toFixed(2)} n=${c.wall.n}` : c.reason ?? '';
-  const rss = c.peakRssKb ? ` rss ${Math.round(c.peakRssKb.median)} KB` : '';
-  console.log(`${c.id.padEnd(30)} [${c.layer.padEnd(13)}] ${c.status.padEnd(8)} parity=${c.parity.status.padEnd(14)} ${w}${rss}`);
+  const rss = c.peakRssKb ? ` maxProcRss ${Math.round(c.peakRssKb.median)} KB` : '';
+  const cg = c.cgroupTreePeakKb ? ` cgTreePeak ${Math.round(c.cgroupTreePeakKb.median)} KB` : '';
+  console.log(`${c.id.padEnd(30)} [${c.layer.padEnd(13)}] ${c.status.padEnd(8)} parity=${c.parity.status.padEnd(14)} ${w}${cg}${rss}`);
 }
 console.log(`result: ${out}${parsed.success ? ' (schema-valid)' : ' (SCHEMA INVALID)'}`);
 if (!opts.smoke) await rm(scratch, { recursive: true, force: true });

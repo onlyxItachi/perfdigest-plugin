@@ -48,3 +48,8 @@ jobs:
         env:
           PERFDIGEST_RUN_CLEF_INTEGRATION: '0'
         run: npm run test:clef-live
+      - name: Validate benchmark schemas, committed results and smoke harness
+        run: |
+          node bench/schema/build-schema.mjs --check
+          node bench/validate.mjs
+          node bench/run-matrix.mjs --smoke

@@ -1,4 +1,4 @@
-// Source of truth for the benchmark result + manifest formats (zod 4, already a
+// Source of truth for the benchmark result + manifest + MCP-reuse formats (zod 4, already a
 // production dependency). The committed JSON Schema files next to this module are
 // GENERATED from these definitions by `node bench/schema/build-schema.mjs` so that
 // non-JS consumers (e.g. PerfDigest-MCP-Bench's Python drivers) can validate the
@@ -11,6 +11,11 @@ const nonEmpty = z.string().min(1);
 /** Explicit architectural layer separating MCP engine, plugin orchestration, and E2E agent flows. */
 export const layerSchema = z.enum(['engine', 'orchestration', 'agent_e2e']);
 export const groupSchema = z.enum(['build', 'runtime', 'worker', 'agent']);
+export const memoryCoverageSchema = z.enum([
+  'cgroup_v2_tree_peak',
+  'max_single_process_only_incomplete_tree',
+  'none',
+]);
 
 /** Order statistics for one metric across N repetitions. All values share `unit`. */
 export const statsSchema = z.object({
@@ -40,6 +45,15 @@ export const paritySchema = z.object({
   checks: z.array(parityCheckSchema),
 }).strict();
 
+export const cpuStatsSchema = z.object({
+  unit: z.literal('ms'),
+  n: z.int().min(1),
+  userMedian: z.number(),
+  sysMedian: z.number(),
+  cgroupUserMedianMs: z.number().optional(),
+  cgroupSysMedianMs: z.number().optional(),
+}).strict();
+
 export const cellSchema = z.object({
   id: nonEmpty,
   layer: layerSchema,
@@ -56,9 +70,24 @@ export const cellSchema = z.object({
   warmup: z.int().min(0).optional(),
   /** Wall time: per-repetition when measured by hyperfine; per-operation when `method` says so. */
   wall: statsSchema.optional(),
-  /** Median user / system CPU per repetition (GNU time). */
-  cpu: z.object({ unit: z.literal('ms'), n: z.int().min(1), userMedian: z.number(), sysMedian: z.number() }).strict().optional(),
+  /** Median user / system CPU per repetition (GNU time + optional cgroup v2 cpu.stat). */
+  cpu: cpuStatsSchema.optional(),
+  /**
+   * Explicitly records whether memory metrics cover the concurrent process tree via Linux cgroup v2
+   * (`cgroup_v2_tree_peak`), only the single largest individual process via GNU time `ru_maxrss`
+   * (`max_single_process_only_incomplete_tree`), or `none`.
+   */
+  memoryCoverage: memoryCoverageSchema.optional(),
+  /**
+   * Peak RSS of the single largest child process from GNU `/usr/bin/time -f '%M'` (`ru_maxrss`);
+   * NOT aggregate concurrent process-tree memory.
+   */
   peakRssKb: statsSchema.optional(),
+  /**
+   * Linux kernel cgroup v2 `memory.peak` (in KB) across the entire concurrent process tree inside a
+   * transient `systemd-run --user --scope` unit. Present when `memoryCoverage === "cgroup_v2_tree_peak"`.
+   */
+  cgroupTreePeakKb: statsSchema.optional(),
   parity: paritySchema,
   extra: z.record(z.string(), z.unknown()).optional(),
 }).strict();
@@ -132,4 +161,83 @@ export const manifestSchema = z.object({
   defaults: z.object({ runs: z.int().min(1), warmup: z.int().min(0), rssRuns: z.int().min(1), spawnIterations: z.int().min(1) }).strict(),
   smokeDefaults: z.object({ runs: z.int().min(1), warmup: z.int().min(0), rssRuns: z.int().min(1), spawnIterations: z.int().min(1) }).strict(),
   cells: z.array(manifestCellSchema).min(1),
+}).strict();
+
+const mcpReuseSubprocessRunSchema = z.object({
+  runs: z.int().min(1),
+  warmup: z.int().min(0),
+  wallMs: statsSchema,
+  userCpuMs: statsSchema,
+  sysCpuMs: statsSchema,
+  cgroupUserCpuMs: statsSchema.optional(),
+  cgroupSysCpuMs: statsSchema.optional(),
+  memoryCoverage: memoryCoverageSchema,
+  maxSingleProcessRssKb: statsSchema,
+  cgroupTreePeakKb: statsSchema.optional(),
+  sessionStats: z.object({
+    spawns: z.int().min(1),
+    calls: z.int().min(1),
+    reusedCalls: z.int().min(0),
+    closed: z.boolean(),
+    tainted: z.boolean(),
+  }).strict(),
+}).strict();
+
+const mcpReuseWorkflowComparisonSchema = z.object({
+  reportCount: z.int().min(1),
+  runtime: nonEmpty,
+  status: z.enum(['measured', 'not-run']),
+  reason: z.string().optional(),
+  note: z.string().optional(),
+  evidenceParity: z.object({
+    status: z.enum(['pass', 'fail', 'not-checked']),
+    detail: nonEmpty,
+  }).strict(),
+  beforePerReportSpawn: mcpReuseSubprocessRunSchema.optional(),
+  afterSessionReuse: mcpReuseSubprocessRunSchema.optional(),
+  delta: z.object({
+    savedWallMs: z.number(),
+    speedupRatio: z.number(),
+    savedCgroupUserCpuMs: z.number().optional(),
+    savedCgroupSysCpuMs: z.number().optional(),
+  }).strict().optional(),
+}).strict();
+
+const singleCallPairSchema = z.object({
+  command: z.array(nonEmpty),
+  reportSequenceCount: z.int().min(1),
+  digestParityPass: z.boolean(),
+  coldSpawn: statsSchema,
+  warmSessionReuse: statsSchema,
+  savedPerReusedCallMs: z.number(),
+  speedupRatio: z.number(),
+}).strict();
+
+export const mcpReuseResultSchema = z.object({
+  schema: z.literal('perfdigest.mcp-reuse-result.v1'),
+  createdAt: z.iso.datetime(),
+  subject: z.object({
+    repo: nonEmpty,
+    gitSha: z.string().regex(/^[a-f0-9]{40}$/),
+    dirty: z.boolean(),
+    ref: z.string().optional(),
+  }).strict(),
+  host: z.object({
+    label: nonEmpty,
+    os: nonEmpty,
+    kernel: nonEmpty,
+    arch: nonEmpty,
+    cpuModel: nonEmpty,
+    logicalCpus: z.int().min(1),
+    memTotalKb: z.int().min(1),
+    loadavg1AtStart: z.number().min(0),
+    node: nonEmpty,
+  }).strict(),
+  singleCallLatencyMs: z.object({
+    perfdigestMcp120: singleCallPairSchema,
+    perfdigestMcp130: singleCallPairSchema.optional(),
+  }).strict(),
+  multiReportWorkflows: z.record(z.string(), mcpReuseWorkflowComparisonSchema),
+  claims: z.array(nonEmpty).min(1),
+  limits: z.array(nonEmpty).min(1),
 }).strict();
