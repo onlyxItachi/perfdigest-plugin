@@ -149,6 +149,223 @@
         "smoke"
       ]
     },
+    "layerSummary": {
+      "type": "object",
+      "properties": {
+        "engine": {
+          "type": "object",
+          "properties": {
+            "total": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "measured": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "notRun": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "failed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "parityPass": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "parityFail": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "parityNotApplicable": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "total",
+            "measured",
+            "notRun",
+            "failed",
+            "parityPass",
+            "parityFail",
+            "parityNotApplicable"
+          ],
+          "additionalProperties": false
+        },
+        "orchestration": {
+          "type": "object",
+          "properties": {
+            "total": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "measured": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "notRun": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "failed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "parityPass": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "parityFail": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "parityNotApplicable": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "total",
+            "measured",
+            "notRun",
+            "failed",
+            "parityPass",
+            "parityFail",
+            "parityNotApplicable"
+          ],
+          "additionalProperties": false
+        },
+        "agent_e2e": {
+          "type": "object",
+          "properties": {
+            "total": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "measured": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "notRun": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "failed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "parityPass": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "parityFail": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "parityNotApplicable": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "total",
+            "measured",
+            "notRun",
+            "failed",
+            "parityPass",
+            "parityFail",
+            "parityNotApplicable"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "engine",
+        "orchestration",
+        "agent_e2e"
+      ],
+      "additionalProperties": false
+    },
+    "benchCompatibility": {
+      "type": "object",
+      "properties": {
+        "upstreamRepo": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rawResultDirs": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "fieldMapping": {
+          "type": "object",
+          "properties": {
+            "latencyJson": {
+              "type": "string",
+              "minLength": 1
+            },
+            "identityJson": {
+              "type": "string",
+              "minLength": 1
+            },
+            "startupJson": {
+              "type": "string",
+              "minLength": 1
+            },
+            "concurrencyJson": {
+              "type": "string",
+              "minLength": 1
+            },
+            "loadavgJson": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "latencyJson",
+            "identityJson",
+            "startupJson",
+            "concurrencyJson",
+            "loadavgJson"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "upstreamRepo",
+        "rawResultDirs",
+        "fieldMapping"
+      ],
+      "additionalProperties": false
+    },
     "cells": {
       "minItems": 1,
       "type": "array",
@@ -159,12 +376,21 @@
             "type": "string",
             "minLength": 1
           },
+          "layer": {
+            "type": "string",
+            "enum": [
+              "engine",
+              "orchestration",
+              "agent_e2e"
+            ]
+          },
           "group": {
             "type": "string",
             "enum": [
               "build",
               "runtime",
-              "worker"
+              "worker",
+              "agent"
             ]
           },
           "backend": {
@@ -384,6 +610,7 @@
         },
         "required": [
           "id",
+          "layer",
           "group",
           "backend",
           "scenario",
@@ -419,6 +646,8 @@
     "host",
     "tools",
     "mode",
+    "layerSummary",
+    "benchCompatibility",
     "cells",
     "claims",
     "limits"
