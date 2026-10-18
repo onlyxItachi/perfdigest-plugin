@@ -1,16 +1,16 @@
 {
   "schema": "perfdigest.benchmark-result.v1",
-  "createdAt": "2026-10-18T17:12:21.870Z",
+  "createdAt": "2026-10-18T17:55:05.324Z",
   "manifest": {
     "id": "stage3-runtime-build-foundations",
     "path": "bench/manifests/default.json",
-    "sha256": "b3f0eb9bfe4c542e51c85dea4f57e4923ff99e87fb74ac97bac62505cd0f2d17"
+    "sha256": "e1f5a55575d899cca83dbcf1bcf81319d17f94d52ccbc56bd288f40dec227283"
   },
   "subject": {
     "repo": "onlyxItachi/perfdigest-plugin",
-    "gitSha": "04de22a5b36ad1c9dc538673f718a44a62dc4ee4",
+    "gitSha": "6d628f532975604c567ec5efc9f95fb92b6bfcbd",
     "dirty": false,
-    "ref": "feat/runtime-benchmark-foundations"
+    "ref": "feat/interoperability-and-bench-consolidation"
   },
   "host": {
     "label": "amd-ryzen-ai-9-hx-370-x64",
@@ -20,7 +20,7 @@
     "cpuModel": "AMD Ryzen AI 9 HX 370 w/ Radeon 890M",
     "logicalCpus": 24,
     "memTotalKb": 14927160,
-    "loadavg1AtStart": 1.71
+    "loadavg1AtStart": 2.21
   },
   "tools": [
     {
@@ -78,9 +78,54 @@
     }
   ],
   "mode": "full",
+  "layerSummary": {
+    "engine": {
+      "total": 1,
+      "measured": 1,
+      "notRun": 0,
+      "failed": 0,
+      "parityPass": 0,
+      "parityFail": 0,
+      "parityNotApplicable": 1
+    },
+    "orchestration": {
+      "total": 16,
+      "measured": 15,
+      "notRun": 1,
+      "failed": 0,
+      "parityPass": 12,
+      "parityFail": 1,
+      "parityNotApplicable": 3
+    },
+    "agent_e2e": {
+      "total": 1,
+      "measured": 1,
+      "notRun": 0,
+      "failed": 0,
+      "parityPass": 1,
+      "parityFail": 0,
+      "parityNotApplicable": 0
+    }
+  },
+  "benchCompatibility": {
+    "upstreamRepo": "onlyxItachi/PerfDigest-MCP-Bench",
+    "rawResultDirs": [
+      "results/interpreter_matrix_raw",
+      "results/cpp_build_loop_raw",
+      "results/cuda_opt_bench_raw"
+    ],
+    "fieldMapping": {
+      "latencyJson": "results/<backend>:<format>.{median_us,q1_us,q3_us,n} -> cells[layer=\"engine\"].wall.{unit:\"us\",median,q1,q3,n}",
+      "identityJson": "results/<backend>:<format>.{sha256,bytes,total_units} -> cells[layer=\"engine\"].parity.checks[name=\"digest-sha256:<backend>:<format>\"]",
+      "startupJson": "median_startup_s -> cells[layer=\"engine\",scenario=\"interpreter-startup\"].wall.{unit:\"s\",median}",
+      "concurrencyJson": "{same_path_1thread,same_path_nthreads,mixed_paths_nthreads}.{wall_time_s,throughput_calls_per_s,correct} -> cells[layer=\"engine\"].extra.concurrency",
+      "loadavgJson": "latency_loadavg.json -> host.loadavg1AtStart"
+    }
+  },
   "cells": [
     {
       "id": "build.tsc6.cold",
+      "layer": "orchestration",
       "group": "build",
       "backend": "tsc-6.0.3",
       "scenario": "cold-build",
@@ -99,30 +144,30 @@
       "wall": {
         "unit": "ms",
         "n": 10,
-        "median": 1160.775,
-        "min": 1124.103,
-        "max": 1230.511,
-        "mean": 1168.378,
-        "stdev": 32.189,
-        "q1": 1155.728,
-        "q3": 1189.054
+        "median": 1290.246,
+        "min": 1184.367,
+        "max": 1368.16,
+        "mean": 1277.823,
+        "stdev": 59.293,
+        "q1": 1251.322,
+        "q3": 1298.589
       },
       "cpu": {
         "unit": "ms",
         "n": 5,
-        "userMedian": 3090,
-        "sysMedian": 110
+        "userMedian": 3310,
+        "sysMedian": 120
       },
       "peakRssKb": {
         "unit": "kb",
         "n": 5,
-        "median": 334908,
-        "min": 329080,
-        "max": 336300,
-        "mean": 333777.6,
-        "stdev": 2908.812,
-        "q1": 332960,
-        "q3": 335640
+        "median": 335428,
+        "min": 334400,
+        "max": 336488,
+        "mean": 335420.8,
+        "stdev": 983.347,
+        "q1": 334476,
+        "q3": 336312
       },
       "parity": {
         "status": "pass",
@@ -162,7 +207,7 @@
           {
             "name": "dist-under-node:report-sha256:traversal-timing",
             "pass": true,
-            "detail": "recorded=c28fa52101f5 recomputed=c28fa52101f5 bytes=396"
+            "detail": "recorded=c1f4fd63f1e4 recomputed=c1f4fd63f1e4 bytes=406"
           },
           {
             "name": "dist-under-node:digest-units=column_major,row_major",
@@ -177,27 +222,28 @@
           {
             "name": "info:js-byte-identical-to-repo-dist",
             "pass": true,
-            "detail": "16/16"
+            "detail": "18/18"
           }
         ]
       },
       "extra": {
         "samplesMs": [
-          1124.102892,
-          1192.864857,
-          1161.012549,
-          1195.534694,
-          1154.2365889999999,
-          1230.5108229999998,
-          1160.2008720000001,
-          1127.154439,
-          1160.537889,
-          1177.6224960000002
+          1368.1596310000002,
+          1348.2844630000002,
+          1296.949049,
+          1287.8211079999999,
+          1261.6428680000001,
+          1247.881558,
+          1191.322071,
+          1299.135777,
+          1292.669947,
+          1184.366531
         ]
       }
     },
     {
       "id": "build.tsgo.cold",
+      "layer": "orchestration",
       "group": "build",
       "backend": "tsgo-7-preview",
       "scenario": "cold-build",
@@ -215,30 +261,30 @@
       "wall": {
         "unit": "ms",
         "n": 10,
-        "median": 147.375,
-        "min": 134.404,
-        "max": 183.539,
-        "mean": 151.351,
-        "stdev": 15.666,
-        "q1": 139.496,
-        "q3": 158.003
+        "median": 135.769,
+        "min": 128.416,
+        "max": 145.761,
+        "mean": 136.095,
+        "stdev": 5.276,
+        "q1": 132.034,
+        "q3": 139.424
       },
       "cpu": {
         "unit": "ms",
         "n": 5,
-        "userMedian": 660,
+        "userMedian": 760,
         "sysMedian": 150
       },
       "peakRssKb": {
         "unit": "kb",
         "n": 5,
-        "median": 185320,
-        "min": 182432,
-        "max": 185832,
-        "mean": 184752,
-        "stdev": 1375.293,
-        "q1": 184604,
-        "q3": 185572
+        "median": 186916,
+        "min": 184348,
+        "max": 187284,
+        "mean": 186191.2,
+        "stdev": 1314.788,
+        "q1": 185256,
+        "q3": 187152
       },
       "parity": {
         "status": "pass",
@@ -278,7 +324,7 @@
           {
             "name": "dist-under-node:report-sha256:traversal-timing",
             "pass": true,
-            "detail": "recorded=d70f03120ab0 recomputed=d70f03120ab0 bytes=396"
+            "detail": "recorded=5dcc2e93d7c8 recomputed=5dcc2e93d7c8 bytes=396"
           },
           {
             "name": "dist-under-node:digest-units=column_major,row_major",
@@ -293,27 +339,28 @@
           {
             "name": "info:js-byte-identical-to-repo-dist",
             "pass": true,
-            "detail": "16/16"
+            "detail": "18/18"
           }
         ]
       },
       "extra": {
         "samplesMs": [
-          151.989043,
-          138.63703100000004,
-          170.01256,
-          160.007819,
-          149.223564,
-          142.071636,
-          183.539426,
-          138.09812200000002,
-          145.526833,
-          134.403617
+          132.360475,
+          137.20384400000003,
+          128.41618300000002,
+          139.68608400000002,
+          140.949515,
+          131.67915900000003,
+          134.33419100000003,
+          138.637256,
+          131.924971,
+          145.760804
         ]
       }
     },
     {
       "id": "runtime.node22.help",
+      "layer": "orchestration",
       "group": "runtime",
       "backend": "node22",
       "scenario": "cli-help",
@@ -329,30 +376,30 @@
       "wall": {
         "unit": "ms",
         "n": 20,
-        "median": 134.356,
-        "min": 120.693,
-        "max": 164.999,
-        "mean": 135.552,
-        "stdev": 11.248,
-        "q1": 129.259,
-        "q3": 139.626
+        "median": 125.655,
+        "min": 118.147,
+        "max": 135.475,
+        "mean": 125.695,
+        "stdev": 5.145,
+        "q1": 120.636,
+        "q3": 128.988
       },
       "cpu": {
         "unit": "ms",
         "n": 5,
-        "userMedian": 180,
+        "userMedian": 170,
         "sysMedian": 20
       },
       "peakRssKb": {
         "unit": "kb",
         "n": 5,
-        "median": 93896,
-        "min": 89240,
-        "max": 95148,
-        "mean": 92580,
-        "stdev": 2967.346,
-        "q1": 89516,
-        "q3": 95100
+        "median": 89600,
+        "min": 89252,
+        "max": 94324,
+        "mean": 91252.8,
+        "stdev": 2496.156,
+        "q1": 89472,
+        "q3": 93616
       },
       "parity": {
         "status": "pass",
@@ -365,31 +412,32 @@
       },
       "extra": {
         "samplesMs": [
-          130.08367700000002,
-          132.806428,
-          121.01194000000001,
-          131.722808,
-          135.904835,
-          136.04855700000002,
-          136.549168,
-          143.37807800000002,
-          159.300337,
-          125.73995200000002,
-          142.93553,
-          164.99904500000002,
-          131.664801,
-          124.745731,
-          129.93401400000002,
-          139.196023,
-          127.232871,
-          120.69252600000002,
-          136.179694,
-          140.914835
+          119.824774,
+          118.511133,
+          127.17679400000002,
+          120.498159,
+          134.709675,
+          129.04489900000002,
+          125.357569,
+          120.68152100000002,
+          135.475342,
+          125.261589,
+          124.654814,
+          124.95855600000002,
+          128.554896,
+          128.96853900000002,
+          118.146551,
+          129.72457500000002,
+          128.459555,
+          125.95294400000002,
+          118.19199100000002,
+          129.74169500000002
         ]
       }
     },
     {
       "id": "runtime.bun.help",
+      "layer": "orchestration",
       "group": "runtime",
       "backend": "bun",
       "scenario": "cli-help",
@@ -405,30 +453,30 @@
       "wall": {
         "unit": "ms",
         "n": 20,
-        "median": 69.129,
-        "min": 58.311,
-        "max": 77.916,
-        "mean": 68.179,
-        "stdev": 5.701,
-        "q1": 63.839,
-        "q3": 72.08
+        "median": 65.024,
+        "min": 57.189,
+        "max": 80.978,
+        "mean": 65.269,
+        "stdev": 6.46,
+        "q1": 60.847,
+        "q3": 68.884
       },
       "cpu": {
         "unit": "ms",
         "n": 5,
         "userMedian": 90,
-        "sysMedian": 10
+        "sysMedian": 20
       },
       "peakRssKb": {
         "unit": "kb",
         "n": 5,
-        "median": 63388,
-        "min": 62896,
-        "max": 64064,
-        "mean": 63508.8,
-        "stdev": 520.595,
-        "q1": 63168,
-        "q3": 64028
+        "median": 61996,
+        "min": 61780,
+        "max": 63708,
+        "mean": 62442.4,
+        "stdev": 797.965,
+        "q1": 61980,
+        "q3": 62748
       },
       "parity": {
         "status": "pass",
@@ -441,31 +489,32 @@
       },
       "extra": {
         "samplesMs": [
-          69.576365,
-          66.257601,
-          68.856292,
-          77.916092,
-          58.311126,
-          71.996506,
-          60.113403000000005,
-          69.401164,
-          71.641495,
-          71.599986,
-          64.915857,
-          72.331759,
-          74.6301,
-          63.964672,
-          62.139855000000004,
-          75.095601,
-          74.43119800000001,
-          67.7838,
-          63.46152000000001,
-          59.16548100000001
+          65.451322,
+          67.454768,
+          71.30048,
+          62.23928600000001,
+          75.75192700000001,
+          65.22442000000001,
+          63.77883800000001,
+          68.178794,
+          57.453517000000005,
+          64.823898,
+          61.868643,
+          57.296126,
+          61.477000000000004,
+          57.188735,
+          80.978119,
+          58.173674,
+          71.2637,
+          65.511843,
+          58.95810000000001,
+          71.000298
         ]
       }
     },
     {
       "id": "runtime.deno.help",
+      "layer": "orchestration",
       "group": "runtime",
       "backend": "deno",
       "scenario": "cli-help",
@@ -483,30 +532,30 @@
       "wall": {
         "unit": "ms",
         "n": 20,
-        "median": 86.77,
-        "min": 79.895,
-        "max": 124.542,
-        "mean": 89.445,
-        "stdev": 10.229,
-        "q1": 82.715,
-        "q3": 93.074
+        "median": 84.911,
+        "min": 79.506,
+        "max": 91.68,
+        "mean": 85.465,
+        "stdev": 3.507,
+        "q1": 82.934,
+        "q3": 88.007
       },
       "cpu": {
         "unit": "ms",
         "n": 5,
-        "userMedian": 90,
+        "userMedian": 80,
         "sysMedian": 20
       },
       "peakRssKb": {
         "unit": "kb",
         "n": 5,
-        "median": 86808,
-        "min": 85764,
-        "max": 87496,
-        "mean": 86830.4,
-        "stdev": 698.218,
-        "q1": 86668,
-        "q3": 87416
+        "median": 85160,
+        "min": 84936,
+        "max": 85552,
+        "mean": 85214.4,
+        "stdev": 225.08,
+        "q1": 85148,
+        "q3": 85276
       },
       "parity": {
         "status": "pass",
@@ -519,31 +568,32 @@
       },
       "extra": {
         "samplesMs": [
-          93.001973,
-          104.574774,
-          93.29120400000001,
-          87.193878,
-          94.59816000000001,
-          94.105638,
-          87.19632000000001,
-          86.346036,
-          85.25666100000001,
-          82.74657,
-          82.620499,
-          81.775396,
-          85.695883,
-          79.895167,
-          88.775367,
-          80.57009000000001,
-          89.94194200000001,
-          85.05379,
-          81.70841800000001,
-          124.542309
+          82.451831,
+          80.61966600000001,
+          87.648163,
+          85.562027,
+          79.50591700000001,
+          81.12547,
+          85.24818400000001,
+          84.57286900000001,
+          90.98316000000001,
+          91.680086,
+          84.468697,
+          90.163404,
+          86.994048,
+          83.40831800000001,
+          82.856544,
+          89.284237,
+          84.44691700000001,
+          82.960425,
+          86.244752,
+          89.084145
         ]
       }
     },
     {
       "id": "runtime.node22.demo",
+      "layer": "orchestration",
       "group": "runtime",
       "backend": "node22",
       "scenario": "offline-demo",
@@ -565,30 +615,30 @@
       "wall": {
         "unit": "ms",
         "n": 15,
-        "median": 582.592,
-        "min": 565.05,
-        "max": 612.965,
-        "mean": 584.754,
-        "stdev": 13.356,
-        "q1": 577.124,
-        "q3": 592.72
+        "median": 580.812,
+        "min": 546.021,
+        "max": 661.485,
+        "mean": 583.201,
+        "stdev": 28.667,
+        "q1": 563.639,
+        "q3": 596.014
       },
       "cpu": {
         "unit": "ms",
         "n": 5,
-        "userMedian": 590,
+        "userMedian": 610,
         "sysMedian": 70
       },
       "peakRssKb": {
         "unit": "kb",
         "n": 5,
-        "median": 93692,
-        "min": 92408,
-        "max": 95300,
-        "mean": 93932,
-        "stdev": 1197.34,
-        "q1": 93292,
-        "q3": 94968
+        "median": 93560,
+        "min": 92648,
+        "max": 95772,
+        "mean": 93824,
+        "stdev": 1229.286,
+        "q1": 92992,
+        "q3": 94148
       },
       "parity": {
         "status": "pass",
@@ -616,7 +666,7 @@
           {
             "name": "report-sha256:traversal-timing",
             "pass": true,
-            "detail": "recorded=5f46596d62a7 recomputed=5f46596d62a7 bytes=385"
+            "detail": "recorded=67555cc0a27a recomputed=67555cc0a27a bytes=415"
           },
           {
             "name": "digest-units=column_major,row_major",
@@ -627,26 +677,27 @@
       },
       "extra": {
         "samplesMs": [
-          577.548991,
-          588.8811019999999,
-          577.6174860000001,
-          569.175611,
-          565.049625,
-          582.592109,
-          599.356794,
-          612.964595,
-          600.202938,
-          578.529041,
-          588.695592,
-          587.7390730000001,
-          569.696937,
-          576.698249,
-          596.5589190000001
+          546.021486,
+          561.803185,
+          596.497618,
+          661.485427,
+          563.1283860000001,
+          611.426161,
+          564.1502360000001,
+          600.423041,
+          595.531232,
+          554.4469980000001,
+          588.321034,
+          566.008723,
+          580.812364,
+          587.873641,
+          570.0802070000001
         ]
       }
     },
     {
       "id": "runtime.bun.demo",
+      "layer": "orchestration",
       "group": "runtime",
       "backend": "bun",
       "scenario": "offline-demo",
@@ -668,30 +719,30 @@
       "wall": {
         "unit": "ms",
         "n": 15,
-        "median": 502.371,
-        "min": 465.113,
-        "max": 536.227,
-        "mean": 505.964,
-        "stdev": 21.592,
-        "q1": 495.346,
-        "q3": 524.737
+        "median": 514.027,
+        "min": 466.277,
+        "max": 549.346,
+        "mean": 514.759,
+        "stdev": 24.485,
+        "q1": 498.425,
+        "q3": 531.926
       },
       "cpu": {
         "unit": "ms",
         "n": 5,
-        "userMedian": 530,
+        "userMedian": 520,
         "sysMedian": 70
       },
       "peakRssKb": {
         "unit": "kb",
         "n": 5,
-        "median": 66300,
-        "min": 65844,
-        "max": 67096,
-        "mean": 66365.6,
-        "stdev": 499.428,
-        "q1": 65996,
-        "q3": 66592
+        "median": 65620,
+        "min": 64792,
+        "max": 66404,
+        "mean": 65562.4,
+        "stdev": 725.813,
+        "q1": 64868,
+        "q3": 66128
       },
       "parity": {
         "status": "pass",
@@ -719,7 +770,7 @@
           {
             "name": "report-sha256:traversal-timing",
             "pass": true,
-            "detail": "recorded=c37565b699f2 recomputed=c37565b699f2 bytes=395"
+            "detail": "recorded=4b5bee5fafe3 recomputed=4b5bee5fafe3 bytes=398"
           },
           {
             "name": "digest-units=column_major,row_major",
@@ -730,26 +781,27 @@
       },
       "extra": {
         "samplesMs": [
-          536.226677,
-          498.88646600000004,
-          465.11282900000003,
-          518.793727,
-          522.365835,
-          474.73404000000005,
-          499.28033200000004,
-          493.29356500000006,
-          483.104633,
-          529.808561,
-          502.37086200000005,
-          527.107479,
-          531.2506410000001,
-          509.7218640000001,
-          497.397943
+          511.476982,
+          509.75823800000006,
+          520.8688989999999,
+          531.546287,
+          549.3458420000001,
+          547.538629,
+          543.505036,
+          532.304975,
+          497.909784,
+          522.892029,
+          466.27650600000004,
+          514.026977,
+          497.392441,
+          498.940025,
+          477.60146000000003
         ]
       }
     },
     {
       "id": "runtime.deno.demo",
+      "layer": "orchestration",
       "group": "runtime",
       "backend": "deno",
       "scenario": "offline-demo",
@@ -795,7 +847,7 @@
           {
             "name": "report-sha256:traversal-timing",
             "pass": true,
-            "detail": "recorded=f859e14b9f2d recomputed=f859e14b9f2d bytes=386"
+            "detail": "recorded=0b9deb97c3c1 recomputed=0b9deb97c3c1 bytes=397"
           },
           {
             "name": "digest-units=column_major,row_major",
@@ -807,6 +859,7 @@
     },
     {
       "id": "runtime.node22.mcp",
+      "layer": "orchestration",
       "group": "runtime",
       "backend": "node22",
       "scenario": "mcp-tools-list",
@@ -824,24 +877,24 @@
       "wall": {
         "unit": "ms",
         "n": 20,
-        "median": 131.075,
-        "min": 124.657,
-        "max": 203.169,
-        "mean": 139.298,
-        "stdev": 19.065,
-        "q1": 125.954,
-        "q3": 149.97
+        "median": 133.089,
+        "min": 124.203,
+        "max": 147.693,
+        "mean": 134.397,
+        "stdev": 7.305,
+        "q1": 129.193,
+        "q3": 139.728
       },
       "peakRssKb": {
         "unit": "kb",
         "n": 5,
-        "median": 94156,
-        "min": 93016,
-        "max": 94672,
-        "mean": 94028.8,
-        "stdev": 647.539,
-        "q1": 93840,
-        "q3": 94460
+        "median": 93160,
+        "min": 91840,
+        "max": 94476,
+        "mean": 93075.2,
+        "stdev": 956.508,
+        "q1": 92692,
+        "q3": 93208
       },
       "parity": {
         "status": "pass",
@@ -855,31 +908,32 @@
       },
       "extra": {
         "samplesMs": [
-          137.88827099999997,
-          203.169064,
-          149.52070699999996,
-          152.291782,
-          124.79618000000005,
-          149.87853900000005,
-          150.24626200000012,
-          131.114908,
-          131.5471,
-          125.9796389999999,
-          160.06441799999993,
-          129.15320700000007,
-          151.85407299999997,
-          126.92328599999973,
-          125.87527100000034,
-          130.01356399999986,
-          125.0943870000001,
-          131.03490999999985,
-          124.85505600000033,
-          124.65706499999987
+          147.69255900000002,
+          139.89300500000002,
+          132.35240300000004,
+          124.20334600000001,
+          141.13862600000004,
+          147.020664,
+          138.66065500000002,
+          129.01330600000006,
+          126.232573,
+          134.52952199999982,
+          133.82579499999997,
+          139.67328399999997,
+          138.1452310000002,
+          129.43034899999998,
+          131.62957800000004,
+          124.5337199999999,
+          131.6305480000001,
+          125.2059549999999,
+          129.25272900000027,
+          143.87686799999983
         ]
       }
     },
     {
       "id": "runtime.bun.mcp",
+      "layer": "orchestration",
       "group": "runtime",
       "backend": "bun",
       "scenario": "mcp-tools-list",
@@ -897,24 +951,24 @@
       "wall": {
         "unit": "ms",
         "n": 20,
-        "median": 80.206,
-        "min": 72.276,
-        "max": 109.27,
-        "mean": 83.103,
-        "stdev": 8.94,
-        "q1": 77.88,
-        "q3": 86.262
+        "median": 78.945,
+        "min": 70.527,
+        "max": 95.587,
+        "mean": 80.18,
+        "stdev": 7.497,
+        "q1": 74.722,
+        "q3": 83.845
       },
       "peakRssKb": {
         "unit": "kb",
         "n": 5,
-        "median": 67044,
-        "min": 66284,
-        "max": 67320,
-        "mean": 66942.4,
-        "stdev": 404.243,
-        "q1": 66872,
-        "q3": 67192
+        "median": 66264,
+        "min": 65796,
+        "max": 66972,
+        "mean": 66361.6,
+        "stdev": 454.538,
+        "q1": 66140,
+        "q3": 66636
       },
       "parity": {
         "status": "pass",
@@ -928,31 +982,32 @@
       },
       "extra": {
         "samplesMs": [
-          85.46864000000001,
-          81.04136600000001,
-          80.15565999999998,
-          78.968953,
-          90.454478,
-          88.64212800000001,
-          77.14353300000005,
-          78.18687899999998,
-          80.25693999999999,
-          75.697315,
-          84.16623500000003,
-          78.12559099999999,
-          76.0363789999999,
-          72.27629700000011,
-          88.76796100000001,
-          74.76294099999996,
-          99.491761,
-          109.26969599999984,
-          78.19513099999995,
-          84.9446089999999
+          90.581122,
+          79.51896199999999,
+          70.52709799999997,
+          75.03713500000003,
+          77.20194299999997,
+          95.58670299999994,
+          72.96794799999998,
+          70.84188100000006,
+          70.89229,
+          76.06877299999996,
+          80.14334599999995,
+          81.22616499999992,
+          89.69140399999992,
+          73.77550499999984,
+          82.58714699999996,
+          87.61858800000005,
+          78.37193200000002,
+          77.13648200000011,
+          81.71924999999987,
+          92.11260399999992
         ]
       }
     },
     {
       "id": "runtime.deno.mcp",
+      "layer": "orchestration",
       "group": "runtime",
       "backend": "deno",
       "scenario": "mcp-tools-list",
@@ -972,24 +1027,24 @@
       "wall": {
         "unit": "ms",
         "n": 20,
-        "median": 97.623,
-        "min": 88.411,
-        "max": 145.412,
-        "mean": 101.663,
-        "stdev": 13.141,
-        "q1": 94.063,
-        "q3": 104.479
+        "median": 94.165,
+        "min": 86.807,
+        "max": 109.466,
+        "mean": 94.766,
+        "stdev": 6.903,
+        "q1": 88.82,
+        "q3": 95.949
       },
       "peakRssKb": {
         "unit": "kb",
         "n": 5,
-        "median": 89736,
-        "min": 88504,
-        "max": 90420,
-        "mean": 89524,
-        "stdev": 805.134,
-        "q1": 88888,
-        "q3": 90072
+        "median": 88020,
+        "min": 86736,
+        "max": 88748,
+        "mean": 87983.2,
+        "stdev": 764.792,
+        "q1": 87984,
+        "q3": 88428
       },
       "parity": {
         "status": "pass",
@@ -1003,31 +1058,32 @@
       },
       "extra": {
         "samplesMs": [
-          104.71264500000001,
-          101.21808499999997,
-          97.82435600000002,
-          121.71377100000007,
-          103.017425,
-          97.42215400000009,
-          145.41200600000002,
-          92.34909399999992,
-          104.40097500000002,
-          94.32365800000002,
-          94.62108999999987,
-          95.38930399999981,
-          92.23639599999979,
-          105.96277499999997,
-          114.47825199999988,
-          93.28207099999986,
-          90.07982399999992,
-          96.13987900000006,
-          100.26844400000027,
-          88.41064599999982
+          94.354644,
+          107.62469199999998,
+          96.91400399999998,
+          107.14589699999999,
+          109.46582700000005,
+          95.57616299999995,
+          93.99542000000008,
+          86.80671099999995,
+          92.26083699999992,
+          95.62747399999989,
+          87.25794499999984,
+          94.43337399999996,
+          91.93405299999995,
+          88.63882600000011,
+          94.33386300000006,
+          102.40494899999999,
+          88.55479600000012,
+          88.88104799999996,
+          87.80093000000011,
+          91.30020800000011
         ]
       }
     },
     {
       "id": "runtime.node22.spawn",
+      "layer": "orchestration",
       "group": "runtime",
       "backend": "node22",
       "scenario": "spawn-overhead",
@@ -1043,30 +1099,30 @@
       "wall": {
         "unit": "ms",
         "n": 199,
-        "median": 0.492,
+        "median": 0.501,
         "min": 0.459,
-        "max": 0.961,
-        "mean": 0.52,
-        "stdev": 0.079,
-        "q1": 0.482,
-        "q3": 0.524
+        "max": 0.902,
+        "mean": 0.525,
+        "stdev": 0.071,
+        "q1": 0.484,
+        "q3": 0.541
       },
       "cpu": {
         "unit": "ms",
         "n": 5,
-        "userMedian": 70,
+        "userMedian": 60,
         "sysMedian": 60
       },
       "peakRssKb": {
         "unit": "kb",
         "n": 5,
-        "median": 46736,
-        "min": 46600,
-        "max": 47000,
-        "mean": 46768,
-        "stdev": 155.229,
-        "q1": 46672,
-        "q3": 46832
+        "median": 46680,
+        "min": 46436,
+        "max": 46940,
+        "mean": 46710.4,
+        "stdev": 201.566,
+        "q1": 46624,
+        "q3": 46872
       },
       "parity": {
         "status": "not-applicable",
@@ -1078,6 +1134,7 @@
     },
     {
       "id": "runtime.bun.spawn",
+      "layer": "orchestration",
       "group": "runtime",
       "backend": "bun",
       "scenario": "spawn-overhead",
@@ -1093,30 +1150,30 @@
       "wall": {
         "unit": "ms",
         "n": 199,
-        "median": 0.249,
-        "min": 0.223,
-        "max": 0.647,
-        "mean": 0.264,
-        "stdev": 0.05,
-        "q1": 0.237,
-        "q3": 0.268
+        "median": 0.24,
+        "min": 0.224,
+        "max": 0.634,
+        "mean": 0.26,
+        "stdev": 0.059,
+        "q1": 0.234,
+        "q3": 0.256
       },
       "cpu": {
         "unit": "ms",
         "n": 5,
-        "userMedian": 60,
+        "userMedian": 50,
         "sysMedian": 10
       },
       "peakRssKb": {
         "unit": "kb",
         "n": 5,
-        "median": 30684,
-        "min": 30496,
-        "max": 31160,
-        "mean": 30735.2,
-        "stdev": 255.991,
-        "q1": 30588,
-        "q3": 30748
+        "median": 29596,
+        "min": 28764,
+        "max": 30108,
+        "mean": 29583.2,
+        "stdev": 565.957,
+        "q1": 29340,
+        "q3": 30108
       },
       "parity": {
         "status": "not-applicable",
@@ -1128,6 +1185,7 @@
     },
     {
       "id": "runtime.deno.spawn",
+      "layer": "orchestration",
       "group": "runtime",
       "backend": "deno",
       "scenario": "spawn-overhead",
@@ -1145,30 +1203,30 @@
       "wall": {
         "unit": "ms",
         "n": 199,
-        "median": 0.261,
-        "min": 0.242,
-        "max": 0.865,
-        "mean": 0.275,
-        "stdev": 0.059,
-        "q1": 0.255,
-        "q3": 0.268
+        "median": 0.267,
+        "min": 0.249,
+        "max": 0.587,
+        "mean": 0.282,
+        "stdev": 0.044,
+        "q1": 0.26,
+        "q3": 0.281
       },
       "cpu": {
         "unit": "ms",
         "n": 5,
-        "userMedian": 70,
-        "sysMedian": 30
+        "userMedian": 60,
+        "sysMedian": 20
       },
       "peakRssKb": {
         "unit": "kb",
         "n": 5,
-        "median": 46344,
-        "min": 45344,
-        "max": 46816,
-        "mean": 46248.8,
-        "stdev": 611.48,
-        "q1": 45972,
-        "q3": 46768
+        "median": 45588,
+        "min": 45112,
+        "max": 45876,
+        "mean": 45573.6,
+        "stdev": 305.373,
+        "q1": 45476,
+        "q3": 45816
       },
       "parity": {
         "status": "not-applicable",
@@ -1180,6 +1238,7 @@
     },
     {
       "id": "runtime.uvx.perfdigest-mcp",
+      "layer": "engine",
       "group": "runtime",
       "backend": "uvx",
       "scenario": "perfdigest-mcp-session-start",
@@ -1193,24 +1252,24 @@
       "wall": {
         "unit": "ms",
         "n": 20,
-        "median": 282.525,
-        "min": 271.528,
-        "max": 311.866,
-        "mean": 285.331,
-        "stdev": 11.456,
-        "q1": 276.959,
-        "q3": 291.436
+        "median": 276.795,
+        "min": 266.165,
+        "max": 313.241,
+        "mean": 280.145,
+        "stdev": 12.05,
+        "q1": 273.45,
+        "q3": 282.298
       },
       "peakRssKb": {
         "unit": "kb",
         "n": 5,
-        "median": 62644,
-        "min": 61868,
-        "max": 62860,
-        "mean": 62501.6,
-        "stdev": 383.339,
-        "q1": 62448,
-        "q3": 62688
+        "median": 62844,
+        "min": 62260,
+        "max": 63232,
+        "mean": 62818.4,
+        "stdev": 394.893,
+        "q1": 62620,
+        "q3": 63136
       },
       "parity": {
         "status": "not-applicable",
@@ -1224,32 +1283,33 @@
       },
       "extra": {
         "samplesMs": [
-          296.857558,
-          284.55049099999997,
-          275.17152799999997,
-          278.41110700000013,
-          282.03348400000004,
-          275.087043,
-          309.17371500000036,
-          285.2090189999999,
-          311.865734,
-          300.0654720000002,
-          283.0167919999999,
-          278.9409690000002,
-          278.39703999999983,
-          276.8967910000001,
-          275.5481770000006,
-          291.2540019999997,
-          283.6493870000004,
-          271.5281410000007,
-          276.98012299999937,
-          291.9808039999998
+          273.669374,
+          281.023384,
+          282.71927800000003,
+          266.858158,
+          275.52683,
+          304.84950000000026,
+          272.791968,
+          276.359547,
+          266.16466299999956,
+          285.29502,
+          295.9050980000002,
+          268.8111650000001,
+          282.1575849999999,
+          274.09326899999996,
+          272.0291219999999,
+          277.2310239999997,
+          275.5416609999993,
+          313.2411510000002,
+          280.07251799999995,
+          278.5551260000002
         ],
         "note": "Upstream PerfDigest MCP server (independently maintained); measured only to size per-digest session cost."
       }
     },
     {
       "id": "worker.node.receipt",
+      "layer": "orchestration",
       "group": "worker",
       "backend": "node-worker",
       "scenario": "exec-and-hash-receipt",
@@ -1265,30 +1325,30 @@
       "wall": {
         "unit": "ms",
         "n": 20,
-        "median": 152.956,
-        "min": 145.65,
-        "max": 165.55,
-        "mean": 154.924,
-        "stdev": 6.429,
-        "q1": 150.748,
-        "q3": 161.045
+        "median": 151.534,
+        "min": 142.879,
+        "max": 167.47,
+        "mean": 150.942,
+        "stdev": 5.292,
+        "q1": 147.622,
+        "q3": 152.682
       },
       "cpu": {
         "unit": "ms",
         "n": 5,
         "userMedian": 90,
-        "sysMedian": 70
+        "sysMedian": 60
       },
       "peakRssKb": {
         "unit": "kb",
         "n": 5,
-        "median": 69568,
-        "min": 69412,
-        "max": 69668,
-        "mean": 69558.4,
-        "stdev": 92.762,
-        "q1": 69556,
-        "q3": 69588
+        "median": 69756,
+        "min": 69156,
+        "max": 69928,
+        "mean": 69565.6,
+        "stdev": 377.069,
+        "q1": 69160,
+        "q3": 69828
       },
       "parity": {
         "status": "pass",
@@ -1301,32 +1361,33 @@
       },
       "extra": {
         "samplesMs": [
-          165.11786,
-          153.42182300000002,
-          153.209392,
-          163.753915,
-          151.08790900000002,
-          160.376385,
-          151.156729,
-          149.30907000000002,
-          153.492346,
-          148.32445500000003,
-          165.550109,
-          152.702161,
-          163.052314,
-          145.649569,
-          154.559476,
-          149.728856,
-          151.420126,
-          148.926541,
-          165.404491,
-          152.237642
+          148.00306500000002,
+          155.36625600000002,
+          145.93296899999999,
+          145.923178,
+          151.767196,
+          148.665921,
+          167.47037500000002,
+          152.316631,
+          147.817004,
+          155.693889,
+          152.167529,
+          151.300902,
+          154.66603,
+          142.87946300000002,
+          152.473542,
+          153.305499,
+          147.035267,
+          148.913483,
+          151.838687,
+          145.312413
         ],
         "prototype": true
       }
     },
     {
       "id": "worker.go.receipt",
+      "layer": "orchestration",
       "group": "worker",
       "backend": "go-worker-prototype",
       "scenario": "exec-and-hash-receipt",
@@ -1341,13 +1402,13 @@
       "wall": {
         "unit": "ms",
         "n": 20,
-        "median": 64.472,
-        "min": 59.536,
-        "max": 66.341,
-        "mean": 63.808,
-        "stdev": 2.05,
-        "q1": 62.964,
-        "q3": 65.412
+        "median": 62.805,
+        "min": 57.613,
+        "max": 69.339,
+        "mean": 62.959,
+        "stdev": 3.539,
+        "q1": 60.212,
+        "q3": 65.328
       },
       "cpu": {
         "unit": "ms",
@@ -1377,40 +1438,163 @@
       },
       "extra": {
         "samplesMs": [
-          66.341364,
-          64.59188400000001,
-          63.064164000000005,
-          63.05693400000001,
-          64.351972,
-          65.48176,
-          59.536163,
-          60.977711000000006,
-          63.074114,
-          59.90882500000001,
-          64.64606500000001,
-          65.185237,
-          65.952543,
-          65.813262,
-          65.117728,
-          62.684813000000005,
-          65.38808,
-          65.836753,
-          63.73207,
-          61.409366000000006
+          59.376378,
+          69.33927000000001,
+          66.619817,
+          62.996837,
+          64.33401900000001,
+          64.04897600000001,
+          58.07852700000001,
+          65.100904,
+          59.101985000000006,
+          66.011263,
+          63.187669,
+          62.283252000000005,
+          57.935686000000004,
+          67.43456400000001,
+          68.666634,
+          62.353082,
+          60.49046700000001,
+          61.594416,
+          57.613293000000006,
+          62.613124000000006
         ],
         "prototype": true
+      }
+    },
+    {
+      "id": "agent.generic.go-cli.e2e",
+      "layer": "agent_e2e",
+      "group": "agent",
+      "backend": "go-generic-cli",
+      "scenario": "offline-demo-agent-e2e",
+      "baseline": true,
+      "status": "measured",
+      "command": [
+        "<node>",
+        "<repo>/dist/cli.js",
+        "demo",
+        "--provider",
+        "offline",
+        "--agent",
+        "generic",
+        "--agent-command",
+        "<go-agent-bin>",
+        "--agent-sessions",
+        "--workspace",
+        "<workspace>"
+      ],
+      "warmup": 3,
+      "method": "hyperfine -N; fresh .perfdigest per run; end-to-end offline demo orchestrated with compiled Go perfdigest-agent/v1 CLI agent (--agent generic --agent-sessions: analysis turn overlapped with capture+MCP digest, followed by verifier and same-session review turn)",
+      "wall": {
+        "unit": "ms",
+        "n": 15,
+        "median": 589.241,
+        "min": 557.804,
+        "max": 679.294,
+        "mean": 598.891,
+        "stdev": 30.542,
+        "q1": 585.204,
+        "q3": 602.613
+      },
+      "cpu": {
+        "unit": "ms",
+        "n": 5,
+        "userMedian": 600,
+        "sysMedian": 80
+      },
+      "peakRssKb": {
+        "unit": "kb",
+        "n": 5,
+        "median": 94236,
+        "min": 93960,
+        "max": 96276,
+        "mean": 94570.4,
+        "stdev": 971.401,
+        "q1": 93976,
+        "q3": 94404
+      },
+      "parity": {
+        "status": "pass",
+        "checks": [
+          {
+            "name": "demo-exit-0",
+            "pass": true,
+            "detail": "exited 0 within 15000ms"
+          },
+          {
+            "name": "status=complete",
+            "pass": true,
+            "detail": "complete"
+          },
+          {
+            "name": "verifier-exit-0",
+            "pass": true,
+            "detail": "0"
+          },
+          {
+            "name": "agent-error-null",
+            "pass": true,
+            "detail": "null"
+          },
+          {
+            "name": "evidence-delivery=same_session_next_turn",
+            "pass": true,
+            "detail": "same_session_next_turn"
+          },
+          {
+            "name": "session-continuation:go-bench-sess-1",
+            "pass": true,
+            "detail": "go-bench-sess-1->go-bench-sess-1"
+          },
+          {
+            "name": "evidence-count=1",
+            "pass": true,
+            "detail": "1"
+          },
+          {
+            "name": "report-sha256:traversal-timing",
+            "pass": true,
+            "detail": "recorded=64e634d09b05 recomputed=64e634d09b05 bytes=398"
+          },
+          {
+            "name": "digest-units=column_major,row_major",
+            "pass": true,
+            "detail": "column_major,row_major"
+          }
+        ]
+      },
+      "extra": {
+        "samplesMs": [
+          604.531068,
+          587.867981,
+          590.370673,
+          581.884394,
+          569.40311,
+          589.241115,
+          586.576373,
+          584.528006,
+          591.9914980000001,
+          557.804297,
+          600.6948100000001,
+          585.879249,
+          636.908099,
+          636.385265,
+          679.2937380000001
+        ]
       }
     }
   ],
   "claims": [
     "Medians below were measured on ONE host (amd-ryzen-ai-9-hx-370-x64) in one sequential session; they rank backends only for this host and this commit.",
-    "A non-baseline backend is reported as \"accepted for further study\" only when its parity status is pass; no superiority claim is made for any cell whose parity is not pass."
+    "A non-baseline backend is reported as \"accepted for further study\" only when its parity status is pass; no superiority claim is made for any cell whose parity is not pass.",
+    "Cells are separated into engine (upstream PerfDigest MCP session cost), orchestration (build, CLI startup, offline demo without agent, MCP discovery, spawn loop, worker receipt), and agent_e2e (full offline investigation with a compiled Go perfdigest-agent/v1 CLI process)."
   ],
   "limits": [
     "Single host, single session: results do not generalize to other CPUs, kernels, filesystems or CI runners.",
     "No CPU frequency pinning, core isolation or turbo control; background load was not controlled beyond sequential execution (loadavg recorded).",
     "Build \"cold\" means no incremental/tsbuildinfo state; the OS page cache and node_modules are warm.",
-    "offline-demo latency is dominated by the uvx perfdigest-mcp child (a Python process), which is identical across runtimes; runtime differences are a small fraction of it.",
+    "offline-demo and agent_e2e latencies are dominated by the uvx perfdigest-mcp child (a Python process), which is identical across runtimes; runtime and local CLI agent overhead are small fractions of total wall time.",
     "Bun/Deno execute the tsc-emitted ESM through their Node-compat layers; incompatibilities outside these four scenarios (Codex SDK, Decisions HTTP, init) were not exercised.",
     "The Go worker is a prototype that only mirrors exec + hash + receipt; it is not a functional replacement for the TypeScript runner."
   ]

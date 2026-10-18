@@ -8,6 +8,10 @@ import { z } from 'zod';
 const sha256 = z.string().regex(/^[a-f0-9]{64}$/);
 const nonEmpty = z.string().min(1);
 
+/** Explicit architectural layer separating MCP engine, plugin orchestration, and E2E agent flows. */
+export const layerSchema = z.enum(['engine', 'orchestration', 'agent_e2e']);
+export const groupSchema = z.enum(['build', 'runtime', 'worker', 'agent']);
+
 /** Order statistics for one metric across N repetitions. All values share `unit`. */
 export const statsSchema = z.object({
   unit: z.enum(['ms', 'us', 's', 'kb']),
@@ -38,7 +42,8 @@ export const paritySchema = z.object({
 
 export const cellSchema = z.object({
   id: nonEmpty,
-  group: z.enum(['build', 'runtime', 'worker']),
+  layer: layerSchema,
+  group: groupSchema,
   backend: nonEmpty,
   scenario: nonEmpty,
   /** Is this the reference baseline for its (group, scenario)? */
@@ -58,6 +63,34 @@ export const cellSchema = z.object({
   extra: z.record(z.string(), z.unknown()).optional(),
 }).strict();
 
+export const layerCountsSchema = z.object({
+  total: z.int().min(0),
+  measured: z.int().min(0),
+  notRun: z.int().min(0),
+  failed: z.int().min(0),
+  parityPass: z.int().min(0),
+  parityFail: z.int().min(0),
+  parityNotApplicable: z.int().min(0),
+}).strict();
+
+export const layerSummarySchema = z.object({
+  engine: layerCountsSchema,
+  orchestration: layerCountsSchema,
+  agent_e2e: layerCountsSchema,
+}).strict();
+
+export const benchCompatibilitySchema = z.object({
+  upstreamRepo: nonEmpty,
+  rawResultDirs: z.array(nonEmpty).min(1),
+  fieldMapping: z.object({
+    latencyJson: nonEmpty,
+    identityJson: nonEmpty,
+    startupJson: nonEmpty,
+    concurrencyJson: nonEmpty,
+    loadavgJson: nonEmpty,
+  }).strict(),
+}).strict();
+
 export const resultSchema = z.object({
   schema: z.literal('perfdigest.benchmark-result.v1'),
   createdAt: z.iso.datetime(),
@@ -71,6 +104,8 @@ export const resultSchema = z.object({
   }).strict(),
   tools: z.array(toolSchema),
   mode: z.enum(['full', 'smoke']),
+  layerSummary: layerSummarySchema,
+  benchCompatibility: benchCompatibilitySchema,
   cells: z.array(cellSchema).min(1),
   /** What these numbers DO support. Keep each claim falsifiable and scoped to this host. */
   claims: z.array(nonEmpty),
@@ -80,7 +115,8 @@ export const resultSchema = z.object({
 
 export const manifestCellSchema = z.object({
   id: nonEmpty,
-  group: z.enum(['build', 'runtime', 'worker']),
+  layer: layerSchema,
+  group: groupSchema,
   backend: nonEmpty,
   scenario: nonEmpty,
   baseline: z.boolean().default(false),

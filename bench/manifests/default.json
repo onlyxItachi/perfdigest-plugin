@@ -1,32 +1,34 @@
 {
   "schema": "perfdigest.benchmark-manifest.v1",
   "id": "stage3-runtime-build-foundations",
-  "description": "Reference baseline: Node 22 + TypeScript 6.0.3 tsc. BUILD cells (tsc 6 vs tsgo TS7 preview) are kept separate from RUNTIME cells (Node / Bun / Deno executing the tsc-built dist). WORKER cells compare a Go prototype against an equivalent Node script for subprocess + hash overhead only.",
+  "description": "Reference baseline: Node 22 + TypeScript 6.0.3 tsc. Cells are explicitly tagged by architectural layer (engine, orchestration, agent_e2e) and group (build, runtime, worker, agent) to separate upstream PerfDigest MCP engine costs, plugin orchestration/build costs, and end-to-end external CLI agent flows.",
   "defaults": { "runs": 20, "warmup": 3, "rssRuns": 5, "spawnIterations": 200 },
   "smokeDefaults": { "runs": 3, "warmup": 1, "rssRuns": 1, "spawnIterations": 10 },
   "cells": [
-    { "id": "build.tsc6.cold", "group": "build", "backend": "tsc-6.0.3", "scenario": "cold-build", "baseline": true, "runs": 10 },
-    { "id": "build.tsgo.cold", "group": "build", "backend": "tsgo-7-preview", "scenario": "cold-build", "runs": 10 },
+    { "id": "build.tsc6.cold", "layer": "orchestration", "group": "build", "backend": "tsc-6.0.3", "scenario": "cold-build", "baseline": true, "runs": 10 },
+    { "id": "build.tsgo.cold", "layer": "orchestration", "group": "build", "backend": "tsgo-7-preview", "scenario": "cold-build", "runs": 10 },
 
-    { "id": "runtime.node22.help", "group": "runtime", "backend": "node22", "scenario": "cli-help", "baseline": true, "smoke": true },
-    { "id": "runtime.bun.help", "group": "runtime", "backend": "bun", "scenario": "cli-help" },
-    { "id": "runtime.deno.help", "group": "runtime", "backend": "deno", "scenario": "cli-help" },
+    { "id": "runtime.node22.help", "layer": "orchestration", "group": "runtime", "backend": "node22", "scenario": "cli-help", "baseline": true, "smoke": true },
+    { "id": "runtime.bun.help", "layer": "orchestration", "group": "runtime", "backend": "bun", "scenario": "cli-help" },
+    { "id": "runtime.deno.help", "layer": "orchestration", "group": "runtime", "backend": "deno", "scenario": "cli-help" },
 
-    { "id": "runtime.node22.demo", "group": "runtime", "backend": "node22", "scenario": "offline-demo", "baseline": true, "runs": 15 },
-    { "id": "runtime.bun.demo", "group": "runtime", "backend": "bun", "scenario": "offline-demo", "runs": 15 },
-    { "id": "runtime.deno.demo", "group": "runtime", "backend": "deno", "scenario": "offline-demo", "runs": 15 },
+    { "id": "runtime.node22.demo", "layer": "orchestration", "group": "runtime", "backend": "node22", "scenario": "offline-demo", "baseline": true, "runs": 15 },
+    { "id": "runtime.bun.demo", "layer": "orchestration", "group": "runtime", "backend": "bun", "scenario": "offline-demo", "runs": 15 },
+    { "id": "runtime.deno.demo", "layer": "orchestration", "group": "runtime", "backend": "deno", "scenario": "offline-demo", "runs": 15 },
 
-    { "id": "runtime.node22.mcp", "group": "runtime", "backend": "node22", "scenario": "mcp-tools-list", "baseline": true, "smoke": true },
-    { "id": "runtime.bun.mcp", "group": "runtime", "backend": "bun", "scenario": "mcp-tools-list" },
-    { "id": "runtime.deno.mcp", "group": "runtime", "backend": "deno", "scenario": "mcp-tools-list" },
+    { "id": "runtime.node22.mcp", "layer": "orchestration", "group": "runtime", "backend": "node22", "scenario": "mcp-tools-list", "baseline": true, "smoke": true },
+    { "id": "runtime.bun.mcp", "layer": "orchestration", "group": "runtime", "backend": "bun", "scenario": "mcp-tools-list" },
+    { "id": "runtime.deno.mcp", "layer": "orchestration", "group": "runtime", "backend": "deno", "scenario": "mcp-tools-list" },
 
-    { "id": "runtime.node22.spawn", "group": "runtime", "backend": "node22", "scenario": "spawn-overhead", "baseline": true },
-    { "id": "runtime.bun.spawn", "group": "runtime", "backend": "bun", "scenario": "spawn-overhead" },
-    { "id": "runtime.deno.spawn", "group": "runtime", "backend": "deno", "scenario": "spawn-overhead" },
+    { "id": "runtime.node22.spawn", "layer": "orchestration", "group": "runtime", "backend": "node22", "scenario": "spawn-overhead", "baseline": true },
+    { "id": "runtime.bun.spawn", "layer": "orchestration", "group": "runtime", "backend": "bun", "scenario": "spawn-overhead" },
+    { "id": "runtime.deno.spawn", "layer": "orchestration", "group": "runtime", "backend": "deno", "scenario": "spawn-overhead" },
 
-    { "id": "runtime.uvx.perfdigest-mcp", "group": "runtime", "backend": "uvx", "scenario": "perfdigest-mcp-session-start" },
+    { "id": "runtime.uvx.perfdigest-mcp", "layer": "engine", "group": "runtime", "backend": "uvx", "scenario": "perfdigest-mcp-session-start" },
 
-    { "id": "worker.node.receipt", "group": "worker", "backend": "node-worker", "scenario": "exec-and-hash-receipt", "baseline": true },
-    { "id": "worker.go.receipt", "group": "worker", "backend": "go-worker-prototype", "scenario": "exec-and-hash-receipt" }
+    { "id": "worker.node.receipt", "layer": "orchestration", "group": "worker", "backend": "node-worker", "scenario": "exec-and-hash-receipt", "baseline": true },
+    { "id": "worker.go.receipt", "layer": "orchestration", "group": "worker", "backend": "go-worker-prototype", "scenario": "exec-and-hash-receipt" },
+
+    { "id": "agent.generic.go-cli.e2e", "layer": "agent_e2e", "group": "agent", "backend": "go-generic-cli", "scenario": "offline-demo-agent-e2e", "baseline": true, "runs": 15, "smoke": true }
   ]
 }

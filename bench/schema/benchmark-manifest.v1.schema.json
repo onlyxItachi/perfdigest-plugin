@@ -87,12 +87,21 @@
             "type": "string",
             "minLength": 1
           },
+          "layer": {
+            "type": "string",
+            "enum": [
+              "engine",
+              "orchestration",
+              "agent_e2e"
+            ]
+          },
           "group": {
             "type": "string",
             "enum": [
               "build",
               "runtime",
-              "worker"
+              "worker",
+              "agent"
             ]
           },
           "backend": {
@@ -124,6 +133,7 @@
         },
         "required": [
           "id",
+          "layer",
           "group",
           "backend",
           "scenario"
