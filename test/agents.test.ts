@@ -250,7 +250,7 @@ if (process.env.SLOW_PHASE === req.phase || !process.env.SLOW_PHASE) {
     const reviewSlowScript = join(root, 'review-slow-agent.mjs');
     await writeFile(reviewSlowScript, `import fs from 'node:fs';
 const req = JSON.parse(fs.readFileSync(0, 'utf8').trim());
-if (req.phase === 'review') setTimeout(() => {}, 5000);
+if (req.phase === 'review') setTimeout(() => {}, 10000);
 else console.log(JSON.stringify({ type: 'result', text: 'analysis-ok' }));
 `);
     const reviewSlowResult = await investigate({
@@ -258,23 +258,27 @@ else console.log(JSON.stringify({ type: 'result', text: 'analysis-ok' }));
       manifest: simpleManifest(),
       routing: 'offline',
       agent: 'generic',
-      agentAdapter: genericCliAdapter({ command: process.execPath, args: [reviewSlowScript], timeoutMs: 80 }),
+      agentAdapter: genericCliAdapter({ command: process.execPath, args: [reviewSlowScript], timeoutMs: 500 }),
     });
     assert.equal(reviewSlowResult.status, 'failed');
     assert.equal(reviewSlowResult.agentError?.kind, 'timed_out');
     assert.equal(reviewSlowResult.agentError?.phase, 'review');
     assert.equal(reviewSlowResult.provenance.length, 1, 'provenance is preserved when review turn times out');
 
-    // 2. Cancellation via external AbortSignal
+    // 2. Cancellation via external AbortSignal (triggered deterministically once analysis starts)
     const abortController = new AbortController();
-    setTimeout(() => abortController.abort(new Error('User cancelled')), 60);
     const cancelResult = await investigate({
       workspace: root,
       manifest: simpleManifest(),
       routing: 'offline',
       agent: 'generic',
       signal: abortController.signal,
-      agentAdapter: genericCliAdapter({ command: process.execPath, args: [slowScript], timeoutMs: 5000 }),
+      onEvent: (event) => {
+        if (event === 'agent.analysis.started') {
+          setTimeout(() => abortController.abort(new Error('User cancelled')), 30);
+        }
+      },
+      agentAdapter: genericCliAdapter({ command: process.execPath, args: [slowScript], timeoutMs: 10000 }),
     });
     assert.equal(cancelResult.status, 'failed');
     assert.equal(cancelResult.agentError?.kind, 'cancelled');
