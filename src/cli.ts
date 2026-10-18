@@ -2,7 +2,7 @@
 import { parseArgs } from 'node:util';
 import { readFile, realpath } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { manifestSchema, type RoutingMode } from './config.js';
+import { manifestSchema, type AgentDeliveryMode, type RoutingMode } from './config.js';
 import { investigate } from './run.js';
 import { demoManifest } from './demo.js';
 import { redact } from './environment.js';
@@ -14,13 +14,14 @@ import { genericCliAdapter } from './agents.js';
 const help = `PerfDigest Evidence — Codex-first MVP
 
   perfdigest-plugin init [--provider cloudflare|local|openai|offline --yes] [--env-file PATH] [--endpoint URL] [--decision-model clef-flash|clef|clef-omni] [--check-connection]
-  perfdigest-plugin demo [--agent none|codex|generic] [--agent-command PATH] [--agent-sessions] [--routing offline|decisions] [--decision-model NAME] [--perf]
-  perfdigest-plugin run manifest.json [--workspace PATH] [--routing decisions|offline] [--agent codex|none|generic] [--agent-command PATH] [--agent-sessions] [--decision-model NAME]
+  perfdigest-plugin demo [--agent none|codex|generic] [--agent-command PATH] [--agent-sessions] [--agent-delivery two_turn|single_turn] [--routing offline|decisions] [--decision-model NAME] [--perf]
+  perfdigest-plugin run manifest.json [--workspace PATH] [--routing decisions|offline] [--agent codex|none|generic] [--agent-command PATH] [--agent-sessions] [--agent-delivery two_turn|single_turn] [--decision-model NAME]
   perfdigest-plugin mcp [--workspace PATH]
 
 Unconfigured demo defaults: real local CPU measurements + verification, offline routing, no model calls.
 Unconfigured run defaults: existing Codex ChatGPT login + live Decisions (PERFDIGEST_DECISIONS_API_KEY).
 Use --agent codex to demonstrate overlap with a real Codex session, or --agent generic --agent-command PATH for a JSONL CLI agent.
+--agent-delivery selects two_turn (default concurrent analysis + review) or single_turn (evidence-first single turn).
 --perf adds Linux hardware counters; otherwise the demo uses genuine elapsed-time traces.
 Raw reports, command receipts and timeline are saved under .perfdigest/runs/.
 --provider cloudflare|local|openai|offline explicitly selects inference; --routing keeps legacy aliases.
@@ -32,6 +33,7 @@ async function main() {
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
     help: { type: 'boolean', short: 'h' }, workspace: { type: 'string' },
     agent: { type: 'string' }, 'agent-command': { type: 'string' }, 'agent-sessions': { type: 'boolean' },
+    'agent-delivery': { type: 'string' }, 'compact-evidence': { type: 'boolean' },
     routing: { type: 'string' }, provider: { type: 'string' }, model: { type: 'string' }, perf: { type: 'boolean' },
     endpoint: { type: 'string' }, 'env-file': { type: 'string' }, 'decision-model': { type: 'string' }, yes: { type: 'boolean' }, 'check-connection': { type: 'boolean' },
   } });
@@ -75,6 +77,11 @@ async function main() {
   if (agent === 'generic' && !values['agent-command']) {
     throw new Error('--agent generic requires --agent-command PATH');
   }
+  const agentDeliveryRaw = values['agent-delivery'];
+  if (agentDeliveryRaw !== undefined && agentDeliveryRaw !== 'two_turn' && agentDeliveryRaw !== 'single_turn') {
+    throw new Error('--agent-delivery must be two_turn or single_turn');
+  }
+  const agentDelivery = agentDeliveryRaw as AgentDeliveryMode | undefined;
   const agentAdapter = agent === 'generic'
     ? genericCliAdapter({ command: values['agent-command']!, sessions: values['agent-sessions'] ?? false })
     : undefined;
@@ -88,6 +95,8 @@ async function main() {
   try {
     const result = await investigate({ workspace, manifest, routing, agent, signal: abort.signal, ...modelOption,
       ...(agentAdapter ? { agentAdapter } : {}),
+      ...(agentDelivery !== undefined ? { agentDelivery } : {}),
+      ...(values['compact-evidence'] !== undefined ? { compactEvidence: values['compact-evidence'] } : {}),
       ...(values.model ? { model: values.model } : {}),
       onEvent: (event, detail) => process.stderr.write(`${event}${detail ? `: ${redact(detail)}` : ''}\n`),
     });

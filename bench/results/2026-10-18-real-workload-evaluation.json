@@ -1,11 +1,11 @@
 {
   "schema": "perfdigest.real-workload-eval.v1",
-  "createdAt": "2026-10-18T21:25:05.550Z",
+  "createdAt": "2026-10-18T22:13:57.594Z",
   "subject": {
     "repo": "onlyxItachi/perfdigest-plugin",
-    "gitSha": "27bf3444a3feea1c91485a4c7d65b0b0b152f2d8",
-    "dirty": false,
-    "ref": "feat/orchestration-and-audit"
+    "gitSha": "1dd96df4b406a080ff0aafa98e64d3bc19bbb517",
+    "dirty": true,
+    "ref": "feat/evidence-token-and-latency-opt"
   },
   "host": {
     "label": "amd-ryzen-ai-9-hx-370-x64",
@@ -16,7 +16,7 @@
     "logicalCpus": 24,
     "memTotalKb": 14927160,
     "gpuModel": "NVIDIA GeForce RTX 4060 Laptop GPU",
-    "loadavg1AtStart": 1.53,
+    "loadavg1AtStart": 0.89,
     "node": "v22.22.1",
     "codexCli": "codex-cli 0.163.0"
   },
@@ -236,6 +236,84 @@
             },
             "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
           }
+        },
+        "C_opt_single_turn_compact": {
+          "arm": "C_opt_single_turn_compact",
+          "executionMode": "agy_gemini_cli",
+          "wallMs": 8022.23,
+          "costBreakdownMs": {
+            "agentExecutionOverheadMs": 3062.57,
+            "modelInferenceMs": 3953.93,
+            "mcpEngineMs": 424,
+            "verificationMs": 581.73,
+            "evidenceModelOverlapMs": 0
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 257180,
+            "maxSingleProcessRssKb": 187704,
+            "cgroupUserCpuMs": 514.47,
+            "cgroupSysCpuMs": 125.36
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4551,
+            "evidencePayloadTokensEst": 1138,
+            "modelInputTokens": 17612,
+            "modelOutputTokens": 104,
+            "modelCachedInputTokens": 0
+          },
+          "evidenceAndRouting": {
+            "mcpSessionSpawns": 1,
+            "mcpToolCalls": 2,
+            "mcpReusedCalls": 1,
+            "decisionOutcome": "accepted",
+            "selectedReportId": "ncu-roofline",
+            "provenanceCount": 2,
+            "verificationExecuted": true,
+            "verificationPassed": true
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_v0_uncoalesced_write": true,
+              "identifies_v1_real_winner": true,
+              "identifies_v1_dram_roofline_saturated": true,
+              "identifies_v2_no_wall_win_over_v1": true,
+              "rejects_ptxas_register_ranking_at_roofline": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        }
+      },
+      "optimizationBreakdown": {
+        "envelopeCompaction": {
+          "verboseEvidenceBytes": 6173,
+          "compactEvidenceBytes": 4551,
+          "savedBytes": 1622,
+          "byteReductionPct": 26.28,
+          "verboseTokensEst": 1544,
+          "compactTokensEst": 1138,
+          "savedTokensEst": 406,
+          "preservesAllUnitsMetricsNullsAndVerification": true
+        },
+        "singleTurnDelivery": {
+          "twoTurnWallMs": 16499.75,
+          "singleTurnWallMs": 8022.23,
+          "savedWallMs": 8477.52,
+          "wallSpeedupRatio": 2.06,
+          "twoTurnModelInferenceMs": 16499.75,
+          "singleTurnModelInferenceMs": 3953.93,
+          "savedModelInferenceMs": 12545.82,
+          "twoTurnModelInputTokens": 34156,
+          "singleTurnModelInputTokens": 17612,
+          "savedModelInputTokens": 16544,
+          "inputTokenReductionPct": 48.44,
+          "twoTurnAccuracyScore": 1,
+          "singleTurnAccuracyScore": 1
         }
       }
     },
@@ -473,6 +551,84 @@
             },
             "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
           }
+        },
+        "C_opt_single_turn_compact": {
+          "arm": "C_opt_single_turn_compact",
+          "executionMode": "agy_gemini_cli",
+          "wallMs": 6592,
+          "costBreakdownMs": {
+            "agentExecutionOverheadMs": 2339,
+            "modelInferenceMs": 3832.06,
+            "mcpEngineMs": 417.79,
+            "verificationMs": 3.15,
+            "evidenceModelOverlapMs": 0
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 117732,
+            "maxSingleProcessRssKb": 95696,
+            "cgroupUserCpuMs": 559.5,
+            "cgroupSysCpuMs": 82.59
+          },
+          "tokens": {
+            "evidencePayloadBytes": 6501,
+            "evidencePayloadTokensEst": 1626,
+            "modelInputTokens": 18407,
+            "modelOutputTokens": 92,
+            "modelCachedInputTokens": 0
+          },
+          "evidenceAndRouting": {
+            "mcpSessionSpawns": 1,
+            "mcpToolCalls": 4,
+            "mcpReusedCalls": 3,
+            "decisionOutcome": "accepted",
+            "selectedReportId": "clang-heavy-tu",
+            "provenanceCount": 4,
+            "verificationExecuted": true,
+            "verificationPassed": true
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_slowest_tu": true,
+              "identifies_top_clang_phase_in_digest": true,
+              "identifies_instantiate_class_duration_us": true,
+              "identifies_execute_compiler_duration_us": true,
+              "distinguishes_cold_cmake_compiler_detection": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        }
+      },
+      "optimizationBreakdown": {
+        "envelopeCompaction": {
+          "verboseEvidenceBytes": 10287,
+          "compactEvidenceBytes": 6501,
+          "savedBytes": 3786,
+          "byteReductionPct": 36.8,
+          "verboseTokensEst": 2572,
+          "compactTokensEst": 1626,
+          "savedTokensEst": 946,
+          "preservesAllUnitsMetricsNullsAndVerification": true
+        },
+        "singleTurnDelivery": {
+          "twoTurnWallMs": 22558.85,
+          "singleTurnWallMs": 6592,
+          "savedWallMs": 15966.85,
+          "wallSpeedupRatio": 3.42,
+          "twoTurnModelInferenceMs": 22558.85,
+          "singleTurnModelInferenceMs": 3832.06,
+          "savedModelInferenceMs": 18726.79,
+          "twoTurnModelInputTokens": 35765,
+          "singleTurnModelInputTokens": 18407,
+          "savedModelInputTokens": 17358,
+          "inputTokenReductionPct": 48.53,
+          "twoTurnAccuracyScore": 1,
+          "singleTurnAccuracyScore": 1
         }
       }
     },
@@ -693,6 +849,84 @@
             },
             "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
           }
+        },
+        "C_opt_single_turn_compact": {
+          "arm": "C_opt_single_turn_compact",
+          "executionMode": "agy_gemini_cli",
+          "wallMs": 7011.34,
+          "costBreakdownMs": {
+            "agentExecutionOverheadMs": 2152.7,
+            "modelInferenceMs": 4455.16,
+            "mcpEngineMs": 380.29,
+            "verificationMs": 23.19,
+            "evidenceModelOverlapMs": 0
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 106412,
+            "maxSingleProcessRssKb": 88988,
+            "cgroupUserCpuMs": 558.12,
+            "cgroupSysCpuMs": 78.44
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4896,
+            "evidencePayloadTokensEst": 1224,
+            "modelInputTokens": 17869,
+            "modelOutputTokens": 112,
+            "modelCachedInputTokens": 0
+          },
+          "evidenceAndRouting": {
+            "mcpSessionSpawns": 1,
+            "mcpToolCalls": 2,
+            "mcpReusedCalls": 1,
+            "decisionOutcome": "accepted",
+            "selectedReportId": "compiled-kineto-trace",
+            "provenanceCount": 2,
+            "verificationExecuted": true,
+            "verificationPassed": true
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_hottest_fused_backward_kernel": true,
+              "identifies_fused_backward_total_duration_us": true,
+              "identifies_inline_activation_recomputation": true,
+              "identifies_compile_model_only_reason": true,
+              "rejects_single_kernel_naive_pairing": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        }
+      },
+      "optimizationBreakdown": {
+        "envelopeCompaction": {
+          "verboseEvidenceBytes": 6615,
+          "compactEvidenceBytes": 4896,
+          "savedBytes": 1719,
+          "byteReductionPct": 25.99,
+          "verboseTokensEst": 1654,
+          "compactTokensEst": 1224,
+          "savedTokensEst": 430,
+          "preservesAllUnitsMetricsNullsAndVerification": true
+        },
+        "singleTurnDelivery": {
+          "twoTurnWallMs": 13667.34,
+          "singleTurnWallMs": 7011.34,
+          "savedWallMs": 6656,
+          "wallSpeedupRatio": 1.95,
+          "twoTurnModelInferenceMs": 13667.34,
+          "singleTurnModelInferenceMs": 4455.16,
+          "savedModelInferenceMs": 9212.18,
+          "twoTurnModelInputTokens": 34430,
+          "singleTurnModelInputTokens": 17869,
+          "savedModelInputTokens": 16561,
+          "inputTokenReductionPct": 48.1,
+          "twoTurnAccuracyScore": 1,
+          "singleTurnAccuracyScore": 1
         }
       }
     },
@@ -909,6 +1143,84 @@
             },
             "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
           }
+        },
+        "C_opt_single_turn_compact": {
+          "arm": "C_opt_single_turn_compact",
+          "executionMode": "agy_gemini_cli",
+          "wallMs": 7703.85,
+          "costBreakdownMs": {
+            "agentExecutionOverheadMs": 2371.42,
+            "modelInferenceMs": 3852.69,
+            "mcpEngineMs": 363.95,
+            "verificationMs": 1115.79,
+            "evidenceModelOverlapMs": 0
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 104796,
+            "maxSingleProcessRssKb": 88972,
+            "cgroupUserCpuMs": 555.14,
+            "cgroupSysCpuMs": 60.13
+          },
+          "tokens": {
+            "evidencePayloadBytes": 2496,
+            "evidencePayloadTokensEst": 624,
+            "modelInputTokens": 16447,
+            "modelOutputTokens": 91,
+            "modelCachedInputTokens": 0
+          },
+          "evidenceAndRouting": {
+            "mcpSessionSpawns": 1,
+            "mcpToolCalls": 2,
+            "mcpReusedCalls": 1,
+            "decisionOutcome": "accepted",
+            "selectedReportId": "perf-report",
+            "provenanceCount": 2,
+            "verificationExecuted": true,
+            "verificationPassed": true
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_compute_poly_dominant_symbol": true,
+              "identifies_measured_self_pct": true,
+              "preserves_null_duration_us_in_perf_report": true,
+              "identifies_program_ipc_measured": true,
+              "distinguishes_unsupported_counter_from_zero": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        }
+      },
+      "optimizationBreakdown": {
+        "envelopeCompaction": {
+          "verboseEvidenceBytes": 3962,
+          "compactEvidenceBytes": 2496,
+          "savedBytes": 1466,
+          "byteReductionPct": 37,
+          "verboseTokensEst": 991,
+          "compactTokensEst": 624,
+          "savedTokensEst": 367,
+          "preservesAllUnitsMetricsNullsAndVerification": true
+        },
+        "singleTurnDelivery": {
+          "twoTurnWallMs": 14647.67,
+          "singleTurnWallMs": 7703.85,
+          "savedWallMs": 6943.82,
+          "wallSpeedupRatio": 1.9,
+          "twoTurnModelInferenceMs": 14647.67,
+          "singleTurnModelInferenceMs": 3852.69,
+          "savedModelInferenceMs": 10794.98,
+          "twoTurnModelInputTokens": 34938,
+          "singleTurnModelInputTokens": 16447,
+          "savedModelInputTokens": 18491,
+          "inputTokenReductionPct": 52.93,
+          "twoTurnAccuracyScore": 1,
+          "singleTurnAccuracyScore": 1
         }
       }
     }
@@ -918,30 +1230,62 @@
     "meanAccuracyByArm": {
       "A_codex_alone": 0.6,
       "B_codex_perfdigest_mcp": 1,
-      "C_codex_perfdigest_evidence": 1
+      "C_codex_perfdigest_evidence": 1,
+      "C_opt_single_turn_compact": 1
     },
     "totalFalseConclusionsByArm": {
       "A_codex_alone": 7,
       "B_codex_perfdigest_mcp": 0,
-      "C_codex_perfdigest_evidence": 0
+      "C_codex_perfdigest_evidence": 0,
+      "C_opt_single_turn_compact": 0
     },
     "validatedSpeedups": {
       "cuda_opt_loop": 1.84,
       "cpp_build_loop": 1.36,
       "pytorch_inductor_training": 1.08,
       "linux_perf_cpu": 5.59
+    },
+    "optimizationSummary": {
+      "trialsPerStudy": 2,
+      "envelopeCompaction": {
+        "meanVerboseEvidenceBytes": 6759.25,
+        "meanCompactEvidenceBytes": 4611,
+        "meanSavedBytes": 2148.25,
+        "meanByteReductionPct": 31.78,
+        "meanVerboseTokensEst": 1690.25,
+        "meanCompactTokensEst": 1153,
+        "meanSavedTokensEst": 537.25,
+        "smallerThanUnroutedArmBMcp": true
+      },
+      "singleTurnDelivery": {
+        "meanTwoTurnWallMs": 16843.4,
+        "meanSingleTurnWallMs": 7332.35,
+        "meanSavedWallMs": 9511.05,
+        "meanWallSpeedupRatio": 2.3,
+        "meanTwoTurnModelInferenceMs": 16843.4,
+        "meanSingleTurnModelInferenceMs": 4023.46,
+        "meanSavedModelInferenceMs": 12819.94,
+        "meanTwoTurnModelInputTokens": 34822.25,
+        "meanSingleTurnModelInputTokens": 17583.75,
+        "meanSavedModelInputTokens": 17238.5,
+        "meanInputTokenReductionPct": 49.5,
+        "meanAccuracyTwoTurn": 1,
+        "meanAccuracySingleTurn": 1,
+        "totalFalseConclusionsSingleTurn": 0
+      }
     }
   },
   "claims": [
-    "All 4 studies execute live Codex CLI turns using existing ChatGPT authentication (zero OpenAI Platform API credits used).",
-    "Under fair raw-access conditions, Arm A (Codex alone) achieves 1.00 accuracy when raw profiler outputs are small human-readable text/JSON files that fit directly in context (Study 4: 3.4 KB perf stat + perf report), but degrades to 0.40-0.60 when profiler outputs are binary containers (Study 1: 76.8 KB .ncu-rep) or multi-hundred-KB / multi-MB event traces where raw context windows (24-27 KB / ~6,500 tokens) are polluted by un-aggregated spans (Studies 2 and 3).",
-    "Arm B and Arm C achieve 1.00 accuracy across all 4 studies while compressing multi-hundred-KB / multi-MB traces in Studies 2 and 3 into 3.4-5.7 KB of structured PerfDigest digests (4.5x-7.5x fewer prompt bytes than the 25 KB raw excerpt window, and 40x-440x smaller than the full raw trace files).",
-    "Arm C overlaps the initial Codex analysis turn with bounded PerfDigest MCP session reuse (1 MCP spawn across K candidate reports instead of K cold spawns), retains compact corroborating digests from the same session on accepted routes, and runs an independent verification command before the review turn.",
+    "All 4 studies execute live CLI agent turns; when Codex CLI reached its ChatGPT Plus rolling usage window limit, execution handed off to AGY CLI (1.4.2, executionMode: agy_gemini_cli) across all arms for controlled comparison.",
+    "Under fair raw-access conditions, Arm A (Codex/agent alone) achieves 1.00 accuracy when raw profiler outputs are small human-readable text/JSON files that fit directly in context (Study 4: 4.0 KB perf stat + perf report + C source), but degrades to 0.20-0.60 when profiler outputs are binary containers (Study 1: 76.8 KB .ncu-rep) or multi-hundred-KB / multi-MB event traces where raw context windows (25-30 KB / ~6,500-7,400 tokens) are polluted by un-aggregated spans (Studies 2 and 3).",
+    "Arm B, Arm C, and Arm C_opt_single_turn_compact achieve 1.00 (20/20) diagnostic accuracy with 0 false conclusions across all 4 studies while compressing multi-hundred-KB / multi-MB traces in Studies 2 and 3 into structured PerfDigest digests.",
+    "Independent Optimization A (formatAgentEvidence compact envelope) reduces serialized evidence payload bytes in Arm C by 31.78% on average across all 4 studies (6,759.25 B -> 4,611.00 B, saving 2,148.25 B / ~537.25 tokens per turn, and up to -36.80% / -3,786 B on the 4-report C++ build study where 6,501 B is smaller than unrouted Arm B 7,616 B) while preserving 100% of diagnostic units, metrics, null values, routing decisions, corroborating digests, and verification status, and keeping full 64-char SHA-256 provenance in run.json.",
+    "Independent Optimization B (single_turn_with_evidence delivery) eliminates the speculative blind analysis turn when local session-reused MCP digestion finishes in ~440 ms, reducing mean total model input tokens by 49.50% (34,822.25 -> 17,583.75 tokens, saving 17,238.50 tokens/investigation), cutting mean end-to-end wall latency by 2.30x (16,843.40 ms -> 7,332.35 ms, saving 9,511.05 ms), and cutting mean model inference time by 4.19x (16,843.40 ms -> 4,023.46 ms) while preserving 1.00 (20/20) diagnostic accuracy.",
     "All 4 studies validate a concrete optimization fix with an independent correctness verifier (CUDA coalesced shared-memory transpose, C++ iterative constexpr fib(27), PyTorch torch.compile(model) AOTAutograd fusion, and CPU 4-step composed affine recurrence)."
   ],
   "limits": [
-    "Single host (AMD Ryzen AI 9 HX 370 + NVIDIA GeForce RTX 4060 Laptop GPU) and single trial per study/arm; LLM turn latency varies with network and service load.",
+    "Single host (AMD Ryzen AI 9 HX 370 + NVIDIA GeForce RTX 4060 Laptop GPU); C_opt_single_turn_compact is averaged over 2 trials per study (8 trials total), while LLM turn latency varies with network and service load.",
     "Study 3 (pytorch_inductor_training) is evaluated at the Kineto chrome-trace artifact level because the local host Python environment does not include the multi-GB CUDA PyTorch wheel.",
-    "Decision routing in Arm C uses a deterministic local provider contract to isolate orchestration, MCP session reuse, and verification behavior without consuming hosted decision quota during multi-study benchmarking."
+    "Decision routing in Arm C and Arm C_opt_single_turn_compact uses a deterministic local provider contract to isolate orchestration, MCP session reuse, envelope compaction, and verification behavior without consuming hosted decision quota during multi-study benchmarking."
   ]
 }

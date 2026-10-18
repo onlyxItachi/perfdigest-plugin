@@ -554,3 +554,210 @@ test('configurable topN (1..10) preserves full digest units locally while boundi
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test('formatAgentEvidence reduces prompt payload byte size by >35% while preserving all units, metrics, nulls, corroborating digests, decision, and verification.passed', async () => {
+  const root = await testDirectory('format-agent-evidence-compact');
+  const priorPath = process.env.PATH;
+  try {
+    process.env.PATH = `${await fixtureUv(root)}${delimiter}${priorPath}`;
+    const reports: ReportSpec[] = [];
+    for (let i = 1; i <= 4; i++) {
+      const name = `profiler-report-with-long-path-${i}.json`;
+      await writeFile(join(root, name), JSON.stringify({ totalUnits: 6 }));
+      reports.push({
+        id: `report-${i}`,
+        path: name,
+        format: 'chrome-trace',
+        description: `Candidate profiler trace #${i} with detailed description metadata for routing evaluation`,
+      });
+    }
+
+    const provider: DecisionProvider = {
+      name: 'cloudflare',
+      async select() {
+        return {
+          selectedId: 'report-2',
+          confidence: 0.92,
+          reason: 'selected',
+          source: 'clef_cloudflare',
+          provider: 'cloudflare',
+          model: 'perfdigest/clef-flash-v1',
+          confidenceSemantics: 'systemone_uniform_zero',
+          transport: 'local_mock',
+          requests: 1,
+          latencyMs: 3,
+          inputTokens: 48,
+          outputTokens: 0,
+          costUsd: null,
+        };
+      },
+    };
+
+    const packet = await gatherEvidence({
+      workspace: root,
+      issue: 'Diagnose multi-report trace bottleneck',
+      reports,
+      routing: 'cloudflare',
+      provider,
+      reuseMcpSession: true,
+      mcpSessionOptions: { topN: 6 },
+      includeCorroborating: true,
+    });
+
+    const verification = {
+      command: process.execPath,
+      args: ['-e', 'console.log("verified-ok")'],
+      startedAt: '2026-10-18T21:00:00.000Z',
+      elapsedMs: 14,
+      exitCode: 0,
+      signal: null,
+      timedOut: false,
+      aborted: false,
+      stdout: 'verified-ok\n',
+      stderr: '',
+    };
+
+    const { formatAgentEvidence } = await import('../src/agents.js');
+    const legacyStr = formatAgentEvidence(packet, verification, 'complete', false);
+    const compactStr = formatAgentEvidence(packet, verification, 'complete', true);
+
+    assert.equal(legacyStr, JSON.stringify({ evidence: packet, verification, pipelineStatus: 'complete' }));
+
+    const legacyBytes = Buffer.byteLength(legacyStr);
+    const compactBytes = Buffer.byteLength(compactStr);
+    const reductionRatio = 1 - compactBytes / legacyBytes;
+    assert.ok(
+      reductionRatio > 0.35,
+      `Expected >35% byte reduction, got ${(reductionRatio * 100).toFixed(1)}% (${legacyBytes} B -> ${compactBytes} B)`,
+    );
+
+    const parsed = JSON.parse(compactStr);
+    assert.equal(parsed.schema, 'perfdigest.agent-evidence.v1');
+    assert.equal(parsed.status, 'complete');
+    assert.deepEqual(parsed.decision, {
+      selectedId: 'report-2',
+      confidence: 0.92,
+      reason: 'selected',
+      provider: 'cloudflare',
+    });
+    assert.equal(parsed.selected.length, 1);
+    assert.equal(parsed.selected[0].id, 'report-2');
+    assert.equal(parsed.selected[0].format, 'chrome-trace');
+    assert.equal(parsed.selected[0].sha256Prefix, packet.evidence[0]!.sha256.slice(0, 16));
+    assert.equal(parsed.selected[0].digest.raw_ref, undefined, 'raw_ref must be stripped from compact digest');
+    assert.equal(parsed.selected[0].digest.units.length, 6);
+    for (let i = 0; i < 6; i++) {
+      const origUnit = (packet.evidence[0]!.digest.units as Array<Record<string, unknown>>)[i]!;
+      const compUnit = parsed.selected[0].digest.units[i];
+      assert.equal(compUnit.name, origUnit.name);
+      assert.equal(compUnit.duration_us, origUnit.duration_us);
+      assert.deepEqual(compUnit.metrics, origUnit.metrics);
+      assert.equal(compUnit.metrics.cache_misses, null, 'null metric values must be preserved');
+    }
+
+    assert.equal(parsed.corroborating.length, 3);
+    assert.deepEqual(parsed.corroborating.map((c: { id: string }) => c.id), ['report-1', 'report-3', 'report-4']);
+    assert.deepEqual(parsed.verification, {
+      passed: true,
+      exitCode: 0,
+      elapsedMs: 14,
+      stdout: 'verified-ok',
+    });
+  } finally {
+    process.env.PATH = priorPath;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('investigate with agentDelivery=single_turn executes 1 review turn, skips blind analysis turn, and preserves full run.json provenance', async () => {
+  const root = await testDirectory('single-turn-agent-delivery');
+  const priorPath = process.env.PATH;
+  try {
+    process.env.PATH = `${await fixtureUv(root)}${delimiter}${priorPath}`;
+    await writeFile(join(root, 'trace-a.json'), JSON.stringify({ totalUnits: 4 }));
+    await writeFile(join(root, 'trace-b.json'), JSON.stringify({ totalUnits: 4 }));
+
+    const { investigate } = await import('../src/run.js');
+    const { genericCliAdapter } = await import('../src/agents.js');
+    const { manifestSchema } = await import('../src/config.js');
+
+    const callsFile = join(root, 'single-turn-calls.jsonl');
+    const agentScript = join(root, 'single-turn-agent.mjs');
+    await writeFile(agentScript, `import fs from 'node:fs';
+const req = JSON.parse(fs.readFileSync(0, 'utf8').trim());
+fs.appendFileSync(${JSON.stringify(callsFile)}, JSON.stringify(req) + '\\n');
+console.log(JSON.stringify({ type: 'started' }));
+const lines = req.prompt.split('\\n');
+const payload = JSON.parse(lines[lines.length - 1]);
+console.log(JSON.stringify({
+  type: 'result',
+  sessionId: 'single-turn-sess-1',
+  text: 'Single-turn diagnosis: schema=' + payload.schema + ' selected=' + (payload.selected?.[0]?.id ?? 'none') + ' passed=' + payload.verification?.passed,
+  usage: { input_tokens: 95, output_tokens: 22, cached_input_tokens: 0 },
+}));
+`);
+
+    const manifest = manifestSchema.parse({
+      version: 1,
+      issue: 'Single-turn delivery verification',
+      reports: [
+        { id: 'trace-a', path: 'trace-a.json', format: 'chrome-trace', description: 'Trace A' },
+        { id: 'trace-b', path: 'trace-b.json', format: 'chrome-trace', description: 'Trace B' },
+      ],
+      verification: { command: process.execPath, args: ['-e', 'process.stdout.write("verifier-ok")'] },
+    });
+
+    const result = await investigate({
+      workspace: root,
+      manifest,
+      routing: 'cloudflare',
+      decisionProvider: {
+        name: 'cloudflare',
+        async select() {
+          return {
+            selectedId: 'trace-a',
+            confidence: 0.94,
+            reason: 'selected',
+            source: 'clef_cloudflare',
+            provider: 'cloudflare',
+            model: 'perfdigest/clef-flash-v1',
+            confidenceSemantics: 'systemone_uniform_zero',
+            transport: 'local_mock',
+            requests: 1,
+            latencyMs: 2,
+            inputTokens: 32,
+            outputTokens: 0,
+            costUsd: null,
+          };
+        },
+      },
+      agent: 'generic',
+      agentAdapter: genericCliAdapter({ command: process.execPath, args: [agentScript], sessions: true }),
+      agentDelivery: 'single_turn',
+      reuseMcpSession: true,
+      includeCorroborating: true,
+    });
+
+    assert.equal(result.status, 'complete');
+    assert.equal(result.analysis, null, 'Blind speculative analysis turn must be skipped in single_turn mode');
+    assert.ok(result.review !== null, 'Single evidence-grounded review turn must be executed');
+    assert.equal(result.telemetry.evidenceDelivery, 'single_turn_with_evidence');
+    assert.equal(result.telemetry.evidenceModelOverlapMs, null);
+    assert.match(result.review!.text, /schema=perfdigest\.agent-evidence\.v1 selected=trace-a passed=true/);
+
+    const calls = (await readFile(callsFile, 'utf8')).trim().split('\n').map(l => JSON.parse(l));
+    assert.equal(calls.length, 1, 'Expected exactly 1 LLM invocation in single_turn mode');
+    assert.equal(calls[0].phase, 'review');
+
+    const runJson = JSON.parse(await readFile(join(result.directory, 'run.json'), 'utf8'));
+    assert.equal(runJson.telemetry.evidenceDelivery, 'single_turn_with_evidence');
+    assert.equal(runJson.provenance.length, 2);
+    assert.match(runJson.provenance[0].sha256, /^[a-f0-9]{64}$/, 'Full 64-char SHA-256 provenance must be preserved in run.json');
+    assert.equal(runJson.evidence.considered.length, 2);
+    assert.ok(runJson.evidence.evidence[0].digest.raw_ref.endsWith('trace-a.json'), 'Full uncompacted raw_ref must be preserved in run.json');
+  } finally {
+    process.env.PATH = priorPath;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+

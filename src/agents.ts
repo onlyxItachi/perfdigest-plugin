@@ -2,16 +2,19 @@ import { spawn } from 'node:child_process';
 import type { ModelReasoningEffort, Thread, Usage } from '@openai/codex-sdk';
 import { codexThread, codexTurn } from './codex.js';
 import { childEnvironment, redact } from './environment.js';
-import type { Emit } from './config.js';
+import type { CommandReceipt, Emit, EvidencePacket } from './config.js';
 
 /**
  * Capability-based agent integration contract.
  *
  * PerfDigest never injects evidence into an agent's hidden reasoning. Evidence is delivered
- * as an ordinary later turn. How that turn is delivered depends on declared capabilities:
+ * as an ordinary later turn (or as a single evidence-grounded turn when agentDelivery is
+ * 'single_turn'). How that turn is delivered depends on declared capabilities and mode:
  * - sameSessionContinuation: the review turn continues the analysis session (Codex threads).
- * - otherwise: a fresh session receives the earlier analysis text plus the evidence, and the
- *   receipt records that weaker delivery explicitly.
+ * - fresh_session_with_context: a fresh session receives the earlier analysis text plus the
+ *   evidence, and the receipt records that weaker delivery explicitly.
+ * - single_turn_with_evidence: skips the speculative blind analysis turn and runs a single
+ *   evidence-grounded turn once local digestion and verification complete.
  * nativeAsyncInput (accepting new input while a turn is running) is declared but never
  * assumed; no current adapter supports it and the runner does not require it.
  */
@@ -25,7 +28,80 @@ export interface AgentCapabilities {
 }
 
 export type AgentPhase = 'analysis' | 'review';
-export type EvidenceDelivery = 'same_session_next_turn' | 'fresh_session_with_context';
+export type EvidenceDelivery = 'same_session_next_turn' | 'fresh_session_with_context' | 'single_turn_with_evidence';
+
+function compactDigest(d: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(d)) {
+    if (k === 'raw_ref') continue;
+    if (k === 'domain' && (v === null || v === undefined || v === '')) continue;
+    if (k === 'units' && Array.isArray(v)) {
+      out.units = v.map(u => {
+        if (!u || typeof u !== 'object' || Array.isArray(u)) return u;
+        const unitObj = u as Record<string, unknown>;
+        const cu: Record<string, unknown> = {};
+        for (const [uk, uv] of Object.entries(unitObj)) {
+          if (uk === 'index') continue;
+          if (uk === 'domain' && (uv === d.domain || uv === null || uv === undefined || uv === '')) continue;
+          cu[uk] = uv;
+        }
+        return cu;
+      });
+      continue;
+    }
+    out[k] = v;
+  }
+  return out;
+}
+
+/**
+ * Formats the evidence packet and verification receipt for agent prompt delivery.
+ * When `compact === true` (default), omits redundant provenance arrays, local filesystem paths
+ * (`raw_ref`), per-unit duplicate `domain`/`index` fields, and full command metadata while
+ * preserving 100% of diagnostic units, metrics (including `null` values), routing decisions,
+ * corroborating digests, and verification status.
+ */
+export function formatAgentEvidence(
+  evidence: EvidencePacket | null,
+  verification: CommandReceipt | null,
+  pipelineStatus: string,
+  compact = true,
+): string {
+  if (!compact) {
+    return JSON.stringify({ evidence, verification, pipelineStatus });
+  }
+  return JSON.stringify({
+    schema: 'perfdigest.agent-evidence.v1',
+    status: pipelineStatus,
+    decision: evidence ? {
+      selectedId: evidence.decision.selectedId,
+      confidence: evidence.decision.confidence,
+      reason: evidence.decision.reason,
+      provider: evidence.decision.provider ?? evidence.decision.source,
+    } : null,
+    selected: evidence?.evidence.map(e => ({
+      id: e.report.id,
+      format: e.report.format,
+      sha256Prefix: e.sha256.slice(0, 16),
+      digest: compactDigest(e.digest),
+    })) ?? [],
+    ...(evidence?.corroborating?.length ? {
+      corroborating: evidence.corroborating.map(e => ({
+        id: e.report.id,
+        format: e.report.format,
+        sha256Prefix: e.sha256.slice(0, 16),
+        digest: compactDigest(e.digest),
+      })),
+    } : {}),
+    verification: verification ? {
+      passed: verification.exitCode === 0 && !verification.timedOut && !verification.aborted,
+      exitCode: verification.exitCode,
+      elapsedMs: verification.elapsedMs,
+      ...(verification.stdout.trim() ? { stdout: verification.stdout.trim().slice(0, 240) } : {}),
+      ...(verification.stderr.trim() ? { stderr: verification.stderr.trim().slice(0, 240) } : {}),
+    } : null,
+  });
+}
 
 /** Kept field-compatible with the previous CodexTurn receipt shape (threadId). */
 export interface AgentTurn {
