@@ -1,0 +1,249 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { writeFile, readFile, chmod, mkdir, rm } from 'node:fs/promises';
+import { join, delimiter } from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { gatherEvidence } from '../src/evidence.js';
+import { openPerfDigestSession, withPerfDigestSession, type PerfDigestSessionStats } from '../src/perfdigest.js';
+import type { DecisionProvider } from '../src/providers.js';
+import type { EvidenceProvenance, ReportSpec } from '../src/config.js';
+import { executable } from '../src/environment.js';
+import { fixtureUv, testDirectory } from './helpers.js';
+
+const execFileAsync = promisify(execFile);
+
+async function countingFixtureUv(root: string, spawnsFile: string, callsFile: string): Promise<string> {
+  const bin = join(root, 'bin-counting');
+  await mkdir(bin, { recursive: true });
+  const script = join(bin, 'uvx');
+  const serverUrl = new URL('./fixtures/mcp-server.js', import.meta.url).href;
+  await writeFile(script, `#!${process.execPath}
+import fs from 'node:fs';
+fs.appendFileSync(${JSON.stringify(spawnsFile)}, JSON.stringify({
+  pid: process.pid,
+  hasCf: !!process.env.PERFDIGEST_CLOUDFLARE_API_TOKEN,
+  hasDecisions: !!process.env.PERFDIGEST_DECISIONS_API_KEY,
+  hasOpenai: !!process.env.OPENAI_API_KEY,
+}) + '\\n');
+process.on('exit', () => {
+  fs.appendFileSync(${JSON.stringify(callsFile)}, JSON.stringify({ exitedPid: process.pid }) + '\\n');
+});
+await import(${JSON.stringify(serverUrl)});
+`);
+  await chmod(script, 0o755);
+  return bin;
+}
+
+test('gatherEvidence reuses one bounded MCP session across multiple candidate reports and closes it before provider routing', async () => {
+  const root = await testDirectory('mcp-reuse-multi');
+  const prior = {
+    path: process.env.PATH,
+    cf: process.env.PERFDIGEST_CLOUDFLARE_API_TOKEN,
+    decisions: process.env.PERFDIGEST_DECISIONS_API_KEY,
+    openai: process.env.OPENAI_API_KEY,
+  };
+  try {
+    const spawnsFile = join(root, 'spawns.jsonl');
+    const exitsFile = join(root, 'exits.jsonl');
+    process.env.PATH = `${await countingFixtureUv(root, spawnsFile, exitsFile)}${delimiter}${prior.path}`;
+    process.env.PERFDIGEST_CLOUDFLARE_API_TOKEN = 'cf-secret-do-not-leak';
+    process.env.PERFDIGEST_DECISIONS_API_KEY = 'decisions-secret-do-not-leak';
+    process.env.OPENAI_API_KEY = 'openai-secret-do-not-leak';
+
+    const reports: ReportSpec[] = [];
+    for (let i = 1; i <= 4; i++) {
+      const name = `trace-${i}.json`;
+      await writeFile(join(root, name), JSON.stringify({ reportIndex: i }));
+      reports.push({ id: `r${i}`, path: name, format: 'chrome-trace', description: `Report ${i}` });
+    }
+
+    let spawnsAtProviderSelect = 0;
+    const provider: DecisionProvider = {
+      name: 'cloudflare',
+      async select(_issue, _reports, _signal, measured) {
+        assert.equal(measured?.length, 4);
+        const spawnsLines = (await readFile(spawnsFile, 'utf8')).trim().split('\n').filter(Boolean);
+        spawnsAtProviderSelect = spawnsLines.length;
+        return {
+          selectedId: 'r3',
+          confidence: 0.88,
+          reason: 'selected',
+          source: 'clef_cloudflare',
+          provider: 'cloudflare',
+          model: '@cf/cloudflare/clef-flash',
+          confidenceSemantics: 'systemone_uniform_zero',
+          transport: 'local_mock',
+          requests: 1,
+          latencyMs: 5,
+          inputTokens: 20,
+          outputTokens: 0,
+          costUsd: null,
+        };
+      },
+    };
+
+    let observedStats: PerfDigestSessionStats | null = null;
+    const provenance: EvidenceProvenance[] = [];
+    const packet = await gatherEvidence({
+      workspace: root,
+      issue: 'Multi-report session reuse test',
+      reports,
+      routing: 'cloudflare',
+      provider,
+      provenance,
+      onMcpSessionStats: s => { observedStats = s; },
+    });
+
+    assert.equal(packet.status, 'complete');
+    assert.equal(packet.evidence.length, 1);
+    assert.equal(packet.evidence[0]!.report.id, 'r3');
+    assert.equal(packet.considered.length, 4);
+    assert.equal(packet.considered.filter(c => c.delivered).length, 1);
+    assert.equal(packet.considered.find(c => c.id === 'r3')?.delivered, true);
+
+    assert.deepEqual(observedStats, {
+      spawns: 1,
+      calls: 4,
+      reusedCalls: 3,
+      closed: true,
+      tainted: false,
+    });
+
+    // Verify only 1 uvx process was spawned across all 4 reports and credentials were stripped
+    const spawns = (await readFile(spawnsFile, 'utf8')).trim().split('\n').map(l => JSON.parse(l));
+    assert.equal(spawns.length, 1, 'Expected exactly 1 uvx process spawn for 4 reports');
+    assert.equal(spawns[0].hasCf, false);
+    assert.equal(spawns[0].hasDecisions, false);
+    assert.equal(spawns[0].hasOpenai, false);
+    assert.equal(spawnsAtProviderSelect, 1);
+  } finally {
+    for (const [k, v] of Object.entries({
+      PATH: prior.path,
+      PERFDIGEST_CLOUDFLARE_API_TOKEN: prior.cf,
+      PERFDIGEST_DECISIONS_API_KEY: prior.decisions,
+      OPENAI_API_KEY: prior.openai,
+    })) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('PerfDigestSession enforces maxCalls, concurrency guards, failure isolation, and per-call timeouts', async () => {
+  const root = await testDirectory('mcp-reuse-isolation');
+  const priorPath = process.env.PATH;
+  try {
+    process.env.PATH = `${await fixtureUv(root)}${delimiter}${priorPath}`;
+    await writeFile(join(root, 'ok1.json'), '{}');
+    await writeFile(join(root, 'ok2.json'), '{}');
+    await writeFile(join(root, 'bad.json'), JSON.stringify({ mode: 'error' }));
+    await writeFile(join(root, 'slow.json'), JSON.stringify({ mode: 'slow' }));
+
+    const r1: ReportSpec = { id: 'ok1', path: 'ok1.json', format: 'chrome-trace', description: 'OK 1' };
+    const r2: ReportSpec = { id: 'ok2', path: 'ok2.json', format: 'chrome-trace', description: 'OK 2' };
+    const rBad: ReportSpec = { id: 'bad', path: 'bad.json', format: 'chrome-trace', description: 'Bad' };
+    const rSlow: ReportSpec = { id: 'slow', path: 'slow.json', format: 'chrome-trace', description: 'Slow' };
+
+    // 1. Invalid bounds rejected
+    assert.throws(() => openPerfDigestSession(root, undefined, { maxCalls: 0 }), /between 1 and 16/);
+    assert.throws(() => openPerfDigestSession(root, undefined, { maxCalls: 17 }), /between 1 and 16/);
+    assert.throws(() => openPerfDigestSession(root, undefined, { callTimeoutMs: 0 }), /must be positive/);
+
+    // 2. maxCalls enforcement
+    await withPerfDigestSession(root, undefined, async session => {
+      await session.digest(r1, join(root, 'ok1.json'));
+      await session.digest(r2, join(root, 'ok2.json'));
+      assert.deepEqual(session.stats(), { spawns: 1, calls: 2, reusedCalls: 1, closed: false, tainted: false });
+      await assert.rejects(session.digest(r1, join(root, 'ok1.json')), /call limit \(2\) exceeded/);
+      assert.equal(session.stats().tainted, true);
+      assert.equal(session.stats().closed, true);
+    }, { maxCalls: 2 });
+
+    // 3. Failure isolation: error on call #2 taints and closes session; call #3 is refused without spawning or reusing
+    const session = openPerfDigestSession(root, undefined, { maxCalls: 4 });
+    try {
+      await session.digest(r1, join(root, 'ok1.json'));
+      await assert.rejects(session.digest(rBad, join(root, 'bad.json')), /MCP tool error/);
+      assert.deepEqual(session.stats(), { spawns: 1, calls: 2, reusedCalls: 1, closed: true, tainted: true });
+      await assert.rejects(session.digest(r2, join(root, 'ok2.json')), /tainted by a prior error/);
+    } finally {
+      await session.close();
+    }
+
+    // 4. Per-call timeout taints and closes session
+    await withPerfDigestSession(root, undefined, async slowSession => {
+      await slowSession.digest(r1, join(root, 'ok1.json'));
+      await assert.rejects(slowSession.digest(rSlow, join(root, 'slow.json')), /timed out/);
+      assert.equal(slowSession.stats().tainted, true);
+      assert.equal(slowSession.stats().closed, true);
+    }, { callTimeoutMs: 80 });
+
+    // 5. Concurrent calls on the same session are rejected
+    await withPerfDigestSession(root, undefined, async concSession => {
+      await assert.rejects(
+        Promise.all([
+          concSession.digest(rSlow, join(root, 'slow.json')),
+          concSession.digest(r1, join(root, 'ok1.json')),
+        ]),
+        /does not allow concurrent calls/,
+      );
+      assert.equal(concSession.stats().tainted, true);
+      assert.equal(concSession.stats().closed, true);
+    }, { callTimeoutMs: 1000 });
+  } finally {
+    process.env.PATH = priorPath;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('real PerfDigest MCP session reuse works across multiple reports on baseline v1.2.0 and v1.3.0 (when cached)', async () => {
+  const root = await testDirectory('mcp-reuse-real-versions');
+  try {
+    const tracePayload = JSON.stringify({
+      traceEvents: [
+        { ph: 'X', name: 'row_major', cat: 'cpu', ts: 0, dur: 120, pid: 1, tid: 1 },
+        { ph: 'X', name: 'column_major', cat: 'cpu', ts: 200, dur: 450, pid: 1, tid: 1 },
+      ],
+    });
+    const reports: ReportSpec[] = [];
+    for (let i = 1; i <= 3; i++) {
+      const p = join(root, `real-${i}.json`);
+      await writeFile(p, tracePayload);
+      reports.push({ id: `real-${i}`, path: `real-${i}.json`, format: 'chrome-trace', description: `Real trace ${i}` });
+    }
+
+    // 1. Installed baseline (perfdigest-mcp v1.2.0)
+    await withPerfDigestSession(root, undefined, async session => {
+      for (const r of reports) {
+        const d = await session.digest(r, join(root, r.path));
+        assert.equal(d.format, 'chrome-trace');
+        assert.equal(d.total_units, 2);
+      }
+      assert.deepEqual(session.stats(), { spawns: 1, calls: 3, reusedCalls: 2, closed: false, tainted: false });
+    });
+
+    // 2. PerfDigest MCP v1.3.0 (MCP SDK 2.3) when cached locally in uv
+    const uvxBin = executable('uvx');
+    let has130 = false;
+    try {
+      await execFileAsync(uvxBin, ['--offline', '--from', 'perfdigest-mcp==1.3.0', 'python', '-c', 'import perfdigest_mcp'], { timeout: 5000 });
+      has130 = true;
+    } catch {
+      has130 = false;
+    }
+    if (has130) {
+      await withPerfDigestSession(root, undefined, async session => {
+        for (const r of reports) {
+          const d = await session.digest(r, join(root, r.path));
+          assert.equal(d.format, 'chrome-trace');
+          assert.equal(d.total_units, 2);
+        }
+        assert.deepEqual(session.stats(), { spawns: 1, calls: 3, reusedCalls: 2, closed: false, tainted: false });
+      }, { command: uvxBin, args: ['--offline', '--from', 'perfdigest-mcp==1.3.0', 'perfdigest-mcp'] });
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

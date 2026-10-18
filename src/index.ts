@@ -7,3 +7,4 @@ export { createDecisionProvider, providerName, toSystemOne, normalizeSystemOne, 
   type DecisionProvider, type DecisionProviderOptions, type DecisionQuestion, type CloudflareModelName, type CloudflareModelSpec } from './providers.js';
 export { initConfiguration, loadConfiguration, applyConfigurationEnvironment, type PluginConfiguration } from './setup.js';
 export { codexAdapter, genericCliAdapter, AgentError, type AgentAdapter, type AgentCapabilities, type AgentSession, type AgentTurn, type AgentErrorKind, type AgentPhase, type EvidenceDelivery, type GenericCliAgentOptions } from './agents.js';
+export { withPerfDigest, withPerfDigestSession, openPerfDigestSession, digestReport, validateDigest, type PerfDigestSession, type PerfDigestSessionOptions, type PerfDigestSessionStats } from './perfdigest.js';

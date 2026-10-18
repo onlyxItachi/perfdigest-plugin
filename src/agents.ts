@@ -115,17 +115,24 @@ export function genericCliAdapter(options: GenericCliAgentOptions): AgentAdapter
         get id() { return sessionId; },
         async turn(prompt, phase, { signal, emit }) {
           emit(`agent.${phase}.started`);
-          const deadline = AbortSignal.timeout(timeoutMs);
-          const combined = AbortSignal.any([signal, deadline]);
+          const deadlineController = new AbortController();
+          let timedOut = false;
+          const timer = setTimeout(() => {
+            timedOut = true;
+            deadlineController.abort(new Error(`no result within ${timeoutMs} ms`));
+          }, timeoutMs);
+          timer.unref?.();
+          const combined = AbortSignal.any([signal, deadlineController.signal]);
           const result = await runTurn(options.command, options.args ?? [], workspace, combined,
             JSON.stringify({ protocol, phase, prompt, sessionId: sessions ? sessionId : null }), maxOutputBytes,
             () => emit(`agent.${phase}.turn_started`))
             .catch((error: unknown) => {
               if (error instanceof AgentError) throw new AgentError(error.kind, phase, error.message);
-              if (deadline.aborted) throw new AgentError('timed_out', phase, `no result within ${timeoutMs} ms`);
+              if (timedOut) throw new AgentError('timed_out', phase, `no result within ${timeoutMs} ms`);
               if (signal.aborted) throw new AgentError('cancelled', phase, 'run cancelled');
               throw new AgentError('failed', phase, error instanceof Error ? error.message : String(error));
-            });
+            })
+            .finally(() => clearTimeout(timer));
           if (sessions) {
             if (!result.sessionId) throw new AgentError('protocol', phase, 'sessions were declared but no sessionId was returned');
             if (sessionId !== null && result.sessionId !== sessionId) throw new AgentError('protocol', phase, 'session continuation was declared but not honored');
