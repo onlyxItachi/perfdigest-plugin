@@ -5,6 +5,7 @@ import { dirname, isAbsolute, join, relative, sep } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import type { Readable, Writable } from 'node:stream';
 import { executable } from './environment.js';
+import { cloudflareModels, isCloudflareModelName } from './cloudflare-models.js';
 
 export const setupProviders = ['cloudflare', 'local', 'openai', 'offline'] as const;
 export type SetupProvider = typeof setupProviders[number];
@@ -17,6 +18,8 @@ export interface PluginConfiguration {
   provider: SetupProvider;
   endpoint?: string;
   envFile?: string;
+  /** Cloudflare Clef model name (clef-flash, clef, clef-omni). Not a secret. */
+  decisionModel?: string;
 }
 
 export interface SetupDiagnostic {
@@ -30,6 +33,7 @@ export interface InitOptions {
   provider?: string;
   endpoint?: string;
   envFile?: string;
+  decisionModel?: string;
   yes?: boolean;
   /** Opt in to one authenticated, read-only Cloudflare model-discovery request. */
   checkConnection?: boolean;
@@ -138,8 +142,8 @@ async function validateEnvReference(path: string, workspace: string): Promise<st
 async function validateConfiguration(value: unknown, workspace: string): Promise<PluginConfiguration> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid PerfDigest configuration.');
   const raw = value as Record<string, unknown>;
-  if (Object.keys(raw).some(key => !['version', 'provider', 'endpoint', 'envFile'].includes(key))) {
-    throw new Error('Configuration may contain only version, provider, endpoint and envFile references.');
+  if (Object.keys(raw).some(key => !['version', 'provider', 'endpoint', 'envFile', 'decisionModel'].includes(key))) {
+    throw new Error('Configuration may contain only version, provider, endpoint, envFile and decisionModel references.');
   }
   if (raw.version !== 1 || typeof raw.provider !== 'string') throw new Error('Invalid PerfDigest configuration version or provider.');
   const provider = normalizeSetupProvider(raw.provider);
@@ -147,9 +151,13 @@ async function validateConfiguration(value: unknown, workspace: string): Promise
     throw new Error('Only the local provider accepts a configurable endpoint.');
   }
   if (raw.envFile !== undefined && typeof raw.envFile !== 'string') throw new Error('Env file must be an absolute external file path.');
+  if (raw.decisionModel !== undefined && (provider !== 'cloudflare' || typeof raw.decisionModel !== 'string' || !isCloudflareModelName(raw.decisionModel))) {
+    throw new Error(`Only the cloudflare provider accepts a decision model: ${Object.keys(cloudflareModels).join(', ')}.`);
+  }
   const configuration: PluginConfiguration = { version: 1, provider };
   if (provider === 'local') configuration.endpoint = validateLocalEndpoint((raw.endpoint as string | undefined) ?? defaultLocalEndpoint);
   if (typeof raw.envFile === 'string') configuration.envFile = await validateEnvReference(raw.envFile, workspace);
+  if (typeof raw.decisionModel === 'string') configuration.decisionModel = raw.decisionModel;
   return configuration;
 }
 
@@ -269,11 +277,11 @@ async function readDiscoveryResponse(response: Response): Promise<unknown> {
   }
 }
 
-async function checkCloudflareConnection(account: string, token: string, signal?: AbortSignal): Promise<SetupDiagnostic> {
+async function checkCloudflareConnection(account: string, token: string, model: string, signal?: AbortSignal): Promise<SetupDiagnostic> {
   // Official API: https://developers.cloudflare.com/api/resources/ai/subresources/models/methods/list/
   // Workers AI Read OR Workers AI Write permits this endpoint. It does not run a model.
   const url = new URL(`https://api.cloudflare.com/client/v4/accounts/${account}/ai/models/search`);
-  url.search = new URLSearchParams({ search: 'clef-flash', per_page: '1', page: '1' }).toString();
+  url.search = new URLSearchParams({ search: model, per_page: '1', page: '1' }).toString();
   const timeout = AbortSignal.timeout(5000);
   try {
     const response = await fetch(url, {
@@ -345,7 +353,7 @@ async function diagnosticsFor(configuration: PluginConfiguration, workspace: str
         ? 'Cloudflare account ID and token present; presence alone does not verify access or quota.'
         : 'Set PERFDIGEST_CLOUDFLARE_ACCOUNT_ID (32 hex characters) and PERFDIGEST_CLOUDFLARE_API_TOKEN in the private runner environment.' });
     diagnostics.push(checkConnection && environmentReady && credentialsReady
-      ? await checkCloudflareConnection(account!, token!, signal)
+      ? await checkCloudflareConnection(account!, token!, configuration.decisionModel ?? 'clef-flash', signal)
       : { check: 'endpoint', status: 'skipped', message: checkConnection
         ? 'Cloudflare was not contacted because its credentials or external env file are missing or invalid.'
         : 'Hosted endpoint was not contacted; use init --check-connection for one read-only Cloudflare check. Inference and remaining quota remain unverified.' });
@@ -426,8 +434,11 @@ export async function initConfiguration(options: InitOptions = {}): Promise<Init
       validateLocalEndpoint(endpoint);
       if (terminal) endpoint = (await ask(`Local endpoint [${endpoint}]: `)).trim() || endpoint;
     }
+    const decisionModel = options.decisionModel !== undefined ? options.decisionModel
+      : previous?.provider === provider ? previous.decisionModel : undefined;
     const configuration = await validateConfiguration({ version: 1, provider,
       ...(endpoint !== undefined ? { endpoint } : {}), ...(envFile ? { envFile } : {}),
+      ...(decisionModel !== undefined ? { decisionModel } : {}),
     }, workspace);
     if (terminal) {
       output.write(`Selected provider: ${provider}\n`);
@@ -438,6 +449,7 @@ export async function initConfiguration(options: InitOptions = {}): Promise<Init
     const path = await saveConfiguration(configuration, workspace);
     output.write(`Active provider: ${provider}\n`);
     if (configuration.endpoint) output.write(`Local endpoint: ${configuration.endpoint}\n`);
+    if (configuration.provider === 'cloudflare') output.write(`Cloudflare decision model: ${configuration.decisionModel ?? 'clef-flash'}\n`);
     const diagnostics = await diagnosticsFor(configuration, workspace, environment, options.checkConnection ?? false, options.signal);
     for (const diagnostic of diagnostics) output.write(`[${diagnostic.status}] ${diagnostic.message}\n`);
     const ready = !diagnostics.some(diagnostic => diagnostic.status === 'error');

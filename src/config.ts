@@ -53,6 +53,8 @@ export interface RouteDecision {
   source: 'offline_order' | 'openai_decisions' | 'clef_local' | 'clef_cloudflare';
   provider?: ProviderName;
   model?: string;
+  /** Cloudflare model endpoint actually requested, e.g. @cf/cloudflare/clef. */
+  requestedModel?: string;
   confidenceSemantics?: 'provider_reported' | 'systemone_uniform_zero';
   transport?: 'openai_https' | 'local_mock' | 'injected_client' | 'loopback_http' | 'cloudflare_https';
   inputSha256?: string;

@@ -5,6 +5,14 @@ import type { EvidencePacket, ProviderName, ReportSpec, RouteDecision, RoutingMo
 import { DecisionsError, decisionsClient, localDecisionsClient, decisionsFailure, decisionsInput,
   offlineSelection, routeDecision, routingQuestion, selectReport, type DecisionsErrorKind } from './decisions.js';
 import { validateLocalEndpoint } from './setup.js';
+import { cloudflareModels, defaultCloudflareModel, isCloudflareModelName, type CloudflareModelName, type CloudflareModelSpec } from './cloudflare-models.js';
+
+export { cloudflareModels, defaultCloudflareModel, type CloudflareModelName, type CloudflareModelSpec } from './cloudflare-models.js';
+/** Exact names only. An unknown name is an error before any request; there is no substitution. */
+export function cloudflareModel(name: string = defaultCloudflareModel): CloudflareModelSpec & { name: CloudflareModelName } {
+  if (!isCloudflareModelName(name)) throw new ProviderError('cloudflare', 'schema');
+  return { ...cloudflareModels[name], name };
+}
 
 export function providerName(mode: RoutingMode): ProviderName {
   switch (mode) {
@@ -15,6 +23,13 @@ export function providerName(mode: RoutingMode): ProviderName {
     default: throw new DecisionsError('schema');
   }
 }
+export interface DecisionProviderOptions {
+  /** Explicit local HTTP contract test only (OpenAI). */
+  decisionsMockURL?: string;
+  /** Cloudflare Clef model; rejected for other providers so a selection is never silently ignored. */
+  cloudflareModel?: string;
+}
+
 // A bounded provider switch, not a generic agent/provider framework.
 export interface DecisionProvider {
   readonly name: ProviderName;
@@ -51,9 +66,9 @@ function questionsChecked(questions: DecisionQuestion[]) {
   }
   return parsed;
 }
-export function toSystemOne(state: string, questions: DecisionQuestion[]) {
+export function toSystemOne(state: string, questions: DecisionQuestion[], model = 'clef-flash') {
   const checked = questionsChecked(questions);
-  return { model: 'clef-flash', state, questions: Object.fromEntries(checked.map(q => [q.name,
+  return { model, state, questions: Object.fromEntries(checked.map(q => [q.name,
     q.type === 'predicate' ? { type: 'noul', instructions: q.instructions }
       : q.type === 'score' ? { type: 'score', instructions: q.instructions,
         criteria: q.levels.map(l => l.description ? `${l.label}: ${l.description}` : l.label) }
@@ -120,9 +135,11 @@ function httpFailure(provider: ProviderName, status: number, code?: number): Pro
     : status === 403 ? 'permission' : status === 429 ? 'rate_limit'
       : status === 400 || status === 422 ? 'schema' : 'service', status);
 }
-export function createDecisionProvider(mode: RoutingMode, options: { decisionsMockURL?: string } = {}): DecisionProvider {
+export function createDecisionProvider(mode: RoutingMode, options: DecisionProviderOptions = {}): DecisionProvider {
   const name = providerName(mode);
   if (options.decisionsMockURL && name !== 'openai') throw new DecisionsError('schema');
+  if (options.cloudflareModel !== undefined && name !== 'cloudflare') throw new ProviderError(name, 'schema');
+  const model = name === 'cloudflare' ? cloudflareModel(options.cloudflareModel) : null;
   if (name === 'offline') return { name, select: async (_issue, reports) => offlineSelection(reports) };
   if (name === 'openai') {
     const client = options.decisionsMockURL ? localDecisionsClient(options.decisionsMockURL) : decisionsClient();
@@ -136,7 +153,7 @@ export function createDecisionProvider(mode: RoutingMode, options: { decisionsMo
     const token = process.env.PERFDIGEST_CLOUDFLARE_API_TOKEN?.trim();
     if (!account || !token) throw new ProviderError(name, 'missing_credential');
     if (!/^[a-f0-9]{32}$/i.test(account) || /[\r\n]/.test(token)) throw new ProviderError(name, 'schema');
-    endpoint = `https://api.cloudflare.com/client/v4/accounts/${account}/ai/run/@cf/cloudflare/clef-flash`;
+    endpoint = `https://api.cloudflare.com/client/v4/accounts/${account}/ai/run/${model!.id}`;
     headers.authorization = `Bearer ${token}`;
   }
   return { name, async select(issue, reports, signal, evidence = []) {
@@ -147,7 +164,7 @@ export function createDecisionProvider(mode: RoutingMode, options: { decisionsMo
       const questions = [routingQuestion(reports)];
       let response: Response;
       try {
-        response = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(toSystemOne(input, questions)),
+        response = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(toSystemOne(input, questions, model?.requestModel ?? 'clef-flash')),
           redirect: 'error', signal: AbortSignal.any([AbortSignal.timeout(name === 'local' ? 120_000 : 30_000), ...(signal ? [signal] : [])]) });
       } catch { throw new ProviderError(name, signal?.aborted ? 'cancelled' : 'network'); }
       // One request, no retries, no redirect, no upstream body/headers in diagnostics.
@@ -173,11 +190,12 @@ export function createDecisionProvider(mode: RoutingMode, options: { decisionsMo
       }
       const normalized = normalizeSystemOne(raw, questions);
       // Check the advertised model identity; this alone cannot verify the server's weights.
-      if (!['clef-flash', '@cf/cloudflare/clef-flash'].includes(normalized.model)) throw new ProviderError(name, 'schema');
+      // Local llama.cpp serves Clef-flash under its alias; Cloudflare must return the requested model.
+      if (!(model?.identities ?? ['clef-flash', '@cf/cloudflare/clef-flash']).includes(normalized.model)) throw new ProviderError(name, 'schema');
       return routeDecision(normalized, reports, { source: name === 'local' ? 'clef_local' : 'clef_cloudflare',
         provider: name, transport: name === 'local' ? 'loopback_http' : 'cloudflare_https', confidenceSemantics: 'systemone_uniform_zero',
         inputSha256: createHash('sha256').update(input).digest('hex'), evidenceCount: evidence.length,
-        latencyMs: Math.round(performance.now() - start) });
+        latencyMs: Math.round(performance.now() - start), ...(model ? { requestedModel: model.id } : {}) });
     } catch (error) {
       if (error instanceof ProviderError) throw error;
       const failure = decisionsFailure(error);

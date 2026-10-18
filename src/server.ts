@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { reportSchema, type EvidencePacket, type RoutingMode } from './config.js';
-import { createDecisionProvider } from './providers.js';
+import { createDecisionProvider, providerName } from './providers.js';
 import { gatherEvidence } from './evidence.js';
 import { redact } from './environment.js';
 
@@ -13,7 +13,8 @@ const reply = (data: Record<string, unknown>) => ({
   content: [{ type: 'text' as const, text: JSON.stringify(data) }], structuredContent: data,
 });
 
-export async function serve(workspace: string, defaultRouting: RoutingMode = 'offline'): Promise<void> {
+export async function serve(workspace: string, defaultRouting: RoutingMode = 'offline',
+  options: { cloudflareModel?: string } = {}): Promise<void> {
   const jobs = new Map<string, Job>();
   const server = new McpServer({ name: 'perfdigest-evidence', version: '0.1.0' }, { instructions:
     'Read-only asynchronous evidence from saved local reports. Launch a job, continue independent work, then collect it. Confidence is not correctness. This server never runs capture commands or applies patches. Offline routing is explicitly labeled.' });
@@ -32,7 +33,9 @@ export async function serve(workspace: string, defaultRouting: RoutingMode = 'of
     cleanup();
     if (new Set(reports.map(r => r.id)).size !== reports.length) throw new Error('Report IDs must be unique');
     if (jobs.size >= 32) throw new Error('Job limit reached; collect or cancel existing jobs');
-    const provider = createDecisionProvider(mode);
+    // The configured Cloudflare model applies only to Cloudflare jobs; other modes never receive it.
+    const provider = createDecisionProvider(mode, providerName(mode) === 'cloudflare' && options.cloudflareModel !== undefined
+      ? { cloudflareModel: options.cloudflareModel } : {});
     const controller = new AbortController();
     const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(90_000)]);
     const id = crypto.randomUUID();
