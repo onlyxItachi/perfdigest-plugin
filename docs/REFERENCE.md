@@ -61,7 +61,20 @@ With an inference provider, PerfDigest first gathers bounded top-three summaries
 | Default demo | First declared report, deterministic | None | Real CPU execution + Python MCP |
 | `--agent codex --routing offline` | First declared report | Existing ChatGPT Codex session | Real local evidence, then Codex review |
 | `--agent codex --routing decisions` | Official Decisions API | Separate Decisions key + ChatGPT Codex | Adapter implemented; live Decisions validation pending |
+| `--agent generic --agent-command PATH` | Any selected provider | Subprocess speaking `perfdigest-agent/v1` JSONL | Same-session next-turn (`--agent-sessions`) or stateless context handoff |
 | `npm test` | Synthetic HTTP and subprocess fixtures | Loopback only; no external/model requests | Contract and failure tests; not a live API result |
+
+## Agent interoperability
+
+`investigate` orchestrates coding agents through a capability-based `AgentAdapter` interface (`src/agents.ts`) with explicit feature flags:
+
+- `sameSessionContinuation`: whether the adapter preserves conversational state across the `analysis` and `review` turns (`evidenceDelivery: "same_session_next_turn"` when true, or `"fresh_session_with_context"` when false).
+- `nativeAsyncInput`: whether the agent accepts mid-turn streaming evidence injection (`false` for both built-in adapters; requesting `nativeAsyncInput: true` fails closed with `AgentError` kind `unsupported`).
+- `cancellation`: whether in-flight turns obey `AbortSignal` and per-turn timeouts (`true`).
+- `usageReporting`: whether token usage is surfaced when returned by the agent (`true`).
+- `sandbox`: execution isolation requested from the agent runtime (`"read-only"` for Codex, `"agent-defined"` for generic CLI subprocesses).
+
+`codexAdapter()` wraps the existing Codex SDK thread and preserves same-thread next-turn evidence delivery (`codex.*` timeline events). `genericCliAdapter({ command, args, sessions, timeoutMs, maxOutputBytes })` spawns a non-shell subprocess per turn with the `childEnvironment()` allowlist (excluding Cloudflare, OpenAI and Decisions API keys), sends a single-line JSON request on `stdin` (`{ protocol: "perfdigest-agent/v1", phase, prompt, sessionId }`), and reads JSON lines on `stdout` (optional `{"type":"started"}` and exactly one `{"type":"result","text","sessionId","usage"}`). It enforces bounded output size (`maxOutputBytes`, default 1 MiB), per-turn timeouts (`SIGTERM` followed by `SIGKILL`), external cancellation, and session-ID continuation checks when `sessions: true`. Structured failures are recorded in `run.json` under `agentError` (`{ kind: "failed" | "timed_out" | "cancelled" | "protocol" | "unsupported", phase, message }`) and `agentCapabilities`.
 
 ## Decision providers
 
@@ -132,6 +145,8 @@ node dist/cli.js run manifest.json --workspace /path/to/project --routing offlin
 Reports are existing files inside the workspace, at most 20 MiB each, with an explicit PerfDigest format. Directory-shaped reports are outside this MVP. An optional `captures` list accepts up to four `{command, args, timeoutMs}` entries; commands run without a shell and must succeed and refresh the declared reports. Only run manifests whose commands you trust. Verification is required even when using saved reports. Capture/verification commands use a limited environment; activate a needed toolchain through its executable path or `PATH`.
 
 Each run saves `.perfdigest/runs/<id>/run.json` and `report.md`: command receipts, report hashes, raw references, missing metrics, route provenance, Codex usage, errors and timestamps. Raw reports remain on disk. A failed or cancelled capture, changed report, empty digest or failed verification produces a failed run. Abstention/low routing confidence produces `needs_review`. Both exit nonzero. `complete` means the declared pipeline succeeded, not that an arbitrary diagnosis or patch was proved correct.
+
+`run.json` also records `provenance`: one entry per digested report (`id`, `reference`, `format`, `sha256`, `bytes`, `modifiedAt`, `provenance: "perfdigest_mcp"`, `delivered`). It is retained when routing abstains, when a provider response is rejected and when a provider request fails, so the measured inputs of every routing attempt stay auditable; `delivered` is true only for evidence handed to the agent. `decisionOutcome` is `accepted`, `abstained` (refusal, human review or confidence below the unchanged 0.65 policy), `rejected` (schema or model-identity validation failed), `failed` (transport, authentication, billing or other provider error) or `not_reached` (the run failed before routing). Both `run.json` and `report.md` are written with mode 600.
 
 Missing measurements remain `null`. Billing is not observed, so `costUsd` stays `null`; token usage is reported only when provided by the service. The controlled CPU demo is not a real PyTorch issue and one timing sample is not a speedup claim.
 

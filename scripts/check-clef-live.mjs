@@ -43,6 +43,8 @@ try {
     quantizationBasis: provider === 'local' ? 'caller label; verify against independent model hash receipt' : 'provider managed, not observed',
     requests: decision?.requests ?? null, decision: decision ?? null,
     evidence: result.evidence?.evidence.map(e => ({ id: e.report.id, reference: e.report.path, sha256: e.sha256, provenance: e.provenance })) ?? [],
+    // Every digested report with its SHA-256, retained even when routing abstains or fails.
+    considered: result.provenance, decisionOutcome: result.decisionOutcome,
     verification: result.verification ? { exitCode: result.verification.exitCode, timedOut: result.verification.timedOut, aborted: result.verification.aborted } : null,
     wallMs: result.telemetry.wallMs, overlapMs: result.telemetry.evidenceModelOverlapMs,
     codex: { execution: values.codex ? 'existing_chatgpt_login' : 'not_requested', model: values.codex ? 'gpt-6-astra' : null,

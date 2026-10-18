@@ -1,0 +1,32 @@
+{
+  "schema": "perfdigest.benchmark-manifest.v1",
+  "id": "stage3-runtime-build-foundations",
+  "description": "Reference baseline: Node 22 + TypeScript 6.0.3 tsc. BUILD cells (tsc 6 vs tsgo TS7 preview) are kept separate from RUNTIME cells (Node / Bun / Deno executing the tsc-built dist). WORKER cells compare a Go prototype against an equivalent Node script for subprocess + hash overhead only.",
+  "defaults": { "runs": 20, "warmup": 3, "rssRuns": 5, "spawnIterations": 200 },
+  "smokeDefaults": { "runs": 3, "warmup": 1, "rssRuns": 1, "spawnIterations": 10 },
+  "cells": [
+    { "id": "build.tsc6.cold", "group": "build", "backend": "tsc-6.0.3", "scenario": "cold-build", "baseline": true, "runs": 10 },
+    { "id": "build.tsgo.cold", "group": "build", "backend": "tsgo-7-preview", "scenario": "cold-build", "runs": 10 },
+
+    { "id": "runtime.node22.help", "group": "runtime", "backend": "node22", "scenario": "cli-help", "baseline": true, "smoke": true },
+    { "id": "runtime.bun.help", "group": "runtime", "backend": "bun", "scenario": "cli-help" },
+    { "id": "runtime.deno.help", "group": "runtime", "backend": "deno", "scenario": "cli-help" },
+
+    { "id": "runtime.node22.demo", "group": "runtime", "backend": "node22", "scenario": "offline-demo", "baseline": true, "runs": 15 },
+    { "id": "runtime.bun.demo", "group": "runtime", "backend": "bun", "scenario": "offline-demo", "runs": 15 },
+    { "id": "runtime.deno.demo", "group": "runtime", "backend": "deno", "scenario": "offline-demo", "runs": 15 },
+
+    { "id": "runtime.node22.mcp", "group": "runtime", "backend": "node22", "scenario": "mcp-tools-list", "baseline": true, "smoke": true },
+    { "id": "runtime.bun.mcp", "group": "runtime", "backend": "bun", "scenario": "mcp-tools-list" },
+    { "id": "runtime.deno.mcp", "group": "runtime", "backend": "deno", "scenario": "mcp-tools-list" },
+
+    { "id": "runtime.node22.spawn", "group": "runtime", "backend": "node22", "scenario": "spawn-overhead", "baseline": true },
+    { "id": "runtime.bun.spawn", "group": "runtime", "backend": "bun", "scenario": "spawn-overhead" },
+    { "id": "runtime.deno.spawn", "group": "runtime", "backend": "deno", "scenario": "spawn-overhead" },
+
+    { "id": "runtime.uvx.perfdigest-mcp", "group": "runtime", "backend": "uvx", "scenario": "perfdigest-mcp-session-start" },
+
+    { "id": "worker.node.receipt", "group": "worker", "backend": "node-worker", "scenario": "exec-and-hash-receipt", "baseline": true },
+    { "id": "worker.go.receipt", "group": "worker", "backend": "go-worker-prototype", "scenario": "exec-and-hash-receipt" }
+  ]
+}
