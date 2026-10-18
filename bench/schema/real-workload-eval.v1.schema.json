@@ -340,6 +340,7 @@
                     "type": "string",
                     "enum": [
                       "codex_chatgpt_login",
+                      "agy_gemini_cli",
                       "deterministic_offline_fallback"
                     ]
                   },
@@ -626,6 +627,7 @@
                     "type": "string",
                     "enum": [
                       "codex_chatgpt_login",
+                      "agy_gemini_cli",
                       "deterministic_offline_fallback"
                     ]
                   },
@@ -912,6 +914,7 @@
                     "type": "string",
                     "enum": [
                       "codex_chatgpt_login",
+                      "agy_gemini_cli",
                       "deterministic_offline_fallback"
                     ]
                   },

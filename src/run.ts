@@ -7,7 +7,7 @@ import { manifestSchema } from './config.js';
 import { commandPassed, runCommand } from './commands.js';
 import { AgentError, codexAdapter, type AgentAdapter, type AgentCapabilities, type AgentErrorKind, type AgentPhase, type AgentTurn, type EvidenceDelivery } from './agents.js';
 import { DecisionsError, type DecisionsFailure } from './decisions.js';
-import { createDecisionProvider, type DecisionProvider } from './providers.js';
+import { createDecisionProvider, providerName, type DecisionProvider } from './providers.js';
 import { gatherEvidence } from './evidence.js';
 import { newRunDirectory, reportFile, writeJson } from './files.js';
 import { redact } from './environment.js';
@@ -30,10 +30,12 @@ export interface RunOptions {
   agentAdapter?: AgentAdapter;
   /** Explicit decision provider (e.g. mock provider in benchmarks). */
   decisionProvider?: DecisionProvider;
-  /** Bounded MCP session options (e.g. local responder command). */
+  /** Bounded MCP session options (e.g. local responder command or topN). */
   mcpSessionOptions?: PerfDigestSessionOptions;
   /** Controls MCP session reuse across reports within this investigation. */
   reuseMcpSession?: boolean;
+  /** Retains non-selected candidate digests from the same session when a route is accepted. */
+  includeCorroborating?: boolean;
 }
 
 export interface RunResult {
@@ -66,6 +68,9 @@ export interface RunResult {
 export async function investigate(options: RunOptions): Promise<RunResult> {
   const manifest = manifestSchema.parse(options.manifest);
   const workspace = await realpath(options.workspace);
+  if (options.decisionProvider && options.decisionProvider.name !== providerName(options.routing)) {
+    throw new Error('Injected provider does not match the explicit routing selection');
+  }
   // Fail before launching Codex or capture commands when the requested API mode lacks a key.
   const provider = options.decisionProvider ?? createDecisionProvider(options.routing, {
     ...(options.decisionsMockURL ? { decisionsMockURL: options.decisionsMockURL } : {}),
@@ -127,6 +132,7 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
         routing: options.routing, provider, signal, provenance,
         ...(options.mcpSessionOptions !== undefined ? { mcpSessionOptions: options.mcpSessionOptions } : {}),
         ...(options.reuseMcpSession !== undefined ? { reuseMcpSession: options.reuseMcpSession } : {}),
+        ...(options.includeCorroborating !== undefined ? { includeCorroborating: options.includeCorroborating } : {}),
         emit: (event, detail) => { if (event === 'routing.started') routingStarted = true; emit(event, detail); } });
       return evidence;
     })();
