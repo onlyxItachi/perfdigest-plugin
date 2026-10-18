@@ -86,7 +86,7 @@ PERFDIGEST_CLOUDFLARE_ACCOUNT_ID=YOUR_CLOUDFLARE_ACCOUNT_ID
 PERFDIGEST_CLOUDFLARE_API_TOKEN=YOUR_WORKERS_AI_TOKEN
 ```
 
-Then configure the installed CLI:
+Then configure the installed CLI (on `main`, you may also pass `--decision-model clef-flash|clef|clef-omni`; `clef-flash` is the default):
 
 ```bash
 chmod 600 /absolute/private/perfdigest.env
@@ -103,10 +103,12 @@ For OpenAI Decisions, use `PERFDIGEST_DECISIONS_API_KEY` in a **separate private
 | Getting started | [docs/SETUP.md](docs/SETUP.md) |
 | Hackathon demo | [docs/HACKATHON.md](docs/HACKATHON.md) |
 | Measurements & evaluation | [docs/EVALUATION.md](docs/EVALUATION.md) |
+| Runtime & MCP session-reuse benchmarks | [docs/BENCHMARKS.md](docs/BENCHMARKS.md) |
+| Real workload evaluation (CUDA, C++, PyTorch, Linux perf) | [docs/REAL_WORKLOAD_EVALUATION.md](docs/REAL_WORKLOAD_EVALUATION.md) |
 | Validation & compatibility | [docs/VALIDATION.md](docs/VALIDATION.md) |
 | Detailed reference | [docs/REFERENCE.md](docs/REFERENCE.md) |
 | Recorded Cloudflare demo | [examples/recorded-cloudflare/](examples/recorded-cloudflare/) |
-| GitHub release | [v0.1.0-hackathon](https://github.com/onlyxItachi/perfdigest-plugin/releases/tag/v0.1.0-hackathon) (built from `bc1d72f`; later README edits are not in that archive) |
+| GitHub release | [v0.1.0-hackathon](https://github.com/onlyxItachi/perfdigest-plugin/releases/tag/v0.1.0-hackathon) (built from `bc1d72f`; later community development on `main` is not in that archive) |
 
 **Security:** provider credentials are read only from a private env file outside the repository (mode 600). They are excluded from the Codex, profiler, verifier and MCP child processes, and never written to receipts. CI uses no credentials. This is environment isolation, not an OS sandbox.
 
