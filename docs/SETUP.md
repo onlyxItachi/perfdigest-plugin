@@ -29,11 +29,23 @@ Configuration is saved to the ignored `.perfdigest/config.json` with private per
 {
   "version": 1,
   "provider": "cloudflare",
-  "envFile": "/absolute/private/perfdigest.env"
+  "envFile": "/absolute/private/perfdigest.env",
+  "decisionModel": "clef-flash"
 }
 ```
 
 The local provider also stores its full `endpoint`. Hosted providers use their fixed service endpoint and refuse `--endpoint`. The local endpoint must be exactly `http://127.0.0.1:PORT/v1/systemone`, with an explicit port and no user information, query or fragment. Init makes one unauthenticated `GET /health` at that loopback address. A successful health response does not establish model identity or successful inference.
+
+## Cloudflare Clef model
+
+Cloudflare documents three Clef decision models with the same typed-question contract: [`clef-flash`](https://developers.cloudflare.com/workers-ai/models/clef-flash/) (default), [`clef`](https://developers.cloudflare.com/workers-ai/models/clef/) and [`clef-omni`](https://developers.cloudflare.com/workers-ai/models/clef-omni/). Select one explicitly; the name is saved as `decisionModel`, is not a secret, and is accepted only for the `cloudflare` provider:
+
+```bash
+perfdigest-plugin init --provider cloudflare --env-file /absolute/private/perfdigest.env --decision-model clef --yes
+perfdigest-plugin demo --provider cloudflare --decision-model clef-omni   # one-off override
+```
+
+Unknown names are refused before any request, and a response whose model identity differs from the requested model is rejected (`schema`); no other model is substituted. All three share SystemOne confidence semantics (0 at a uniform distribution, not calibrated, not correctness) and the unchanged 0.65 routing policy. The plugin sends text state only, even though `clef` documents image input and `clef-omni` documents image, audio and video. Only `clef-flash` has been exercised live by this project (12 and 18 October 2026); `clef` and `clef-omni` are covered by network-free contract tests until an explicit opt-in live check (`scripts/check-clef-live.mjs --provider cloudflare --decision-model clef`) qualifies them on your account. Cloudflare notes that text state can be truncated to fit a model's context window; PerfDigest keeps routing input bounded, but very large manifests should be checked against the selected model's documented limits.
 
 ## Optional Cloudflare connection check
 
@@ -44,7 +56,7 @@ perfdigest-plugin init --check-connection
 perfdigest-plugin init --provider cloudflare --env-file /absolute/private/perfdigest.env --yes --check-connection
 ```
 
-When Cloudflare is selected and its dedicated credentials and env file are valid, setup makes exactly one authenticated `GET /accounts/{account_id}/ai/models/search`, with `search=clef-flash`, `per_page=1` and `page=1`. Cloudflare documents **Workers AI Read** or **Workers AI Write** as accepted permissions for this [model-discovery endpoint](https://developers.cloudflare.com/api/resources/ai/subresources/models/methods/list/).
+When Cloudflare is selected and its dedicated credentials and env file are valid, setup makes exactly one authenticated `GET /accounts/{account_id}/ai/models/search`, with `search=` set to the configured model (default `clef-flash`), `per_page=1` and `page=1`. Cloudflare documents **Workers AI Read** or **Workers AI Write** as accepted permissions for this [model-discovery endpoint](https://developers.cloudflare.com/api/resources/ai/subresources/models/methods/list/).
 
 The request has a five-second deadline and a 64 KiB response limit. It follows no redirects, performs no retries or pagination, and does not display tokens, headers or upstream response bodies. Missing or invalid credentials/env files skip the request and fail prerequisite checks. A failed requested connection check also fails prerequisite checks, while preserving your provider selection.
 

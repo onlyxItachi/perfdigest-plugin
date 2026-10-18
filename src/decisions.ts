@@ -119,7 +119,7 @@ export function routingQuestion(reports: ReportSpec[]) {
 }
 /** Shared routing policy; provider confidence retains its own semantics. */
 export function routeDecision(raw: unknown, reports: ReportSpec[], metadata: Pick<RouteDecision,
-  'source' | 'transport' | 'provider' | 'confidenceSemantics' | 'inputSha256' | 'evidenceCount' | 'latencyMs'>): RouteDecision {
+  'source' | 'transport' | 'provider' | 'confidenceSemantics' | 'inputSha256' | 'evidenceCount' | 'latencyMs'> & Pick<Partial<RouteDecision>, 'requestedModel'>): RouteDecision {
   const decision = responseSchema.parse(raw);
   if (decision.usage.total_tokens !== undefined
       && decision.usage.total_tokens !== decision.usage.input_tokens + decision.usage.output_tokens) throw new DecisionsError('schema');

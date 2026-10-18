@@ -16,9 +16,12 @@ if (process.env.PERFDIGEST_RUN_CLEF_INTEGRATION !== '1') {
   process.exit(0);
 }
 const { values } = parseArgs({ options: { provider: { type: 'string' }, manifest: { type: 'string' },
-  workspace: { type: 'string' }, codex: { type: 'boolean' }, quantization: { type: 'string' } } });
+  workspace: { type: 'string' }, codex: { type: 'boolean' }, quantization: { type: 'string' },
+  'decision-model': { type: 'string' } } });
 if (!['cloudflare', 'local'].includes(values.provider)) throw new Error('Explicit --provider cloudflare|local required');
-const provider = providerName(values.provider); createDecisionProvider(provider); // Fail before capture/ChatGPT access.
+const provider = providerName(values.provider);
+const modelOption = values['decision-model'] !== undefined ? { cloudflareModel: values['decision-model'] } : {};
+createDecisionProvider(provider, modelOption); // Fail before capture/ChatGPT access; unknown models never reach the network.
 const parent = resolve('work/clef'); await mkdir(parent, { recursive: true });
 const workspace = values.workspace ? resolve(values.workspace) : await mkdtemp(join(parent, `${provider}-`));
 await mkdir(workspace, { recursive: true });
@@ -29,14 +32,14 @@ try {
   if (provider === 'local' && (!values.manifest || manifest.captures.length)) {
     throw new Error('Local Clef integration requires --manifest with captures=[]; capture before loading the local server');
   }
-  const result = await investigate({ workspace, manifest, routing: provider, agent: values.codex ? 'codex' : 'none',
+  const result = await investigate({ workspace, manifest, routing: provider, agent: values.codex ? 'codex' : 'none', ...modelOption,
     model: 'gpt-6-astra', effort: 'max', onEvent: (event, detail) => process.stderr.write(`${event}${detail ? `: ${redact(detail)}` : ''}\n`) });
   const decision = result.evidence?.decision;
   const receipt = { status: result.status, responseValidated: !!decision,
     inferenceValidated: provider === 'cloudflare' && !!decision, syntheticFixture: provider === 'cloudflare' ? false : null,
     identityBasis: provider === 'cloudflare' ? 'authenticated TLS request to fixed Workers AI model endpoint'
       : 'local SystemOne response only; correlate independent server/process/model-hash receipt before claiming genuine Clef inference',
-    provider, model: decision?.model ?? null, quantization: provider === 'local' ? values.quantization ?? null : null,
+    provider, model: decision?.model ?? null, requestedModel: decision?.requestedModel ?? null, quantization: provider === 'local' ? values.quantization ?? null : null,
     quantizationBasis: provider === 'local' ? 'caller label; verify against independent model hash receipt' : 'provider managed, not observed',
     requests: decision?.requests ?? null, decision: decision ?? null,
     evidence: result.evidence?.evidence.map(e => ({ id: e.report.id, reference: e.report.path, sha256: e.sha256, provenance: e.provenance })) ?? [],

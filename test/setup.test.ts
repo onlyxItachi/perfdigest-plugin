@@ -71,7 +71,7 @@ test('missing, malformed and unknown-field configurations never silently choose 
     assert.equal((error as Error).message, 'Configuration is not valid JSON.'); return true;
   });
   await writeFile(path, JSON.stringify({ version: 1, provider: 'offline', apiKey: 'do-not-repeat-this' }));
-  await assert.rejects(loadConfiguration(workspace), /only version, provider, endpoint and envFile/);
+  await assert.rejects(loadConfiguration(workspace), /only version, provider, endpoint, envFile and decisionModel/);
   for (const alias of ['clef-cloudflare', 'clef-local', 'openai-luna', 'decisions']) {
     await writeFile(path, JSON.stringify({ version: 1, provider: alias }));
     assert.equal((await loadConfiguration(workspace))?.provider, normalizeSetupProvider(alias));

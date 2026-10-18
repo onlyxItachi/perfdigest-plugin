@@ -23,6 +23,8 @@ export interface RunOptions {
   onEvent?: Emit;
   /** Explicit local HTTP contract test only; never reads a real API credential. */
   decisionsMockURL?: string;
+  /** Cloudflare Clef model (clef-flash, clef, clef-omni); an error for other providers. */
+  cloudflareModel?: string;
 }
 
 export interface RunResult {
@@ -49,8 +51,9 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
   const manifest = manifestSchema.parse(options.manifest);
   const workspace = await realpath(options.workspace);
   // Fail before launching Codex or capture commands when the requested API mode lacks a key.
-  const provider = createDecisionProvider(options.routing,
-    options.decisionsMockURL ? { decisionsMockURL: options.decisionsMockURL } : {});
+  const provider = createDecisionProvider(options.routing, {
+    ...(options.decisionsMockURL ? { decisionsMockURL: options.decisionsMockURL } : {}),
+    ...(options.cloudflareModel !== undefined ? { cloudflareModel: options.cloudflareModel } : {}) });
   const directory = await newRunDirectory(workspace);
   const start = performance.now();
   const controller = new AbortController();
