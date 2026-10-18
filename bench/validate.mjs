@@ -9,7 +9,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { manifestSchema, mcpReuseResultSchema, realWorkloadEvalResultSchema, resultSchema } from './schema/formats.mjs';
+import { manifestSchema, mcpReuseResultSchema, realWorkloadEvalResultSchema, resultSchema, lifecycleBenchmarkResultSchema } from './schema/formats.mjs';
 
 const benchDir = dirname(fileURLToPath(import.meta.url));
 const listJson = async (dir) => (await readdir(join(benchDir, dir)).catch(() => [])).filter((f) => f.endsWith('.json')).map((f) => join(benchDir, dir, f));
@@ -31,6 +31,8 @@ function selectSchema(doc) {
       return { kind: 'mcp-reuse', schema: mcpReuseResultSchema };
     case 'perfdigest.real-workload-eval.v1':
       return { kind: 'real-workload-eval', schema: realWorkloadEvalResultSchema };
+    case 'perfdigest.lifecycle-benchmark.v1':
+      return { kind: 'lifecycle-benchmark', schema: lifecycleBenchmarkResultSchema };
     default:
       return { kind: 'unknown', schema: resultSchema };
   }
@@ -100,6 +102,18 @@ for (const file of files) {
       }
     }
   }
+  if (parsed.success && kind === 'lifecycle-benchmark') {
+    for (const cell of doc.tableA_workerReceipt ?? []) {
+      if (cell.parity?.status !== 'pass') {
+        problems.push(`tableA_workerReceipt.${cell.id}: parity.status must be "pass"`);
+      }
+    }
+    for (const cell of doc.tableB_investigateOrchestration ?? []) {
+      if (cell.parity?.status !== 'pass') {
+        problems.push(`tableB_investigateOrchestration.${cell.id}: parity.status must be "pass"`);
+      }
+    }
+  }
   if (problems.length) {
     failures++;
     console.error(`FAIL ${file}\n  ${problems.join('\n  ')}`);
@@ -110,7 +124,9 @@ for (const file of files) {
         ? `mcp-reuse, ${Object.keys(doc.multiReportWorkflows).length} workflows`
         : kind === 'real-workload-eval'
           ? `real-workload-eval, ${doc.studies.length} studies`
-          : `result, ${doc.cells.length} cells`;
+          : kind === 'lifecycle-benchmark'
+            ? `lifecycle-benchmark, Table A: ${doc.tableA_workerReceipt.length} cells, Table B: ${doc.tableB_investigateOrchestration.length} cells, Table C: ${doc.tableC_costSeparation.length} entries`
+            : `result, ${doc.cells.length} cells`;
     console.log(`ok   ${file} (${summary})`);
   }
 }

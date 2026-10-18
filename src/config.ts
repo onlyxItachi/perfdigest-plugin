@@ -109,4 +109,9 @@ export interface EvidencePacket {
     provenance: 'perfdigest_mcp';
     digest: Record<string, unknown>;
   }>;
+  /**
+   * Optional non-selected candidate digests already computed during measured routing,
+   * included only when `includeCorroborating: true` and a route was accepted.
+   */
+  corroborating?: EvidencePacket['evidence'];
 }

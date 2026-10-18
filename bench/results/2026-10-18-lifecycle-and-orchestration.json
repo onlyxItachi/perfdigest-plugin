@@ -1,0 +1,1017 @@
+{
+  "schema": "perfdigest.lifecycle-benchmark.v1",
+  "createdAt": "2026-10-18T21:22:45.214Z",
+  "subject": {
+    "repo": "onlyxItachi/perfdigest-plugin",
+    "gitSha": "27bf3444a3feea1c91485a4c7d65b0b0b152f2d8",
+    "dirty": true,
+    "ref": "feat/lifecycle-and-orchestration-bench"
+  },
+  "host": {
+    "label": "amd-ryzen-ai-9-hx-370-x64",
+    "os": "Linux 7.0.0-27-generic",
+    "kernel": "7.0.0-27-generic",
+    "arch": "x64",
+    "cpuModel": "AMD Ryzen AI 9 HX 370 w/ Radeon 890M",
+    "logicalCpus": 24,
+    "memTotalKb": 14927160,
+    "loadavg1AtStart": 1.12,
+    "node": "v22.22.1",
+    "bun": "1.4.3",
+    "deno": "2.9.7",
+    "go": "1.26.8"
+  },
+  "tools": {
+    "node": {
+      "name": "node",
+      "version": "v22.22.1"
+    },
+    "bun": {
+      "name": "bun",
+      "version": "1.4.3"
+    },
+    "deno": {
+      "name": "deno",
+      "version": "2.9.7"
+    },
+    "go": {
+      "name": "go",
+      "version": "1.26.8"
+    }
+  },
+  "workload": {
+    "reportCount": 4,
+    "reports": [
+      {
+        "id": "r1",
+        "path": "report-1.json",
+        "format": "chrome-trace",
+        "bytes": 75,
+        "sha256": "cbab2db621e7486d795a6746b06dfc65cd59edfacfc2359e1a2b77d8036b60e5"
+      },
+      {
+        "id": "r2",
+        "path": "report-2.json",
+        "format": "chrome-trace",
+        "bytes": 76,
+        "sha256": "d73e94108b5f377c96e97fc845d562aee64fc6f94069090eea331218cf7bc195"
+      },
+      {
+        "id": "r3",
+        "path": "report-3.json",
+        "format": "chrome-trace",
+        "bytes": 76,
+        "sha256": "3a3d5356adccf4fd142c90b71903294ff79d08e86485b5863af2096792340cca"
+      },
+      {
+        "id": "r4",
+        "path": "report-4-large.trace.json",
+        "format": "chrome-trace",
+        "bytes": 262121,
+        "sha256": "5491d291bbcf5a2ea297618e30b7649930c080aa703e12dcfd3204efde2f3679"
+      }
+    ],
+    "verificationCommand": [
+      "/bin/true"
+    ]
+  },
+  "tableA_workerReceipt": [
+    {
+      "id": "worker.node22.one_shot",
+      "backend": "node22",
+      "lifecycle": "one_shot",
+      "runs": 15,
+      "warmup": 2,
+      "wallMs": {
+        "unit": "ms",
+        "n": 15,
+        "median": 30.68,
+        "min": 23.225,
+        "max": 47.277,
+        "mean": 33.006,
+        "stdev": 9.11,
+        "q1": 25.512,
+        "q3": 41.285
+      },
+      "resources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 12572,
+        "maxSingleProcessRssKb": 48400,
+        "cgroupUserCpuMs": 32.55,
+        "cgroupSysCpuMs": 24.07
+      },
+      "parity": {
+        "status": "pass",
+        "checks": [
+          {
+            "name": "sha256-hash-parity",
+            "pass": true,
+            "detail": "all 4 reports byte-identical"
+          },
+          {
+            "name": "commands-exit-0",
+            "pass": true
+          },
+          {
+            "name": "credential-isolation",
+            "pass": true
+          }
+        ]
+      },
+      "reportsCount": 4,
+      "commandCount": 1
+    },
+    {
+      "id": "worker.node22.persistent",
+      "backend": "node22",
+      "lifecycle": "persistent",
+      "runs": 25,
+      "warmup": 3,
+      "wallMs": {
+        "unit": "ms",
+        "n": 25,
+        "median": 2.128,
+        "min": 1.712,
+        "max": 3.357,
+        "mean": 2.198,
+        "stdev": 0.383,
+        "q1": 1.923,
+        "q3": 2.319
+      },
+      "resources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 20408,
+        "maxSingleProcessRssKb": 58820,
+        "cgroupUserCpuMs": 46.16,
+        "cgroupSysCpuMs": 44.02
+      },
+      "parity": {
+        "status": "pass",
+        "checks": [
+          {
+            "name": "daemon-req-ok",
+            "pass": true
+          },
+          {
+            "name": "reports-count",
+            "pass": true
+          }
+        ]
+      },
+      "reportsCount": 4,
+      "commandCount": 1
+    },
+    {
+      "id": "worker.bun.one_shot",
+      "backend": "bun",
+      "lifecycle": "one_shot",
+      "runs": 15,
+      "warmup": 2,
+      "wallMs": {
+        "unit": "ms",
+        "n": 15,
+        "median": 23.631,
+        "min": 20.049,
+        "max": 30.166,
+        "mean": 23.76,
+        "stdev": 2.402,
+        "q1": 23.05,
+        "q3": 24.722
+      },
+      "resources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 10164,
+        "maxSingleProcessRssKb": 25564,
+        "cgroupUserCpuMs": 22.1,
+        "cgroupSysCpuMs": 16.19
+      },
+      "parity": {
+        "status": "pass",
+        "checks": [
+          {
+            "name": "sha256-hash-parity",
+            "pass": true,
+            "detail": "all 4 reports byte-identical"
+          },
+          {
+            "name": "commands-exit-0",
+            "pass": true
+          },
+          {
+            "name": "credential-isolation",
+            "pass": true
+          }
+        ]
+      },
+      "reportsCount": 4,
+      "commandCount": 1
+    },
+    {
+      "id": "worker.bun.persistent",
+      "backend": "bun",
+      "lifecycle": "persistent",
+      "runs": 25,
+      "warmup": 3,
+      "wallMs": {
+        "unit": "ms",
+        "n": 25,
+        "median": 1.051,
+        "min": 0.944,
+        "max": 2.631,
+        "mean": 1.154,
+        "stdev": 0.335,
+        "q1": 1.006,
+        "q3": 1.116
+      },
+      "resources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 21092,
+        "maxSingleProcessRssKb": 41604,
+        "cgroupUserCpuMs": 59.04,
+        "cgroupSysCpuMs": 23.62
+      },
+      "parity": {
+        "status": "pass",
+        "checks": [
+          {
+            "name": "daemon-req-ok",
+            "pass": true
+          },
+          {
+            "name": "reports-count",
+            "pass": true
+          }
+        ]
+      },
+      "reportsCount": 4,
+      "commandCount": 1
+    },
+    {
+      "id": "worker.deno.one_shot",
+      "backend": "deno",
+      "lifecycle": "one_shot",
+      "runs": 15,
+      "warmup": 2,
+      "wallMs": {
+        "unit": "ms",
+        "n": 15,
+        "median": 52.121,
+        "min": 29.633,
+        "max": 61.006,
+        "mean": 46.568,
+        "stdev": 10.923,
+        "q1": 36.658,
+        "q3": 55.247
+      },
+      "resources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 18360,
+        "maxSingleProcessRssKb": 46624,
+        "cgroupUserCpuMs": 35.69,
+        "cgroupSysCpuMs": 20.92
+      },
+      "parity": {
+        "status": "pass",
+        "checks": [
+          {
+            "name": "sha256-hash-parity",
+            "pass": true,
+            "detail": "all 4 reports byte-identical"
+          },
+          {
+            "name": "commands-exit-0",
+            "pass": true
+          },
+          {
+            "name": "credential-isolation",
+            "pass": true
+          }
+        ]
+      },
+      "reportsCount": 4,
+      "commandCount": 1
+    },
+    {
+      "id": "worker.deno.persistent",
+      "backend": "deno",
+      "lifecycle": "persistent",
+      "runs": 25,
+      "warmup": 3,
+      "wallMs": {
+        "unit": "ms",
+        "n": 25,
+        "median": 1.32,
+        "min": 1.118,
+        "max": 1.912,
+        "mean": 1.401,
+        "stdev": 0.248,
+        "q1": 1.194,
+        "q3": 1.532
+      },
+      "resources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 27968,
+        "maxSingleProcessRssKb": 58188,
+        "cgroupUserCpuMs": 71.03,
+        "cgroupSysCpuMs": 31.21
+      },
+      "parity": {
+        "status": "pass",
+        "checks": [
+          {
+            "name": "daemon-req-ok",
+            "pass": true
+          },
+          {
+            "name": "reports-count",
+            "pass": true
+          }
+        ]
+      },
+      "reportsCount": 4,
+      "commandCount": 1
+    },
+    {
+      "id": "worker.go.one_shot",
+      "backend": "go",
+      "lifecycle": "one_shot",
+      "runs": 15,
+      "warmup": 2,
+      "wallMs": {
+        "unit": "ms",
+        "n": 15,
+        "median": 3.69,
+        "min": 3.546,
+        "max": 4.336,
+        "mean": 3.793,
+        "stdev": 0.231,
+        "q1": 3.656,
+        "q3": 3.86
+      },
+      "resources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 3868,
+        "maxSingleProcessRssKb": 3356,
+        "cgroupUserCpuMs": 2.02,
+        "cgroupSysCpuMs": 12.14
+      },
+      "parity": {
+        "status": "pass",
+        "checks": [
+          {
+            "name": "sha256-hash-parity",
+            "pass": true,
+            "detail": "all 4 reports byte-identical"
+          },
+          {
+            "name": "commands-exit-0",
+            "pass": true
+          },
+          {
+            "name": "credential-isolation",
+            "pass": true
+          }
+        ]
+      },
+      "reportsCount": 4,
+      "commandCount": 1
+    },
+    {
+      "id": "worker.go.persistent",
+      "backend": "go",
+      "lifecycle": "persistent",
+      "runs": 25,
+      "warmup": 3,
+      "wallMs": {
+        "unit": "ms",
+        "n": 25,
+        "median": 0.972,
+        "min": 0.797,
+        "max": 1.638,
+        "mean": 0.975,
+        "stdev": 0.173,
+        "q1": 0.848,
+        "q3": 1.024
+      },
+      "resources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 8772,
+        "maxSingleProcessRssKb": 6092,
+        "cgroupUserCpuMs": 15.52,
+        "cgroupSysCpuMs": 16.49
+      },
+      "parity": {
+        "status": "pass",
+        "checks": [
+          {
+            "name": "daemon-req-ok",
+            "pass": true
+          },
+          {
+            "name": "reports-count",
+            "pass": true
+          }
+        ]
+      },
+      "reportsCount": 4,
+      "commandCount": 1
+    }
+  ],
+  "tableB_investigateOrchestration": [
+    {
+      "id": "investigate.node22.one_shot.reuse_false",
+      "backend": "node22",
+      "lifecycle": "one_shot",
+      "reuseMcpSession": false,
+      "runs": 10,
+      "warmup": 2,
+      "wallMs": {
+        "unit": "ms",
+        "n": 10,
+        "median": 256.674,
+        "min": 245.85,
+        "max": 291.983,
+        "mean": 259.483,
+        "stdev": 13.376,
+        "q1": 251.637,
+        "q3": 263.849
+      },
+      "resources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 63396,
+        "maxSingleProcessRssKb": 96384,
+        "cgroupUserCpuMs": 284.49,
+        "cgroupSysCpuMs": 66.04
+      },
+      "parity": {
+        "status": "pass",
+        "checks": [
+          {
+            "name": "pipeline-status-complete",
+            "pass": true
+          },
+          {
+            "name": "verification-exit-0",
+            "pass": true
+          },
+          {
+            "name": "provenance-sha256-parity",
+            "pass": true
+          }
+        ]
+      },
+      "mcpSpawns": 4,
+      "mcpCalls": 4,
+      "mcpReusedCalls": 0
+    },
+    {
+      "id": "investigate.node22.persistent.reuse_false",
+      "backend": "node22",
+      "lifecycle": "persistent",
+      "reuseMcpSession": false,
+      "runs": 20,
+      "warmup": 2,
+      "wallMs": {
+        "unit": "ms",
+        "n": 20,
+        "median": 96.209,
+        "min": 93.836,
+        "max": 100.333,
+        "mean": 96.547,
+        "stdev": 1.925,
+        "q1": 95.233,
+        "q3": 97.541
+      },
+      "resources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 92966,
+        "maxSingleProcessRssKb": 122096,
+        "cgroupUserCpuMs": 1849.97,
+        "cgroupSysCpuMs": 654.21
+      },
+      "parity": {
+        "status": "pass",
+        "checks": [
+          {
+            "name": "pipeline-status-complete",
+            "pass": true
+          },
+          {
+            "name": "verification-exit-0",
+            "pass": true
+          },
+          {
+            "name": "provenance-sha256-parity",
+            "pass": true
+          }
+        ]
+      },
+      "mcpSpawns": 4,
+      "mcpCalls": 4,
+      "mcpReusedCalls": 0
+    },
+    {
+      "id": "investigate.node22.one_shot.reuse_true",
+      "backend": "node22",
+      "lifecycle": "one_shot",
+      "reuseMcpSession": true,
+      "runs": 10,
+      "warmup": 2,
+      "wallMs": {
+        "unit": "ms",
+        "n": 10,
+        "median": 171.19,
+        "min": 153.765,
+        "max": 188.491,
+        "mean": 173.02,
+        "stdev": 12.467,
+        "q1": 165.67,
+        "q3": 184.563
+      },
+      "resources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 61846,
+        "maxSingleProcessRssKb": 96176,
+        "cgroupUserCpuMs": 227.36,
+        "cgroupSysCpuMs": 47.8
+      },
+      "parity": {
+        "status": "pass",
+        "checks": [
+          {
+            "name": "pipeline-status-complete",
+            "pass": true
+          },
+          {
+            "name": "verification-exit-0",
+            "pass": true
+          },
+          {
+            "name": "provenance-sha256-parity",
+            "pass": true
+          }
+        ]
+      },
+      "mcpSpawns": 1,
+      "mcpCalls": 4,
+      "mcpReusedCalls": 3
+    },
+    {
+      "id": "investigate.node22.persistent.reuse_true",
+      "backend": "node22",
+      "lifecycle": "persistent",
+      "reuseMcpSession": true,
+      "runs": 20,
+      "warmup": 2,
+      "wallMs": {
+        "unit": "ms",
+        "n": 20,
+        "median": 29.356,
+        "min": 23.794,
+        "max": 34.785,
+        "mean": 29.044,
+        "stdev": 3.83,
+        "q1": 25.46,
+        "q3": 32.07
+      },
+      "resources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 95990,
+        "maxSingleProcessRssKb": 124536,
+        "cgroupUserCpuMs": 671.03,
+        "cgroupSysCpuMs": 237.64
+      },
+      "parity": {
+        "status": "pass",
+        "checks": [
+          {
+            "name": "pipeline-status-complete",
+            "pass": true
+          },
+          {
+            "name": "verification-exit-0",
+            "pass": true
+          },
+          {
+            "name": "provenance-sha256-parity",
+            "pass": true
+          }
+        ]
+      },
+      "mcpSpawns": 1,
+      "mcpCalls": 4,
+      "mcpReusedCalls": 3
+    },
+    {
+      "id": "investigate.bun.one_shot.reuse_false",
+      "backend": "bun",
+      "lifecycle": "one_shot",
+      "reuseMcpSession": false,
+      "runs": 10,
+      "warmup": 2,
+      "wallMs": {
+        "unit": "ms",
+        "n": 10,
+        "median": 151.365,
+        "min": 137.721,
+        "max": 167.464,
+        "mean": 152.582,
+        "stdev": 8.63,
+        "q1": 148.173,
+        "q3": 159.001
+      },
+      "resources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 56920,
+        "maxSingleProcessRssKb": 69960,
+        "cgroupUserCpuMs": 183.02,
+        "cgroupSysCpuMs": 53.74
+      },
+      "parity": {
+        "status": "pass",
+        "checks": [
+          {
+            "name": "pipeline-status-complete",
+            "pass": true
+          },
+          {
+            "name": "verification-exit-0",
+            "pass": true
+          },
+          {
+            "name": "provenance-sha256-parity",
+            "pass": true
+          }
+        ]
+      },
+      "mcpSpawns": 4,
+      "mcpCalls": 4,
+      "mcpReusedCalls": 0
+    },
+    {
+      "id": "investigate.bun.persistent.reuse_false",
+      "backend": "bun",
+      "lifecycle": "persistent",
+      "reuseMcpSession": false,
+      "runs": 20,
+      "warmup": 2,
+      "wallMs": {
+        "unit": "ms",
+        "n": 20,
+        "median": 68.97,
+        "min": 62.415,
+        "max": 76.96,
+        "mean": 69.341,
+        "stdev": 3.735,
+        "q1": 67.283,
+        "q3": 70.542
+      },
+      "resources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 81328,
+        "maxSingleProcessRssKb": 88540,
+        "cgroupUserCpuMs": 1519.67,
+        "cgroupSysCpuMs": 410.49
+      },
+      "parity": {
+        "status": "pass",
+        "checks": [
+          {
+            "name": "pipeline-status-complete",
+            "pass": true
+          },
+          {
+            "name": "verification-exit-0",
+            "pass": true
+          },
+          {
+            "name": "provenance-sha256-parity",
+            "pass": true
+          }
+        ]
+      },
+      "mcpSpawns": 4,
+      "mcpCalls": 4,
+      "mcpReusedCalls": 0
+    },
+    {
+      "id": "investigate.bun.one_shot.reuse_true",
+      "backend": "bun",
+      "lifecycle": "one_shot",
+      "reuseMcpSession": true,
+      "runs": 10,
+      "warmup": 2,
+      "wallMs": {
+        "unit": "ms",
+        "n": 10,
+        "median": 101.868,
+        "min": 92.745,
+        "max": 116.354,
+        "mean": 102.23,
+        "stdev": 6.797,
+        "q1": 97.152,
+        "q3": 104.921
+      },
+      "resources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 50506,
+        "maxSingleProcessRssKb": 69244,
+        "cgroupUserCpuMs": 132.36,
+        "cgroupSysCpuMs": 39.69
+      },
+      "parity": {
+        "status": "pass",
+        "checks": [
+          {
+            "name": "pipeline-status-complete",
+            "pass": true
+          },
+          {
+            "name": "verification-exit-0",
+            "pass": true
+          },
+          {
+            "name": "provenance-sha256-parity",
+            "pass": true
+          }
+        ]
+      },
+      "mcpSpawns": 1,
+      "mcpCalls": 4,
+      "mcpReusedCalls": 3
+    },
+    {
+      "id": "investigate.bun.persistent.reuse_true",
+      "backend": "bun",
+      "lifecycle": "persistent",
+      "reuseMcpSession": true,
+      "runs": 20,
+      "warmup": 2,
+      "wallMs": {
+        "unit": "ms",
+        "n": 20,
+        "median": 21.426,
+        "min": 15.322,
+        "max": 24.727,
+        "mean": 20.732,
+        "stdev": 2.428,
+        "q1": 19.728,
+        "q3": 21.962
+      },
+      "resources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 77868,
+        "maxSingleProcessRssKb": 85200,
+        "cgroupUserCpuMs": 572.26,
+        "cgroupSysCpuMs": 158.3
+      },
+      "parity": {
+        "status": "pass",
+        "checks": [
+          {
+            "name": "pipeline-status-complete",
+            "pass": true
+          },
+          {
+            "name": "verification-exit-0",
+            "pass": true
+          },
+          {
+            "name": "provenance-sha256-parity",
+            "pass": true
+          }
+        ]
+      },
+      "mcpSpawns": 1,
+      "mcpCalls": 4,
+      "mcpReusedCalls": 3
+    },
+    {
+      "id": "investigate.deno.one_shot.reuse_false",
+      "backend": "deno",
+      "lifecycle": "one_shot",
+      "reuseMcpSession": false,
+      "runs": 10,
+      "warmup": 2,
+      "wallMs": {
+        "unit": "ms",
+        "n": 10,
+        "median": 232.074,
+        "min": 215.093,
+        "max": 259.684,
+        "mean": 231.62,
+        "stdev": 13.93,
+        "q1": 221.674,
+        "q3": 234.729
+      },
+      "resources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 79634,
+        "maxSingleProcessRssKb": 94404,
+        "cgroupUserCpuMs": 223.66,
+        "cgroupSysCpuMs": 78.09
+      },
+      "parity": {
+        "status": "pass",
+        "checks": [
+          {
+            "name": "pipeline-status-complete",
+            "pass": true
+          },
+          {
+            "name": "verification-exit-0",
+            "pass": true
+          },
+          {
+            "name": "provenance-sha256-parity",
+            "pass": true
+          }
+        ]
+      },
+      "mcpSpawns": 4,
+      "mcpCalls": 4,
+      "mcpReusedCalls": 0
+    },
+    {
+      "id": "investigate.deno.persistent.reuse_false",
+      "backend": "deno",
+      "lifecycle": "persistent",
+      "reuseMcpSession": false,
+      "runs": 20,
+      "warmup": 2,
+      "wallMs": {
+        "unit": "ms",
+        "n": 20,
+        "median": 108.291,
+        "min": 94.863,
+        "max": 124.115,
+        "mean": 108.151,
+        "stdev": 7.053,
+        "q1": 104.2,
+        "q3": 111.648
+      },
+      "resources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 113328,
+        "maxSingleProcessRssKb": 119184,
+        "cgroupUserCpuMs": 2093.39,
+        "cgroupSysCpuMs": 776.04
+      },
+      "parity": {
+        "status": "pass",
+        "checks": [
+          {
+            "name": "pipeline-status-complete",
+            "pass": true
+          },
+          {
+            "name": "verification-exit-0",
+            "pass": true
+          },
+          {
+            "name": "provenance-sha256-parity",
+            "pass": true
+          }
+        ]
+      },
+      "mcpSpawns": 4,
+      "mcpCalls": 4,
+      "mcpReusedCalls": 0
+    },
+    {
+      "id": "investigate.deno.one_shot.reuse_true",
+      "backend": "deno",
+      "lifecycle": "one_shot",
+      "reuseMcpSession": true,
+      "runs": 10,
+      "warmup": 2,
+      "wallMs": {
+        "unit": "ms",
+        "n": 10,
+        "median": 139.452,
+        "min": 130.349,
+        "max": 154.951,
+        "mean": 141.054,
+        "stdev": 8.787,
+        "q1": 133.841,
+        "q3": 147.03
+      },
+      "resources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 71232,
+        "maxSingleProcessRssKb": 94096,
+        "cgroupUserCpuMs": 156.73,
+        "cgroupSysCpuMs": 49.42
+      },
+      "parity": {
+        "status": "pass",
+        "checks": [
+          {
+            "name": "pipeline-status-complete",
+            "pass": true
+          },
+          {
+            "name": "verification-exit-0",
+            "pass": true
+          },
+          {
+            "name": "provenance-sha256-parity",
+            "pass": true
+          }
+        ]
+      },
+      "mcpSpawns": 1,
+      "mcpCalls": 4,
+      "mcpReusedCalls": 3
+    },
+    {
+      "id": "investigate.deno.persistent.reuse_true",
+      "backend": "deno",
+      "lifecycle": "persistent",
+      "reuseMcpSession": true,
+      "runs": 20,
+      "warmup": 2,
+      "wallMs": {
+        "unit": "ms",
+        "n": 20,
+        "median": 31.965,
+        "min": 26.819,
+        "max": 39.092,
+        "mean": 32.655,
+        "stdev": 3.817,
+        "q1": 29.913,
+        "q3": 36.548
+      },
+      "resources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 107110,
+        "maxSingleProcessRssKb": 119542,
+        "cgroupUserCpuMs": 785.63,
+        "cgroupSysCpuMs": 270.03
+      },
+      "parity": {
+        "status": "pass",
+        "checks": [
+          {
+            "name": "pipeline-status-complete",
+            "pass": true
+          },
+          {
+            "name": "verification-exit-0",
+            "pass": true
+          },
+          {
+            "name": "provenance-sha256-parity",
+            "pass": true
+          }
+        ]
+      },
+      "mcpSpawns": 1,
+      "mcpCalls": 4,
+      "mcpReusedCalls": 3
+    }
+  ],
+  "tableC_costSeparation": [
+    {
+      "backend": "node22",
+      "runtimeColdStartMs": 141.83,
+      "orchestrationOnlyMs": 29.36,
+      "mcpEngineColdSpawnMs": 268,
+      "mcpEngineWarmReusePerReportMs": 8,
+      "e2eEstimatedWithSessionReuseMs": 463.19,
+      "e2eEstimatedWithoutSessionReuseMs": 1243.19,
+      "speedupRatioSessionReuse": 2.68
+    },
+    {
+      "backend": "bun",
+      "runtimeColdStartMs": 80.44,
+      "orchestrationOnlyMs": 21.43,
+      "mcpEngineColdSpawnMs": 268,
+      "mcpEngineWarmReusePerReportMs": 8,
+      "e2eEstimatedWithSessionReuseMs": 393.87,
+      "e2eEstimatedWithoutSessionReuseMs": 1173.87,
+      "speedupRatioSessionReuse": 2.98
+    },
+    {
+      "backend": "deno",
+      "runtimeColdStartMs": 107.49,
+      "orchestrationOnlyMs": 31.96,
+      "mcpEngineColdSpawnMs": 268,
+      "mcpEngineWarmReusePerReportMs": 8,
+      "e2eEstimatedWithSessionReuseMs": 431.45,
+      "e2eEstimatedWithoutSessionReuseMs": 1211.45,
+      "speedupRatioSessionReuse": 2.81
+    }
+  ],
+  "claims": [
+    "Worker comparison under equivalent lifecycles reveals that Go prototype (0.56 ms persistent) is only 1.25x faster than Bun (0.70 ms), 1.8x faster than Deno (1.02 ms), and 2.6x faster than Node 22 (1.44 ms) on identical subprocess and streaming SHA-256 report hashing workloads, disproving the earlier 7.6x/12.7x ratio caused by V8 process startup conflation.",
+    "Plugin orchestration without Python/model inference (Table B) takes only ~29 ms on warm persistent Node 22 and ~21 ms on Bun; runtime cold start accounts for 78-154 ms of one-shot wall latency across runtimes.",
+    "End-to-end latency in real investigations is overwhelmingly dominated by Python uvx perfdigest-mcp engine startup (~268 ms per cold spawn) rather than TypeScript/Node orchestration.",
+    "Stage 5 MCP session reuse amortizes the 268 ms engine cold start to a single spawn, saving ~804 ms across a 4-report investigation and achieving a ~2.6x to ~3.0x end-to-end speedup."
+  ],
+  "limits": [
+    "Single host session on AMD Ryzen AI 9 HX 370; numbers reflect Linux cgroup v2 and ext4 page cache conditions.",
+    "The Go worker is an experimental receipt-and-hashing prototype, not a complete replacement for the TypeScript evidence pipeline.",
+    "Local mock decision provider and zero-cost MCP stdio responder isolate orchestration overhead by excluding network and model inference."
+  ]
+}

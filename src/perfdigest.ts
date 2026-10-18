@@ -6,6 +6,8 @@ import type { ReportSpec } from './config.js';
 export interface PerfDigestSessionOptions {
   /** Maximum summarize_report calls allowed on a single MCP session (1..16, default 8). */
   maxCalls?: number;
+  /** Number of top units requested from summarize_report (1..10, default 3). */
+  topN?: number;
   /** Maximum lifetime of the session in milliseconds (default 120_000). */
   maxLifetimeMs?: number;
   /** Timeout for initial MCP handshake in milliseconds (default 60_000). */
@@ -126,6 +128,10 @@ export function openPerfDigestSession(
   if (!Number.isInteger(maxCalls) || maxCalls < 1 || maxCalls > 16) {
     throw new Error('PerfDigestSession maxCalls must be an integer between 1 and 16');
   }
+  const topN = options.topN ?? 3;
+  if (!Number.isInteger(topN) || topN < 1 || topN > 10) {
+    throw new Error('PerfDigestSession topN must be an integer between 1 and 10');
+  }
   const maxLifetimeMs = options.maxLifetimeMs ?? 120_000;
   const connectTimeoutMs = options.connectTimeoutMs ?? 60_000;
   const callTimeoutMs = options.callTimeoutMs ?? 30_000;
@@ -135,6 +141,8 @@ export function openPerfDigestSession(
 
   let client: Client | null = null;
   let transport: StdioClientTransport | null = null;
+  let resolvedCommand: string | null = null;
+  let resolvedEnv: Record<string, string> | null = null;
   let stderr = '';
   let spawns = 0;
   let calls = 0;
@@ -204,12 +212,14 @@ export function openPerfDigestSession(
       calls++;
       try {
         if (!client || !transport) {
+          resolvedCommand ??= options.command ?? executable('uvx');
+          resolvedEnv ??= childEnvironment();
           const nextClient = new Client({ name: 'perfdigest-plugin', version: '0.1.0' });
           const nextTransport = new StdioClientTransport({
-            command: options.command ?? executable('uvx'),
+            command: resolvedCommand,
             args: options.args ?? ['perfdigest-mcp'],
             cwd: workspace,
-            env: childEnvironment(),
+            env: resolvedEnv,
             stderr: 'pipe',
           });
           stderr = '';
@@ -233,7 +243,7 @@ export function openPerfDigestSession(
         const activeClient = client!;
         return await withScopedSignal(effectiveSignal, callTimeoutMs, () => { tainted = true; void close(); }, async (scopedSignal) => {
           const result = await activeClient.callTool(
-            { name: 'summarize_report', arguments: { report_ref: absolutePath, format: report.format, top_n: 3 } },
+            { name: 'summarize_report', arguments: { report_ref: absolutePath, format: report.format, top_n: topN } },
             undefined,
             { timeout: callTimeoutMs, signal: scopedSignal },
           );

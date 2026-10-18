@@ -454,3 +454,103 @@ if (scenario === 'normal-reuse') {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test('configurable topN (1..10) preserves full digest units locally while bounding external router input to top-3, and includeCorroborating retains non-selected digests only on accepted routes', async () => {
+  const root = await testDirectory('mcp-topn-corroborating');
+  const priorPath = process.env.PATH;
+  try {
+    process.env.PATH = `${await fixtureUv(root)}${delimiter}${priorPath}`;
+    await writeFile(join(root, 'kineto-eager.json'), JSON.stringify({ totalUnits: 8 }));
+    await writeFile(join(root, 'kineto-compiled.json'), JSON.stringify({ totalUnits: 6 }));
+
+    assert.throws(() => openPerfDigestSession(root, undefined, { topN: 0 }), /between 1 and 10/);
+    assert.throws(() => openPerfDigestSession(root, undefined, { topN: 11 }), /between 1 and 10/);
+
+    const reports: ReportSpec[] = [
+      { id: 'eager', path: 'kineto-eager.json', format: 'kineto-trace', description: 'Eager Kineto trace' },
+      { id: 'compiled', path: 'kineto-compiled.json', format: 'kineto-trace', description: 'Compiled Kineto trace' },
+    ];
+
+    const { decisionsInput } = await import('../src/decisions.js');
+
+    let routerSummaryUnits: number[] = [];
+    const acceptProvider: DecisionProvider = {
+      name: 'cloudflare',
+      async select(issue, reps, _signal, measured) {
+        const payload = JSON.parse(decisionsInput(issue, reps, measured));
+        routerSummaryUnits = payload.reports.map((r: { evidence: { summary: { units: unknown[] } } }) => r.evidence.summary.units.length);
+        return {
+          selectedId: 'compiled',
+          confidence: 0.89,
+          reason: 'selected',
+          source: 'clef_cloudflare',
+          provider: 'cloudflare',
+          model: 'clef-flash',
+          confidenceSemantics: 'systemone_uniform_zero',
+          transport: 'local_mock',
+          requests: 1,
+          latencyMs: 2,
+          inputTokens: 30,
+          outputTokens: 0,
+          costUsd: null,
+        };
+      },
+    };
+
+    const accepted = await gatherEvidence({
+      workspace: root,
+      issue: 'Compare eager vs compiled Kineto traces',
+      reports,
+      routing: 'cloudflare',
+      provider: acceptProvider,
+      mcpSessionOptions: { topN: 6 },
+      includeCorroborating: true,
+    });
+
+    assert.deepEqual(routerSummaryUnits, [3, 3], 'External decision router summary remains bounded to 3 units');
+    assert.equal(accepted.status, 'complete');
+    assert.equal(accepted.evidence.length, 1);
+    assert.equal(accepted.evidence[0]!.report.id, 'compiled');
+    assert.equal((accepted.evidence[0]!.digest.units as unknown[]).length, 6);
+    assert.equal(accepted.corroborating?.length, 1);
+    assert.equal(accepted.corroborating?.[0]?.report.id, 'eager');
+    assert.equal((accepted.corroborating?.[0]?.digest.units as unknown[]).length, 6);
+
+    const abstainProvider: DecisionProvider = {
+      name: 'cloudflare',
+      async select() {
+        return {
+          selectedId: null,
+          confidence: 0.55,
+          reason: 'low_confidence',
+          source: 'clef_cloudflare',
+          provider: 'cloudflare',
+          model: 'clef-flash',
+          confidenceSemantics: 'systemone_uniform_zero',
+          transport: 'local_mock',
+          requests: 1,
+          latencyMs: 2,
+          inputTokens: 30,
+          outputTokens: 0,
+          costUsd: null,
+        };
+      },
+    };
+
+    const abstained = await gatherEvidence({
+      workspace: root,
+      issue: 'Compare eager vs compiled Kineto traces',
+      reports,
+      routing: 'cloudflare',
+      provider: abstainProvider,
+      mcpSessionOptions: { topN: 6 },
+      includeCorroborating: true,
+    });
+    assert.equal(abstained.status, 'needs_review');
+    assert.deepEqual(abstained.evidence, []);
+    assert.equal(abstained.corroborating, undefined, 'Abstention must never deliver corroborating digests');
+  } finally {
+    process.env.PATH = priorPath;
+    await rm(root, { recursive: true, force: true });
+  }
+});

@@ -244,7 +244,7 @@ export const mcpReuseResultSchema = z.object({
 
 const workloadArmResultSchema = z.object({
   arm: z.enum(['A_codex_alone', 'B_codex_perfdigest_mcp', 'C_codex_perfdigest_evidence']),
-  executionMode: z.enum(['codex_chatgpt_login', 'deterministic_offline_fallback']),
+  executionMode: z.enum(['codex_chatgpt_login', 'agy_gemini_cli', 'deterministic_offline_fallback']),
   wallMs: z.number().min(0),
   costBreakdownMs: z.object({
     agentExecutionOverheadMs: z.number().min(0),
@@ -376,3 +376,97 @@ export const realWorkloadEvalResultSchema = z.object({
   claims: z.array(nonEmpty).min(1),
   limits: z.array(nonEmpty).min(1),
 }).strict();
+
+export const workerReceiptCellSchema = z.object({
+  id: nonEmpty,
+  backend: z.enum(['node22', 'bun', 'deno', 'go']),
+  lifecycle: z.enum(['one_shot', 'persistent']),
+  runs: z.int().min(1),
+  warmup: z.int().min(0),
+  wallMs: statsSchema,
+  resources: z.object({
+    memoryCoverage: memoryCoverageSchema,
+    cgroupTreePeakKb: z.number().optional(),
+    maxSingleProcessRssKb: z.number().optional(),
+    cgroupUserCpuMs: z.number().optional(),
+    cgroupSysCpuMs: z.number().optional(),
+  }).strict(),
+  parity: paritySchema,
+  reportsCount: z.int().min(1),
+  commandCount: z.int().min(1),
+}).strict();
+
+export const investigateOrchestrationCellSchema = z.object({
+  id: nonEmpty,
+  backend: z.enum(['node22', 'bun', 'deno']),
+  lifecycle: z.enum(['one_shot', 'persistent']),
+  reuseMcpSession: z.boolean(),
+  runs: z.int().min(1),
+  warmup: z.int().min(0),
+  wallMs: statsSchema,
+  resources: z.object({
+    memoryCoverage: memoryCoverageSchema,
+    cgroupTreePeakKb: z.number().optional(),
+    maxSingleProcessRssKb: z.number().optional(),
+    cgroupUserCpuMs: z.number().optional(),
+    cgroupSysCpuMs: z.number().optional(),
+  }).strict(),
+  parity: paritySchema,
+  mcpSpawns: z.int().min(0),
+  mcpCalls: z.int().min(0),
+  mcpReusedCalls: z.int().min(0),
+}).strict();
+
+export const costSeparationEntrySchema = z.object({
+  backend: z.enum(['node22', 'bun', 'deno']),
+  runtimeColdStartMs: z.number(),
+  orchestrationOnlyMs: z.number(),
+  mcpEngineColdSpawnMs: z.number(),
+  mcpEngineWarmReusePerReportMs: z.number(),
+  e2eEstimatedWithSessionReuseMs: z.number(),
+  e2eEstimatedWithoutSessionReuseMs: z.number(),
+  speedupRatioSessionReuse: z.number(),
+}).strict();
+
+export const lifecycleBenchmarkResultSchema = z.object({
+  schema: z.literal('perfdigest.lifecycle-benchmark.v1'),
+  createdAt: z.iso.datetime(),
+  subject: z.object({
+    repo: nonEmpty,
+    gitSha: z.string().regex(/^[a-f0-9]{40}$/),
+    dirty: z.boolean(),
+    ref: z.string().optional(),
+  }).strict(),
+  host: z.object({
+    label: nonEmpty,
+    os: nonEmpty,
+    kernel: nonEmpty,
+    arch: nonEmpty,
+    cpuModel: nonEmpty,
+    logicalCpus: z.int().min(1),
+    memTotalKb: z.int().min(1),
+    loadavg1AtStart: z.number().min(0),
+    node: nonEmpty,
+    bun: z.string().nullable(),
+    deno: z.string().nullable(),
+    go: z.string().nullable(),
+  }).strict(),
+  tools: z.record(z.string(), toolSchema),
+  workload: z.object({
+    reportCount: z.int().min(1),
+    reports: z.array(z.object({
+      id: nonEmpty,
+      path: nonEmpty,
+      format: nonEmpty,
+      bytes: z.int().min(1),
+      sha256: sha256,
+    }).strict()).min(4),
+    verificationCommand: z.array(z.string()),
+  }).strict(),
+  tableA_workerReceipt: z.array(workerReceiptCellSchema).min(8),
+  tableB_investigateOrchestration: z.array(investigateOrchestrationCellSchema).min(6),
+  tableC_costSeparation: z.array(costSeparationEntrySchema).min(3),
+  claims: z.array(nonEmpty).min(1),
+  limits: z.array(nonEmpty).min(1),
+}).strict();
+

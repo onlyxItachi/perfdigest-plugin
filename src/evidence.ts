@@ -1,3 +1,4 @@
+import { realpath } from 'node:fs/promises';
 import type OpenAI from 'openai';
 import type { Emit, EvidencePacket, EvidenceProvenance, ReportSpec, RoutingMode } from './config.js';
 import { offlineSelection, selectReport } from './decisions.js';
@@ -13,13 +14,18 @@ export async function gatherEvidence(args: {
    * even when routing later abstains, is rejected or fails with an exception.
    */
   provenance?: EvidenceProvenance[];
-  /** Optional bounded session options (e.g. maxCalls or command override in qualification tests). */
+  /** Optional bounded session options (e.g. maxCalls, topN or command override in qualification tests). */
   mcpSessionOptions?: PerfDigestSessionOptions;
   /**
    * Controls whether candidate reports within this investigation share one bounded MCP session
    * (`true`, default) or open one fresh 1-call MCP session per report (`false`, controlled baseline).
    */
   reuseMcpSession?: boolean;
+  /**
+   * When true and a route is accepted, retains the other candidate digests already computed
+   * during measured routing in `packet.corroborating` without re-spawning PerfDigest MCP.
+   */
+  includeCorroborating?: boolean;
   /** Optional observer receiving deterministic MCP session stats once the session is closed. */
   onMcpSessionStats?: (stats: PerfDigestSessionStats) => void;
 }): Promise<EvidencePacket> {
@@ -29,11 +35,12 @@ export async function gatherEvidence(args: {
   if ((args.client && selectedProvider !== 'openai') || (args.client && args.provider)
       || (args.provider && args.provider.name !== selectedProvider)) throw new Error('Injected provider does not match the explicit routing selection');
   const provider = args.provider ?? (args.client ? undefined : createDecisionProvider(args.routing));
+  const workspaceRealpath = await realpath(args.workspace);
   const measuredRouting = selectedProvider !== 'offline';
   const reuseMcpSession = args.reuseMcpSession ?? true;
   const considered: EvidenceProvenance[] = [];
   const sharedSession: PerfDigestSession | null = reuseMcpSession
-    ? openPerfDigestSession(args.workspace, args.signal, {
+    ? openPerfDigestSession(workspaceRealpath, args.signal, {
         maxCalls: Math.min(16, Math.max(1, args.reports.length)),
         ...args.mcpSessionOptions,
       })
@@ -50,7 +57,7 @@ export async function gatherEvidence(args: {
     if (sharedSession) {
       return await sharedSession.digest(report, absolutePath, args.signal);
     }
-    const singleSession = openPerfDigestSession(args.workspace, args.signal, {
+    const singleSession = openPerfDigestSession(workspaceRealpath, args.signal, {
       ...args.mcpSessionOptions,
       maxCalls: 1,
     });
@@ -69,10 +76,10 @@ export async function gatherEvidence(args: {
 
   const collect = async (report: ReportSpec): Promise<EvidencePacket['evidence'][number]> => {
     args.signal?.throwIfAborted();
-    const before = await reportFile(args.workspace, report.path);
+    const before = await reportFile(args.workspace, report.path, workspaceRealpath);
     emit('digest.started', report.id);
     const digest = await digestOne(report, before.path);
-    const after = await reportFile(args.workspace, report.path);
+    const after = await reportFile(args.workspace, report.path, workspaceRealpath);
     if (before.sha256 !== after.sha256) throw new Error('Report changed while digesting; recapture and retry');
     const record: EvidenceProvenance = { id: report.id, reference: report.path, format: report.format, sha256: before.sha256,
       bytes: before.bytes, modifiedAt: before.modifiedAt, provenance: 'perfdigest_mcp', delivered: false };
@@ -100,7 +107,7 @@ export async function gatherEvidence(args: {
       : measuredRouting ? await selectReport(args.client!, args.issue, args.reports, args.signal, measured)
         : offlineSelection(args.reports);
     for (const entry of measured) {
-      if ((await reportFile(args.workspace, entry.report.path)).sha256 !== entry.sha256) {
+      if ((await reportFile(args.workspace, entry.report.path, workspaceRealpath)).sha256 !== entry.sha256) {
         throw new Error('Report changed while routing; recapture and retry');
       }
     }
@@ -109,8 +116,18 @@ export async function gatherEvidence(args: {
     const report = args.reports.find(r => r.id === decision.selectedId)!;
     const selected = measured.find(e => e.report.id === report.id) ?? await collect(report);
     for (const record of considered) if (record.id === report.id && record.sha256 === selected.sha256) record.delivered = true;
+    const corroborating = args.includeCorroborating
+      ? measured.filter(e => e.report.id !== report.id)
+      : undefined;
     emit('evidence.ready', report.id);
-    return { status: 'complete', routing: args.routing, decision, considered: [...considered], evidence: [selected] };
+    return {
+      status: 'complete',
+      routing: args.routing,
+      decision,
+      considered: [...considered],
+      evidence: [selected],
+      ...(corroborating && corroborating.length > 0 ? { corroborating } : {}),
+    };
   } finally {
     await sharedSession?.close();
     args.onMcpSessionStats?.(sharedSession ? sharedSession.stats() : { ...perReportAggregate });

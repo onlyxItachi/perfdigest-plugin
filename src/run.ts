@@ -7,10 +7,11 @@ import { manifestSchema } from './config.js';
 import { commandPassed, runCommand } from './commands.js';
 import { AgentError, codexAdapter, type AgentAdapter, type AgentCapabilities, type AgentErrorKind, type AgentPhase, type AgentTurn, type EvidenceDelivery } from './agents.js';
 import { DecisionsError, type DecisionsFailure } from './decisions.js';
-import { createDecisionProvider } from './providers.js';
+import { createDecisionProvider, providerName, type DecisionProvider } from './providers.js';
 import { gatherEvidence } from './evidence.js';
 import { newRunDirectory, reportFile, writeJson } from './files.js';
 import { redact } from './environment.js';
+import type { PerfDigestSessionOptions } from './perfdigest.js';
 
 export interface RunOptions {
   workspace: string;
@@ -27,6 +28,14 @@ export interface RunOptions {
   cloudflareModel?: string;
   /** Explicit adapter for agent 'generic' (or to override Codex in tests). Never chosen implicitly. */
   agentAdapter?: AgentAdapter;
+  /** Explicit decision provider (e.g. mock provider in benchmarks). */
+  decisionProvider?: DecisionProvider;
+  /** Bounded MCP session options (e.g. local responder command or topN). */
+  mcpSessionOptions?: PerfDigestSessionOptions;
+  /** Controls MCP session reuse across reports within this investigation. */
+  reuseMcpSession?: boolean;
+  /** Retains non-selected candidate digests from the same session when a route is accepted. */
+  includeCorroborating?: boolean;
 }
 
 export interface RunResult {
@@ -59,8 +68,11 @@ export interface RunResult {
 export async function investigate(options: RunOptions): Promise<RunResult> {
   const manifest = manifestSchema.parse(options.manifest);
   const workspace = await realpath(options.workspace);
+  if (options.decisionProvider && options.decisionProvider.name !== providerName(options.routing)) {
+    throw new Error('Injected provider does not match the explicit routing selection');
+  }
   // Fail before launching Codex or capture commands when the requested API mode lacks a key.
-  const provider = createDecisionProvider(options.routing, {
+  const provider = options.decisionProvider ?? createDecisionProvider(options.routing, {
     ...(options.decisionsMockURL ? { decisionsMockURL: options.decisionsMockURL } : {}),
     ...(options.cloudflareModel !== undefined ? { cloudflareModel: options.cloudflareModel } : {}) });
   const directory = await newRunDirectory(workspace);
@@ -98,7 +110,7 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
     const worker = (async () => {
       emit('evidence.prefetch.started');
       const oldReports = await Promise.all(manifest.reports.map(async r => {
-        try { return await reportFile(workspace, r.path); } catch { return null; }
+        try { return await reportFile(workspace, r.path, workspace); } catch { return null; }
       }));
       for (const capture of manifest.captures) {
         emit('capture.started', capture.command);
@@ -109,7 +121,7 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
       }
       if (manifest.captures.length) {
         for (let i = 0; i < manifest.reports.length; i++) {
-          const current = await reportFile(workspace, manifest.reports[i]!.path);
+          const current = await reportFile(workspace, manifest.reports[i]!.path, workspace);
           const old = oldReports[i];
           if (old && old.sha256 === current.sha256 && old.modifiedAt === current.modifiedAt) {
             throw new Error(`Capture did not refresh report ${manifest.reports[i]!.id}`);
@@ -118,6 +130,9 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
       }
       evidence = await gatherEvidence({ workspace, issue: manifest.issue, reports: manifest.reports,
         routing: options.routing, provider, signal, provenance,
+        ...(options.mcpSessionOptions !== undefined ? { mcpSessionOptions: options.mcpSessionOptions } : {}),
+        ...(options.reuseMcpSession !== undefined ? { reuseMcpSession: options.reuseMcpSession } : {}),
+        ...(options.includeCorroborating !== undefined ? { includeCorroborating: options.includeCorroborating } : {}),
         emit: (event, detail) => { if (event === 'routing.started') routingStarted = true; emit(event, detail); } });
       return evidence;
     })();
