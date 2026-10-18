@@ -1,0 +1,483 @@
+{
+  "schemaVersion": "perfdigest-stage5-mcp-reuse.v1",
+  "recordedAt": "2026-10-18T18:11:03.989Z",
+  "host": {
+    "hostId": "amd-ryzen-ai-9-hx-370-x64",
+    "cpu": "AMD Ryzen AI 9 HX 370 w/ Radeon 890M",
+    "cores": 24,
+    "arch": "x64",
+    "kernel": "7.0.0-27-generic",
+    "node": "v22.22.1"
+  },
+  "singleCallLatencyMs": {
+    "perfdigestMcp120": {
+      "coldSpawn": {
+        "unit": "ms",
+        "n": 10,
+        "median": 380.166,
+        "min": 355.372,
+        "max": 418.114,
+        "mean": 380.66,
+        "stdev": 16.818,
+        "q1": 374.132,
+        "q3": 385.513
+      },
+      "warmSessionReuse": {
+        "unit": "ms",
+        "n": 10,
+        "median": 1.112,
+        "min": 0.973,
+        "max": 1.156,
+        "mean": 1.087,
+        "stdev": 0.072,
+        "q1": 1.027,
+        "q3": 1.145
+      },
+      "savedPerReusedCallMs": 379.05
+    },
+    "perfdigestMcp130": {
+      "coldSpawn": {
+        "unit": "ms",
+        "n": 10,
+        "median": 485.756,
+        "min": 468.96,
+        "max": 519.9,
+        "mean": 488.233,
+        "stdev": 17.19,
+        "q1": 472.631,
+        "q3": 500.81
+      },
+      "warmSessionReuse": {
+        "unit": "ms",
+        "n": 10,
+        "median": 0.565,
+        "min": 0.438,
+        "max": 0.628,
+        "mean": 0.536,
+        "stdev": 0.069,
+        "q1": 0.471,
+        "q3": 0.589
+      },
+      "savedPerReusedCallMs": 485.19
+    }
+  },
+  "multiReportWorkflows": {
+    "reports_1_node22": {
+      "reportCount": 1,
+      "runtime": "node22",
+      "beforePerReportSpawn": {
+        "runs": 8,
+        "warmup": 2,
+        "wallMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 522.064,
+          "min": 498.645,
+          "max": 553.927,
+          "mean": 526.999,
+          "stdev": 21.095,
+          "q1": 511.772,
+          "q3": 548.701
+        },
+        "userCpuMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 545,
+          "min": 520,
+          "max": 570,
+          "mean": 543.75,
+          "stdev": 19.226,
+          "q1": 527.5,
+          "q3": 560
+        },
+        "sysCpuMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 55,
+          "min": 50,
+          "max": 70,
+          "mean": 56.25,
+          "stdev": 7.44,
+          "q1": 50,
+          "q3": 60
+        },
+        "peakRssKb": {
+          "unit": "KB",
+          "n": 8,
+          "median": 90028,
+          "min": 89748,
+          "max": 93052,
+          "mean": 90416.5,
+          "stdev": 1096.901,
+          "q1": 89841,
+          "q3": 90410
+        }
+      },
+      "afterSessionReuse": {
+        "runs": 8,
+        "warmup": 2,
+        "wallMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 498.544,
+          "min": 483.256,
+          "max": 518.523,
+          "mean": 499.294,
+          "stdev": 11.965,
+          "q1": 490.181,
+          "q3": 508.424
+        },
+        "userCpuMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 505,
+          "min": 490,
+          "max": 530,
+          "mean": 510,
+          "stdev": 15.119,
+          "q1": 500,
+          "q3": 522.5
+        },
+        "sysCpuMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 60,
+          "min": 50,
+          "max": 70,
+          "mean": 60,
+          "stdev": 7.559,
+          "q1": 57.5,
+          "q3": 62.5
+        },
+        "peakRssKb": {
+          "unit": "KB",
+          "n": 8,
+          "median": 90280,
+          "min": 90008,
+          "max": 90520,
+          "mean": 90270.5,
+          "stdev": 155.463,
+          "q1": 90177,
+          "q3": 90356
+        }
+      },
+      "delta": {
+        "savedWallMs": 23.52,
+        "speedupRatio": 1.05
+      }
+    },
+    "reports_4_node22": {
+      "reportCount": 4,
+      "runtime": "node22",
+      "beforePerReportSpawn": {
+        "runs": 8,
+        "warmup": 2,
+        "wallMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 1629.759,
+          "min": 1595.454,
+          "max": 1750.718,
+          "mean": 1645.061,
+          "stdev": 51.501,
+          "q1": 1609.471,
+          "q3": 1665.738
+        },
+        "userCpuMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 1540,
+          "min": 1480,
+          "max": 1660,
+          "mean": 1553.75,
+          "stdev": 54.232,
+          "q1": 1527.5,
+          "q3": 1575
+        },
+        "sysCpuMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 170,
+          "min": 150,
+          "max": 190,
+          "mean": 170,
+          "stdev": 14.142,
+          "q1": 160,
+          "q3": 175
+        },
+        "peakRssKb": {
+          "unit": "KB",
+          "n": 8,
+          "median": 92850,
+          "min": 89976,
+          "max": 93624,
+          "mean": 92604,
+          "stdev": 1133.631,
+          "q1": 92590,
+          "q3": 93137
+        }
+      },
+      "afterSessionReuse": {
+        "runs": 8,
+        "warmup": 2,
+        "wallMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 521.739,
+          "min": 501.369,
+          "max": 533.916,
+          "mean": 519.566,
+          "stdev": 11.017,
+          "q1": 513.222,
+          "q3": 526.897
+        },
+        "userCpuMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 540,
+          "min": 520,
+          "max": 550,
+          "mean": 537.5,
+          "stdev": 10.351,
+          "q1": 530,
+          "q3": 542.5
+        },
+        "sysCpuMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 50,
+          "min": 50,
+          "max": 60,
+          "mean": 53.75,
+          "stdev": 5.175,
+          "q1": 50,
+          "q3": 60
+        },
+        "peakRssKb": {
+          "unit": "KB",
+          "n": 8,
+          "median": 90206,
+          "min": 89264,
+          "max": 92648,
+          "mean": 90347.5,
+          "stdev": 1013.767,
+          "q1": 89881,
+          "q3": 90359
+        }
+      },
+      "delta": {
+        "savedWallMs": 1108.02,
+        "speedupRatio": 3.12
+      }
+    },
+    "reports_8_node22": {
+      "reportCount": 8,
+      "runtime": "node22",
+      "beforePerReportSpawn": {
+        "runs": 8,
+        "warmup": 2,
+        "wallMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 3081.867,
+          "min": 3018.067,
+          "max": 3315.068,
+          "mean": 3108.777,
+          "stdev": 97.766,
+          "q1": 3052.623,
+          "q3": 3122.36
+        },
+        "userCpuMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 2875,
+          "min": 2770,
+          "max": 3090,
+          "mean": 2887.5,
+          "stdev": 94.378,
+          "q1": 2850,
+          "q3": 2892.5
+        },
+        "sysCpuMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 300,
+          "min": 290,
+          "max": 320,
+          "mean": 301.25,
+          "stdev": 12.464,
+          "q1": 290,
+          "q3": 305
+        },
+        "peakRssKb": {
+          "unit": "KB",
+          "n": 8,
+          "median": 93852,
+          "min": 92964,
+          "max": 95004,
+          "mean": 93882.5,
+          "stdev": 617.53,
+          "q1": 93595,
+          "q3": 94052
+        }
+      },
+      "afterSessionReuse": {
+        "runs": 8,
+        "warmup": 2,
+        "wallMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 529.338,
+          "min": 508.938,
+          "max": 558.05,
+          "mean": 534.437,
+          "stdev": 15.876,
+          "q1": 526.968,
+          "q3": 547.125
+        },
+        "userCpuMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 545,
+          "min": 530,
+          "max": 570,
+          "mean": 547.5,
+          "stdev": 17.525,
+          "q1": 530,
+          "q3": 562.5
+        },
+        "sysCpuMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 60,
+          "min": 50,
+          "max": 60,
+          "mean": 57.5,
+          "stdev": 4.629,
+          "q1": 57.5,
+          "q3": 60
+        },
+        "peakRssKb": {
+          "unit": "KB",
+          "n": 8,
+          "median": 91464,
+          "min": 89960,
+          "max": 93632,
+          "mean": 91582.5,
+          "stdev": 1466.714,
+          "q1": 90306,
+          "q3": 92581
+        }
+      },
+      "delta": {
+        "savedWallMs": 2552.53,
+        "speedupRatio": 5.82
+      }
+    },
+    "reports_4_bun": {
+      "reportCount": 4,
+      "runtime": "bun-1.4.3",
+      "afterSessionReuse": {
+        "runs": 8,
+        "warmup": 2,
+        "wallMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 455.884,
+          "min": 442.395,
+          "max": 474.982,
+          "mean": 459.367,
+          "stdev": 12.734,
+          "q1": 452.196,
+          "q3": 472.035
+        },
+        "userCpuMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 450,
+          "min": 430,
+          "max": 470,
+          "mean": 448.75,
+          "stdev": 12.464,
+          "q1": 440,
+          "q3": 452.5
+        },
+        "sysCpuMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 65,
+          "min": 50,
+          "max": 70,
+          "mean": 61.25,
+          "stdev": 9.91,
+          "q1": 50,
+          "q3": 70
+        },
+        "peakRssKb": {
+          "unit": "KB",
+          "n": 8,
+          "median": 63074,
+          "min": 62984,
+          "max": 63548,
+          "mean": 63168,
+          "stdev": 198.497,
+          "q1": 63044,
+          "q3": 63290
+        }
+      }
+    },
+    "reports_4_deno_post_fix": {
+      "reportCount": 4,
+      "runtime": "deno-2.9.7",
+      "note": "Post-fix measurement after withScopedSignal + clearTimeout(deadlineTimer) resolved the 240s AbortSignal.timeout exit hang; not counted as a performance win over Node 22 reference.",
+      "afterSessionReuse": {
+        "runs": 8,
+        "warmup": 2,
+        "wallMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 475.859,
+          "min": 447.364,
+          "max": 543.248,
+          "mean": 482.459,
+          "stdev": 27.61,
+          "q1": 472.182,
+          "q3": 484.758
+        },
+        "userCpuMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 445,
+          "min": 420,
+          "max": 500,
+          "mean": 446.25,
+          "stdev": 24.458,
+          "q1": 430,
+          "q3": 450
+        },
+        "sysCpuMs": {
+          "unit": "ms",
+          "n": 8,
+          "median": 60,
+          "min": 40,
+          "max": 60,
+          "mean": 55,
+          "stdev": 7.559,
+          "q1": 50,
+          "q3": 60
+        },
+        "peakRssKb": {
+          "unit": "KB",
+          "n": 8,
+          "median": 90284,
+          "min": 89544,
+          "max": 90536,
+          "mean": 90154,
+          "stdev": 387.053,
+          "q1": 89914,
+          "q3": 90464
+        }
+      }
+    }
+  }
+}

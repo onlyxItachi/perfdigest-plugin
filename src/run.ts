@@ -66,8 +66,9 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
   const directory = await newRunDirectory(workspace);
   const start = performance.now();
   const controller = new AbortController();
-  const deadline = AbortSignal.timeout(240_000);
-  const signal = AbortSignal.any([controller.signal, deadline, ...(options.signal ? [options.signal] : [])]);
+  const deadlineTimer = setTimeout(() => controller.abort(new Error('Investigation timed out after 240000 ms')), 240_000);
+  deadlineTimer.unref?.();
+  const signal = options.signal ? AbortSignal.any([controller.signal, options.signal]) : controller.signal;
   const events: TimelineEvent[] = [];
   const emit: Emit = (event, detail) => {
     events.push({ event, at: new Date().toISOString(), elapsedMs: Math.round((performance.now() - start) * 100) / 100,
@@ -162,6 +163,7 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
     failure = redact(error instanceof Error ? error.message : String(error));
     status = 'failed'; emit('run.failed', failure);
   } finally {
+    clearTimeout(deadlineTimer);
     controller.abort();
   }
   emit('run.completed', status);
