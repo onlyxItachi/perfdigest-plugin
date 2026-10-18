@@ -243,7 +243,7 @@ export const mcpReuseResultSchema = z.object({
 }).strict();
 
 const workloadArmResultSchema = z.object({
-  arm: z.enum(['A_codex_alone', 'B_codex_perfdigest_mcp', 'C_codex_perfdigest_evidence']),
+  arm: z.enum(['A_codex_alone', 'B_codex_perfdigest_mcp', 'C_codex_perfdigest_evidence', 'C_opt_single_turn_compact']),
   executionMode: z.enum(['codex_chatgpt_login', 'agy_gemini_cli', 'deterministic_offline_fallback']),
   wallMs: z.number().min(0),
   costBreakdownMs: z.object({
@@ -285,6 +285,34 @@ const workloadArmResultSchema = z.object({
     falseConclusions: z.array(z.string()),
     checks: z.record(z.string(), z.boolean()),
     summary: nonEmpty,
+  }).strict(),
+}).strict();
+
+const studyOptimizationBreakdownSchema = z.object({
+  envelopeCompaction: z.object({
+    verboseEvidenceBytes: z.int().min(1),
+    compactEvidenceBytes: z.int().min(1),
+    savedBytes: z.int(),
+    byteReductionPct: z.number(),
+    verboseTokensEst: z.int().min(1),
+    compactTokensEst: z.int().min(1),
+    savedTokensEst: z.int(),
+    preservesAllUnitsMetricsNullsAndVerification: z.boolean(),
+  }).strict(),
+  singleTurnDelivery: z.object({
+    twoTurnWallMs: z.number().min(0),
+    singleTurnWallMs: z.number().min(0),
+    savedWallMs: z.number(),
+    wallSpeedupRatio: z.number().positive(),
+    twoTurnModelInferenceMs: z.number().min(0),
+    singleTurnModelInferenceMs: z.number().min(0),
+    savedModelInferenceMs: z.number(),
+    twoTurnModelInputTokens: z.int().min(0).nullable(),
+    singleTurnModelInputTokens: z.int().min(0).nullable(),
+    savedModelInputTokens: z.int().nullable(),
+    inputTokenReductionPct: z.number().nullable(),
+    twoTurnAccuracyScore: z.number().min(0).max(1),
+    singleTurnAccuracyScore: z.number().min(0).max(1),
   }).strict(),
 }).strict();
 
@@ -357,7 +385,9 @@ export const realWorkloadEvalResultSchema = z.object({
       A_codex_alone: workloadArmResultSchema,
       B_codex_perfdigest_mcp: workloadArmResultSchema,
       C_codex_perfdigest_evidence: workloadArmResultSchema,
+      C_opt_single_turn_compact: workloadArmResultSchema.optional(),
     }).strict(),
+    optimizationBreakdown: studyOptimizationBreakdownSchema.optional(),
   }).strict()).min(4),
   summary: z.object({
     totalStudies: z.int().min(4),
@@ -365,13 +395,44 @@ export const realWorkloadEvalResultSchema = z.object({
       A_codex_alone: z.number().min(0).max(1),
       B_codex_perfdigest_mcp: z.number().min(0).max(1),
       C_codex_perfdigest_evidence: z.number().min(0).max(1),
+      C_opt_single_turn_compact: z.number().min(0).max(1).optional(),
     }).strict(),
     totalFalseConclusionsByArm: z.object({
       A_codex_alone: z.int().min(0),
       B_codex_perfdigest_mcp: z.int().min(0),
       C_codex_perfdigest_evidence: z.int().min(0),
+      C_opt_single_turn_compact: z.int().min(0).optional(),
     }).strict(),
     validatedSpeedups: z.record(z.string(), z.number().positive()),
+    optimizationSummary: z.object({
+      trialsPerStudy: z.int().min(1),
+      envelopeCompaction: z.object({
+        meanVerboseEvidenceBytes: z.number().positive(),
+        meanCompactEvidenceBytes: z.number().positive(),
+        meanSavedBytes: z.number(),
+        meanByteReductionPct: z.number(),
+        meanVerboseTokensEst: z.number().positive(),
+        meanCompactTokensEst: z.number().positive(),
+        meanSavedTokensEst: z.number(),
+        smallerThanUnroutedArmBMcp: z.boolean(),
+      }).strict(),
+      singleTurnDelivery: z.object({
+        meanTwoTurnWallMs: z.number().positive(),
+        meanSingleTurnWallMs: z.number().positive(),
+        meanSavedWallMs: z.number(),
+        meanWallSpeedupRatio: z.number().positive(),
+        meanTwoTurnModelInferenceMs: z.number().positive(),
+        meanSingleTurnModelInferenceMs: z.number().positive(),
+        meanSavedModelInferenceMs: z.number(),
+        meanTwoTurnModelInputTokens: z.number().positive(),
+        meanSingleTurnModelInputTokens: z.number().positive(),
+        meanSavedModelInputTokens: z.number(),
+        meanInputTokenReductionPct: z.number(),
+        meanAccuracyTwoTurn: z.number().min(0).max(1),
+        meanAccuracySingleTurn: z.number().min(0).max(1),
+        totalFalseConclusionsSingleTurn: z.int().min(0),
+      }).strict(),
+    }).strict().optional(),
   }).strict(),
   claims: z.array(nonEmpty).min(1),
   limits: z.array(nonEmpty).min(1),

@@ -27,6 +27,7 @@ export type ProviderName = typeof providerNames[number];
 export type RoutingMode = ProviderName | 'decisions' | 'openai-luna' | 'clef-local' | 'clef-cloudflare';
 /** 'generic' requires an explicit adapter (CLI: --agent-command); nothing is selected implicitly. */
 export type AgentMode = 'none' | 'codex' | 'generic';
+export type AgentDeliveryMode = 'two_turn' | 'single_turn';
 
 export interface TimelineEvent {
   event: string;
