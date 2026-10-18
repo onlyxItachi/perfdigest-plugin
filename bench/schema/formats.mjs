@@ -244,7 +244,7 @@ export const mcpReuseResultSchema = z.object({
 
 const workloadArmResultSchema = z.object({
   arm: z.enum(['A_codex_alone', 'B_codex_perfdigest_mcp', 'C_codex_perfdigest_evidence']),
-  executionMode: z.enum(['codex_chatgpt_login', 'deterministic_offline_fallback']),
+  executionMode: z.enum(['codex_chatgpt_login', 'agy_gemini_cli', 'deterministic_offline_fallback']),
   wallMs: z.number().min(0),
   costBreakdownMs: z.object({
     agentExecutionOverheadMs: z.number().min(0),
