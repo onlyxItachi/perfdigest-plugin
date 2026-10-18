@@ -69,6 +69,9 @@ export async function benchmarkArm(options: {
   expected: SlowerRegion; expectedHashes: Record<string, string>; model?: string;
   effort?: ModelReasoningEffort; signal?: AbortSignal;
 }) {
+  if (options.agent !== 'none' && options.agent !== 'codex') {
+    throw new Error(`benchmarkArm only supports agent modes none and codex (received ${options.agent})`);
+  }
   const started = performance.now();
   const controller = new AbortController();
   const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(240_000), ...(options.signal ? [options.signal] : [])]);
