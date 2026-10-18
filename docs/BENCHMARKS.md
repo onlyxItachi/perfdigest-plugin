@@ -152,10 +152,88 @@ To guarantee an apples-to-apples comparison, [`bench/mcp-reuse-bench.mjs`](../be
 
 ---
 
-## 6. Explicit scope & limitations
+## 7. Stage 7 — Equivalent-Lifecycle (`One-Shot` vs. `Persistent`) & Orchestration-Cost Separation
+
+The Stage 7 benchmark in [`bench/bench-lifecycle.mjs`](../bench/bench-lifecycle.mjs) and [`bench/results/2026-10-18-lifecycle-and-orchestration.json`](../bench/results/2026-10-18-lifecycle-and-orchestration.json) addresses the two methodological weaknesses identified in our audit of earlier benchmarks (`bench/run-matrix.mjs`):
+1. **Cold-start conflation in worker comparison**: Earlier runs compared `worker.go.receipt` (`5.14 ms`) against `worker.node.receipt` (`39.00 ms`) only under one-shot cold process start, conflating ~26–30 ms V8/ESM process initialization with actual orchestration work.
+2. **Unseparated bundle in runtime demo**: Earlier measurements of `runtime.*.demo` (~404–606 ms) measured an unseparated bundle mixing runtime startup, capture subprocesses, Python `uvx perfdigest-mcp` cold start (~268 ms), and verification subprocesses.
+
+Stage 7 establishes an **Equivalent-Lifecycle & Orchestration-Only Benchmark** comparing **Node.js 22.22.1**, **Bun 1.4.3**, **Deno 2.9.7**, and **Go 1.26.8** under strictly identical lifecycle conditions (`one_shot` vs `persistent` stdio daemons) and explicit cost separation.
+
+### Table A: Worker Receipt Prototype Benchmark (Identical Workload: 4 reports, 1 cmd)
+
+All 4 backends execute the exact same workload over a 4-report workspace (3 small profile reports + 1 `256 KB` trace file to exercise streaming SHA-256 + 1 allowlisted `/bin/true` verification command):
+- **`one_shot` lifecycle ($N = 15$)**: Spawns a fresh worker process per run, measuring cold startup + execution + teardown.
+- **`persistent` lifecycle ($N = 25$ warm requests after 3 warmup requests)**: Runs a long-lived worker daemon reading newline-delimited JSON requests over `stdin` and writing JSON receipts on `stdout`.
+
+| Backend | Lifecycle | N (warmup) | Wall median (ms) | Wall IQR `[Q1..Q3]` (ms) | Wall p95 (ms) | cgroup Tree Peak (KB) | Max Single-Proc RSS (KB) | cgroup User / Sys CPU (ms) | Parity (`sha256` + exit 0) |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| `node22` *(baseline)* | `one_shot` | 15 (2) | **30.68** | `25.51..41.28` | 47.28 | 12,304 | 48,400 | 23.8 / 13.3 | `pass` (all 4 byte-identical) |
+| `node22` *(baseline)* | `persistent` | 25 (3) | **2.13** | `1.92..2.32` | 3.36 | 19,532 | 58,820 | 42.4 / 31.0 | `pass` (all 4 byte-identical) |
+| `bun` | `one_shot` | 15 (2) | **23.63** | `23.05..24.72` | 30.17 | 21,296 | 25,564 | 14.8 / 11.2 | `pass` (all 4 byte-identical) |
+| `bun` | `persistent` | 25 (3) | **1.05** | `1.01..1.12` | 2.63 | 23,540 | 41,604 | 18.4 / 15.6 | `pass` (all 4 byte-identical) |
+| `deno` | `one_shot` | 15 (2) | **52.12** | `36.66..55.25` | 61.01 | 38,420 | 46,624 | 34.1 / 20.8 | `pass` (all 4 byte-identical) |
+| `deno` | `persistent` | 25 (3) | **1.32** | `1.19..1.53` | 1.91 | 40,116 | 58,188 | 28.2 / 21.0 | `pass` (all 4 byte-identical) |
+| `go` *(prototype)* | `one_shot` | 15 (2) | **3.69** | `3.66..3.86` | 4.34 | 8,140 | 3,356 | 2.1 / 3.4 | `pass` (all 4 byte-identical) |
+| `go` *(prototype)* | `persistent` | 25 (3) | **0.97** | `0.85..1.02` | 1.64 | 8,776 | 6,092 | 8.4 / 11.6 | `pass` (all 4 byte-identical) |
+
+> **Key Takeaway**: Under a persistent daemon model, the Go prototype (`0.97 ms`) is only **1.08× faster than Bun (`1.05 ms`)**, **1.36× faster than Deno (`1.32 ms`)**, and **2.20× faster than Node 22 (`2.13 ms`)**. The earlier apparent 7.6×–12.7× gap was almost entirely an artifact of V8 process startup cold start, not core execution overhead.
+
+---
+
+### Table B: Full Plugin `investigate()` Orchestration-Only Benchmark
+
+Table B isolates pure TypeScript plugin orchestration by replacing `uvx perfdigest-mcp` with an in-process deterministic zero-latency mock `DecisionProvider` (`routing: "cloudflare"`) and a local zero-cost MCP stdio responder. This completely eliminates Python runtime startup (~268 ms) and model inference (~2–5 s), measuring exclusively:
+- Manifest schema validation (`manifestSchema.parse`)
+- Child process environment allowlisting (`childEnvironment`)
+- Pre- and post-digest artifact `realpath`, `stat`, and streaming SHA-256 hashing across 4 reports (including the `256 KB` trace file)
+- Bounded MCP JSON-RPC `initialize` + 4 `tools/call` (`summarize_report`) round-trips + `validateDigest`
+- Verification command subprocess spawn (`/bin/true`)
+- Atomic run receipt and report write (`run.json` + `report.md` with `0600` permissions)
+
+| Backend | Lifecycle | MCP Session Reuse | Runs (warmup) | Wall median (ms) | Wall IQR `[Q1..Q3]` (ms) | cgroup Tree Peak (KB) | Max Single-Proc RSS (KB) | Parity |
+| --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |
+| `node22` *(baseline)* | `one_shot` | `false` (1 spawn/rep) | 10 (2) | **256.67** | `251.64..263.85` | 63,174 | 96,384 | `pass` (`complete`, exit 0) |
+| `node22` *(baseline)* | `persistent` | `false` (1 spawn/rep) | 20 (2) | **96.21** | `95.23..97.54` | 121,400 | 122,096 | `pass` (`complete`, exit 0) |
+| `node22` *(baseline)* | `one_shot` | `true` (bounded reuse) | 10 (2) | **171.19** | `165.67..184.56` | 63,200 | 96,176 | `pass` (`complete`, exit 0) |
+| `node22` *(baseline)* | `persistent` | `true` (bounded reuse) | 20 (2) | **29.36** | `25.46..32.07` | 123,800 | 124,536 | `pass` (`complete`, exit 0) |
+| `bun` | `one_shot` | `false` (1 spawn/rep) | 10 (2) | **151.37** | `148.17..159.00` | 55,800 | 69,960 | `pass` (`complete`, exit 0) |
+| `bun` | `persistent` | `false` (1 spawn/rep) | 20 (2) | **68.97** | `67.28..70.54` | 86,400 | 88,540 | `pass` (`complete`, exit 0) |
+| `bun` | `one_shot` | `true` (bounded reuse) | 10 (2) | **101.87** | `97.15..104.92` | 55,200 | 69,244 | `pass` (`complete`, exit 0) |
+| `bun` | `persistent` | `true` (bounded reuse) | 20 (2) | **21.43** | `19.73..21.96` | 82,900 | 85,200 | `pass` (`complete`, exit 0) |
+| `deno` | `one_shot` | `false` (1 spawn/rep) | 10 (2) | **232.07** | `221.67..234.73` | 81,032 | 94,404 | `pass` (`complete`, exit 0) |
+| `deno` | `persistent` | `false` (1 spawn/rep) | 20 (2) | **108.29** | `104.20..111.65` | 111,190 | 119,184 | `pass` (`complete`, exit 0) |
+| `deno` | `one_shot` | `true` (bounded reuse) | 10 (2) | **139.45** | `133.84..147.03` | 70,288 | 94,096 | `pass` (`complete`, exit 0) |
+| `deno` | `persistent` | `true` (bounded reuse) | 20 (2) | **31.96** | `29.91..36.55` | 107,624 | 119,542 | `pass` (`complete`, exit 0) |
+
+---
+
+### Table C: End-to-End Cost Separation & Pipeline Decomposition
+
+By combining the pure orchestration latencies from Table B with the measured Stage 5 single-call engine costs (`268.00 ms` cold spawn, `8.00 ms` marginal cost per reused report), we decompose a full 4-report investigation into its exact structural constituents:
+
+$$\text{Latency}_{\text{reuse}} = \text{ColdStart} + \text{Orchestration} + \text{MCPEngine}_{\text{cold}} + 3 \times \text{MCPEngine}_{\text{warm}}$$
+$$\text{Latency}_{\text{noreuse}} = \text{ColdStart} + \text{Orchestration} + 4 \times \text{MCPEngine}_{\text{cold}}$$
+
+| Runtime | Runtime Cold Start (ms) | Orchestration Only (ms) | Real Python MCP Cold Start (ms) | Warm MCP Reuse / Report (ms) | E2E with Session Reuse (ms) | E2E without Session Reuse (ms) | End-to-End Speedup Ratio |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| **Node.js 22** *(baseline)* | 141.83 | **29.36** | 268.00 | 8.00 | **463.19** | 1,243.19 | **2.68×** |
+| **Bun 1.4.3** | 80.44 | **21.43** | 268.00 | 8.00 | **393.87** | 1,173.87 | **2.98×** |
+| **Deno 2.9.7** | 107.49 | **31.96** | 268.00 | 8.00 | **431.45** | 1,211.45 | **2.81×** |
+
+### Architectural Takeaways:
+1. **Local Orchestration is Negligible**: In all three runtimes, warm plugin orchestration (manifest validation, streaming SHA-256 over 256 KB, stdio JSON-RPC tool roundtrips, subprocess execution, atomic receipt writes) requires only **21.43 ms (Bun)**, **29.36 ms (Node 22)**, and **31.96 ms (Deno)**.
+2. **Python MCP Startup Dominates**: Unoptimized cold investigations spend >80% of their total wall time spawning Python `uvx perfdigest-mcp` processes (`268 ms` per report $\times$ 4 reports = `1,072 ms`).
+3. **Session Reuse Amortization**: Bounded MCP session reuse consolidates the 4 cold Python spawns into 1 spawn + 3 warm stdio calls (`268 ms + 24 ms = 292 ms`), eliminating ~780 ms of unnecessary engine startup overhead.
+4. **Where Backends Actually Differ**: Go's true advantage is cold CLI startup (3.69 ms cold vs 23–52 ms) and minimal memory footprint (3.3–6.1 MB RSS vs 25–96 MB). When running warm services or daemons, Node 22, Bun, and Deno achieve virtually identical orchestration latency (~21–32 ms).
+
+---
+
+## 8. Explicit scope & limitations
 
 - **Single host, single session**: All medians, IQRs, and resource figures apply strictly to `amd-ryzen-ai-9-hx-370-x64` (`Linux 7.0.0-27-generic`) and do not generalize to other CPUs, OS kernels, filesystems, or shared CI runners.
 - **1-report floor**: Single-report investigations (`K = 1`) still pay one initial `uvx perfdigest-mcp` startup (~288–404 ms); bounded session reuse eliminates $K - 1$ redundant Python/MCP startups when $K \ge 2$ candidate reports are summarized in a single investigation (such as multi-artifact CMake/Ninja/Clang or `ptxas` + `ncu` manifests).
 - **Warm OS page cache**: "Cold build" means the output directory is deleted before every run and incremental `.tsbuildinfo` state is absent; the OS filesystem cache and `node_modules/` remain warm.
 - **Deterministic local CLI agent in `agent_e2e`**: `agent.generic.go-cli.e2e` measures the full `perfdigest-agent/v1` stdio JSONL protocol, concurrent `analysis`/evidence overlap, session-continuation verification, and `review` evidence delivery using a compiled Go binary with zero network or LLM API calls; real workload evaluation with live Codex CLI turns is reported separately in `docs/REAL_WORKLOAD_EVALUATION.md`.
 - **Prototype boundary**: `bench/go-worker/` measures only `os/exec` + streaming `crypto/sha256` receipt generation and is not a replacement for the TypeScript evidence runner.
+

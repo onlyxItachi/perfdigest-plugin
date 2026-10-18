@@ -7,10 +7,11 @@ import { manifestSchema } from './config.js';
 import { commandPassed, runCommand } from './commands.js';
 import { AgentError, codexAdapter, type AgentAdapter, type AgentCapabilities, type AgentErrorKind, type AgentPhase, type AgentTurn, type EvidenceDelivery } from './agents.js';
 import { DecisionsError, type DecisionsFailure } from './decisions.js';
-import { createDecisionProvider } from './providers.js';
+import { createDecisionProvider, type DecisionProvider } from './providers.js';
 import { gatherEvidence } from './evidence.js';
 import { newRunDirectory, reportFile, writeJson } from './files.js';
 import { redact } from './environment.js';
+import type { PerfDigestSessionOptions } from './perfdigest.js';
 
 export interface RunOptions {
   workspace: string;
@@ -27,6 +28,12 @@ export interface RunOptions {
   cloudflareModel?: string;
   /** Explicit adapter for agent 'generic' (or to override Codex in tests). Never chosen implicitly. */
   agentAdapter?: AgentAdapter;
+  /** Explicit decision provider (e.g. mock provider in benchmarks). */
+  decisionProvider?: DecisionProvider;
+  /** Bounded MCP session options (e.g. local responder command). */
+  mcpSessionOptions?: PerfDigestSessionOptions;
+  /** Controls MCP session reuse across reports within this investigation. */
+  reuseMcpSession?: boolean;
 }
 
 export interface RunResult {
@@ -60,7 +67,7 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
   const manifest = manifestSchema.parse(options.manifest);
   const workspace = await realpath(options.workspace);
   // Fail before launching Codex or capture commands when the requested API mode lacks a key.
-  const provider = createDecisionProvider(options.routing, {
+  const provider = options.decisionProvider ?? createDecisionProvider(options.routing, {
     ...(options.decisionsMockURL ? { decisionsMockURL: options.decisionsMockURL } : {}),
     ...(options.cloudflareModel !== undefined ? { cloudflareModel: options.cloudflareModel } : {}) });
   const directory = await newRunDirectory(workspace);
@@ -118,6 +125,8 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
       }
       evidence = await gatherEvidence({ workspace, issue: manifest.issue, reports: manifest.reports,
         routing: options.routing, provider, signal, provenance,
+        ...(options.mcpSessionOptions !== undefined ? { mcpSessionOptions: options.mcpSessionOptions } : {}),
+        ...(options.reuseMcpSession !== undefined ? { reuseMcpSession: options.reuseMcpSession } : {}),
         emit: (event, detail) => { if (event === 'routing.started') routingStarted = true; emit(event, detail); } });
       return evidence;
     })();
