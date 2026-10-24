@@ -9,7 +9,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { manifestSchema, mcpReuseResultSchema, realWorkloadEvalResultSchema, resultSchema, lifecycleBenchmarkResultSchema, regressionCorpusSchema } from './schema/formats.mjs';
+import { manifestSchema, mcpReuseResultSchema, realWorkloadEvalResultSchema, resultSchema, lifecycleBenchmarkResultSchema, regressionCorpusSchema, multiModelEvalResultSchema } from './schema/formats.mjs';
 
 const benchDir = dirname(fileURLToPath(import.meta.url));
 const listJson = async (dir) => (await readdir(join(benchDir, dir)).catch(() => [])).filter((f) => f.endsWith('.json')).map((f) => join(benchDir, dir, f));
@@ -35,6 +35,8 @@ function selectSchema(doc) {
       return { kind: 'lifecycle-benchmark', schema: lifecycleBenchmarkResultSchema };
     case 'perfdigest.regression-corpus.v1':
       return { kind: 'regression-corpus', schema: regressionCorpusSchema };
+    case 'perfdigest.multi-model-eval.v1':
+      return { kind: 'multi-model-eval', schema: multiModelEvalResultSchema };
     default:
       return { kind: 'unknown', schema: resultSchema };
   }
@@ -140,7 +142,9 @@ for (const file of files) {
             ? `lifecycle-benchmark, Table A: ${doc.tableA_workerReceipt.length} cells, Table B: ${doc.tableB_investigateOrchestration.length} cells, Table B2: ${(doc.tableB2_liveMcpEndToEnd ?? []).length} cells, Table C: ${doc.tableC_costSeparation.length} entries, Table D: ${(doc.tableD_mcpServerLifecycle ?? []).length} cells`
             : kind === 'regression-corpus'
               ? `regression-corpus, ${doc.studies.length} studies`
-              : `result, ${doc.cells.length} cells`;
+              : kind === 'multi-model-eval'
+                ? `multi-model-eval, ${doc.summary.totalModels} models × ${doc.summary.totalStudies} studies (${doc.summary.totalEvaluations} evals)`
+                : `result, ${doc.cells.length} cells`;
     console.log(`ok   ${file} (${summary})`);
   }
 }

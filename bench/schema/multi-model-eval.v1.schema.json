@@ -1,0 +1,1493 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "perfdigest.multi-model-eval.v1"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+    },
+    "subject": {
+      "type": "object",
+      "properties": {
+        "repo": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gitSha": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "dirty": {
+          "type": "boolean"
+        },
+        "ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "repo",
+        "gitSha",
+        "dirty"
+      ],
+      "additionalProperties": false
+    },
+    "host": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "os": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kernel": {
+          "type": "string",
+          "minLength": 1
+        },
+        "arch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cpuModel": {
+          "type": "string",
+          "minLength": 1
+        },
+        "logicalCpus": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "memTotalKb": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "gpuModel": {
+          "type": "string",
+          "minLength": 1
+        },
+        "loadavg1AtStart": {
+          "type": "number",
+          "minimum": 0
+        },
+        "node": {
+          "type": "string",
+          "minLength": 1
+        },
+        "agyCli": {
+          "type": "string",
+          "minLength": 1
+        },
+        "claudeCli": {
+          "type": "string",
+          "minLength": 1
+        },
+        "go": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "label",
+        "os",
+        "kernel",
+        "arch",
+        "cpuModel",
+        "logicalCpus",
+        "memTotalKb",
+        "gpuModel",
+        "loadavg1AtStart",
+        "node",
+        "agyCli",
+        "claudeCli",
+        "go"
+      ],
+      "additionalProperties": false
+    },
+    "preflightSmokeTests": {
+      "type": "object",
+      "properties": {
+        "agyGemini38Flash": {
+          "type": "object",
+          "properties": {
+            "passed": {
+              "type": "boolean"
+            },
+            "cliVersion": {
+              "type": "string",
+              "minLength": 1
+            },
+            "modelId": {
+              "type": "string",
+              "const": "gemini-3.8-flash-high"
+            },
+            "supportedEfforts": {
+              "minItems": 3,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high"
+                ]
+              }
+            },
+            "highestSupportedEffort": {
+              "type": "string",
+              "const": "high"
+            },
+            "unsupportedMaxEffortError": {
+              "type": "string",
+              "minLength": 1
+            },
+            "streamingTelemetryVerified": {
+              "type": "boolean"
+            },
+            "observedEvents": {
+              "minItems": 4,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "smokeTimingsMs": {
+              "type": "object",
+              "properties": {
+                "cliInitMs": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "promptSubmittedMs": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "firstResponseDeltaMs": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "streamDoneMs": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "serverReportedDurationMs": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "totalProcessWallMs": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "cliInitMs",
+                "promptSubmittedMs",
+                "firstResponseDeltaMs",
+                "streamDoneMs",
+                "serverReportedDurationMs",
+                "totalProcessWallMs"
+              ],
+              "additionalProperties": false
+            },
+            "smokeUsage": {
+              "type": "object",
+              "properties": {
+                "inputTokens": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "outputTokens": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "thinkingTokens": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "cacheReadTokens": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "totalTokens": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "inputTokens",
+                "outputTokens",
+                "thinkingTokens",
+                "cacheReadTokens",
+                "totalTokens"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "passed",
+            "cliVersion",
+            "modelId",
+            "supportedEfforts",
+            "highestSupportedEffort",
+            "unsupportedMaxEffortError",
+            "streamingTelemetryVerified",
+            "observedEvents",
+            "smokeTimingsMs",
+            "smokeUsage"
+          ],
+          "additionalProperties": false
+        },
+        "claudeCodeIsolation": {
+          "type": "object",
+          "properties": {
+            "passed": {
+              "type": "boolean"
+            },
+            "cliVersion": {
+              "type": "string",
+              "minLength": 1
+            },
+            "authMethod": {
+              "type": "string",
+              "minLength": 1
+            },
+            "apiProvider": {
+              "type": "string",
+              "minLength": 1
+            },
+            "isolationFlags": {
+              "minItems": 6,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "isolationEnv": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "plantedCanaries": {
+              "type": "object",
+              "properties": {
+                "claudeMdCanary": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "dotClaudeMdCanary": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "mcpJsonCanaryServer": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "userPromptSubmitHookExit2": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "claudeMdCanary",
+                "dotClaudeMdCanary",
+                "mcpJsonCanaryServer",
+                "userPromptSubmitHookExit2"
+              ],
+              "additionalProperties": false
+            },
+            "observedInitState": {
+              "type": "object",
+              "properties": {
+                "toolsCount": {
+                  "type": "number",
+                  "const": 0
+                },
+                "mcpServersCount": {
+                  "type": "number",
+                  "const": 0
+                },
+                "slashCommandsCount": {
+                  "type": "number",
+                  "const": 0
+                },
+                "skillsCount": {
+                  "type": "number",
+                  "const": 0
+                },
+                "hookExecuted": {
+                  "type": "boolean",
+                  "const": false
+                },
+                "canaryLeakedInResponse": {
+                  "type": "boolean",
+                  "const": false
+                },
+                "responseText": {
+                  "type": "string",
+                  "const": "ISOLATED"
+                }
+              },
+              "required": [
+                "toolsCount",
+                "mcpServersCount",
+                "slashCommandsCount",
+                "skillsCount",
+                "hookExecuted",
+                "canaryLeakedInResponse",
+                "responseText"
+              ],
+              "additionalProperties": false
+            },
+            "smokeCostUsd": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "passed",
+            "cliVersion",
+            "authMethod",
+            "apiProvider",
+            "isolationFlags",
+            "isolationEnv",
+            "plantedCanaries",
+            "observedInitState",
+            "smokeCostUsd"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "agyGemini38Flash",
+        "claudeCodeIsolation"
+      ],
+      "additionalProperties": false
+    },
+    "models": {
+      "minItems": 6,
+      "maxItems": 6,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": [
+              "gemini-4-argon-high",
+              "gemini-3.8-flash-high",
+              "claude-fable-5-1",
+              "claude-opus-5-5",
+              "claude-sonnet-5-5",
+              "claude-haiku-5-5"
+            ]
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cli": {
+            "type": "string",
+            "enum": [
+              "agy",
+              "claude"
+            ]
+          },
+          "modelArg": {
+            "type": "string",
+            "minLength": 1
+          },
+          "highestSupportedEffort": {
+            "type": "string",
+            "enum": [
+              "high",
+              "max"
+            ]
+          },
+          "isolationMode": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cliResources": {
+            "type": "object",
+            "properties": {
+              "memoryCoverage": {
+                "type": "string",
+                "enum": [
+                  "cgroup_v2_tree_peak",
+                  "max_single_process_only_incomplete_tree",
+                  "none"
+                ]
+              },
+              "cgroupTreePeakKb": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "maxSingleProcessRssKb": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "cgroupUserCpuMs": {
+                "type": "number",
+                "minimum": 0
+              },
+              "cgroupSysCpuMs": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "memoryCoverage",
+              "maxSingleProcessRssKb"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "displayName",
+          "cli",
+          "modelArg",
+          "highestSupportedEffort",
+          "isolationMode",
+          "cliResources"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "studies": {
+      "minItems": 4,
+      "maxItems": 4,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "benchStudyRef": {
+            "type": "string",
+            "minLength": 1
+          },
+          "captureMode": {
+            "type": "string",
+            "enum": [
+              "live_hardware_capture",
+              "artifact_and_live_toolchain",
+              "artifact_level_boundary"
+            ]
+          },
+          "boundaryNote": {
+            "type": "string"
+          },
+          "candidateReports": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "format": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "rawBytes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "rawSha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "digestBytes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "compressionRatio": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "id",
+                "format",
+                "rawBytes",
+                "rawSha256",
+                "digestBytes",
+                "compressionRatio"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "validatedFix": {
+            "type": "object",
+            "properties": {
+              "attempted": {
+                "type": "boolean"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1
+              },
+              "verificationCommand": {
+                "type": "string",
+                "minLength": 1
+              },
+              "verificationExitCode": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "correctnessPassed": {
+                "type": "boolean"
+              },
+              "baselineMetric": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "unit": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "median": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "samples": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    }
+                  }
+                },
+                "required": [
+                  "name",
+                  "unit",
+                  "median",
+                  "samples"
+                ],
+                "additionalProperties": false
+              },
+              "fixedMetric": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "unit": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "median": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "samples": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    }
+                  }
+                },
+                "required": [
+                  "name",
+                  "unit",
+                  "median",
+                  "samples"
+                ],
+                "additionalProperties": false
+              },
+              "speedupRatio": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            "required": [
+              "attempted",
+              "description",
+              "verificationCommand",
+              "verificationExitCode",
+              "correctnessPassed",
+              "baselineMetric",
+              "fixedMetric",
+              "speedupRatio"
+            ],
+            "additionalProperties": false
+          },
+          "armPipelines": {
+            "type": "object",
+            "properties": {
+              "raw": {
+                "type": "object",
+                "properties": {
+                  "payloadBytes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "payloadTokensEst": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "orchestrationMs": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "mcpMs": {
+                    "type": "number",
+                    "const": 0
+                  },
+                  "routingMs": {
+                    "type": "number",
+                    "const": 0
+                  },
+                  "verificationMs": {
+                    "type": "number",
+                    "const": 0
+                  },
+                  "resources": {
+                    "type": "object",
+                    "properties": {
+                      "memoryCoverage": {
+                        "type": "string",
+                        "enum": [
+                          "cgroup_v2_tree_peak",
+                          "max_single_process_only_incomplete_tree",
+                          "none"
+                        ]
+                      },
+                      "cgroupTreePeakKb": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "maxSingleProcessRssKb": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "cgroupUserCpuMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "cgroupSysCpuMs": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "memoryCoverage",
+                      "maxSingleProcessRssKb"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "payloadBytes",
+                  "payloadTokensEst",
+                  "orchestrationMs",
+                  "mcpMs",
+                  "routingMs",
+                  "verificationMs",
+                  "resources"
+                ],
+                "additionalProperties": false
+              },
+              "mcp_digest": {
+                "type": "object",
+                "properties": {
+                  "payloadBytes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "payloadTokensEst": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "orchestrationMs": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "mcpMs": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "routingMs": {
+                    "type": "number",
+                    "const": 0
+                  },
+                  "verificationMs": {
+                    "type": "number",
+                    "const": 0
+                  },
+                  "mcpSpawns": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "mcpCalls": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "mcpReusedCalls": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "resources": {
+                    "type": "object",
+                    "properties": {
+                      "memoryCoverage": {
+                        "type": "string",
+                        "enum": [
+                          "cgroup_v2_tree_peak",
+                          "max_single_process_only_incomplete_tree",
+                          "none"
+                        ]
+                      },
+                      "cgroupTreePeakKb": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "maxSingleProcessRssKb": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "cgroupUserCpuMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "cgroupSysCpuMs": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "memoryCoverage",
+                      "maxSingleProcessRssKb"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "payloadBytes",
+                  "payloadTokensEst",
+                  "orchestrationMs",
+                  "mcpMs",
+                  "routingMs",
+                  "verificationMs",
+                  "mcpSpawns",
+                  "mcpCalls",
+                  "mcpReusedCalls",
+                  "resources"
+                ],
+                "additionalProperties": false
+              },
+              "compact_evidence": {
+                "type": "object",
+                "properties": {
+                  "verbosePayloadBytes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "compactPayloadBytes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "byteReductionPct": {
+                    "type": "number"
+                  },
+                  "payloadTokensEst": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "orchestrationMs": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "mcpMs": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "routingMs": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "verificationMs": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "mcpSpawns": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "mcpCalls": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "mcpReusedCalls": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "selectedReportId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenanceCount": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "verificationPassed": {
+                    "type": "boolean"
+                  },
+                  "resources": {
+                    "type": "object",
+                    "properties": {
+                      "memoryCoverage": {
+                        "type": "string",
+                        "enum": [
+                          "cgroup_v2_tree_peak",
+                          "max_single_process_only_incomplete_tree",
+                          "none"
+                        ]
+                      },
+                      "cgroupTreePeakKb": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "maxSingleProcessRssKb": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "cgroupUserCpuMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "cgroupSysCpuMs": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "memoryCoverage",
+                      "maxSingleProcessRssKb"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "verbosePayloadBytes",
+                  "compactPayloadBytes",
+                  "byteReductionPct",
+                  "payloadTokensEst",
+                  "orchestrationMs",
+                  "mcpMs",
+                  "routingMs",
+                  "verificationMs",
+                  "mcpSpawns",
+                  "mcpCalls",
+                  "mcpReusedCalls",
+                  "selectedReportId",
+                  "provenanceCount",
+                  "verificationPassed",
+                  "resources"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "raw",
+              "mcp_digest",
+              "compact_evidence"
+            ],
+            "additionalProperties": false
+          },
+          "evaluations": {
+            "minItems": 18,
+            "maxItems": 18,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "modelId": {
+                  "type": "string",
+                  "enum": [
+                    "gemini-4-argon-high",
+                    "gemini-3.8-flash-high",
+                    "claude-fable-5-1",
+                    "claude-opus-5-5",
+                    "claude-sonnet-5-5",
+                    "claude-haiku-5-5"
+                  ]
+                },
+                "cli": {
+                  "type": "string",
+                  "enum": [
+                    "agy",
+                    "claude"
+                  ]
+                },
+                "effort": {
+                  "type": "string",
+                  "enum": [
+                    "high",
+                    "max"
+                  ]
+                },
+                "arm": {
+                  "type": "string",
+                  "enum": [
+                    "raw",
+                    "mcp_digest",
+                    "compact_evidence"
+                  ]
+                },
+                "timingsMs": {
+                  "type": "object",
+                  "properties": {
+                    "orchestrationMs": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "mcpMs": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "routingMs": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "verificationMs": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "cliStartupMs": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "cliTimeToRequestMs": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "modelFirstResponseMs": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "cliReportedTtftMs": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "thinkingStreamMs": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "textOutputStreamMs": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "reasoningAndOutputStreamingMs": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "modelApiDurationMs": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "modelCliTotalWallMs": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "totalE2eWallMs": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "orchestrationMs",
+                    "mcpMs",
+                    "routingMs",
+                    "verificationMs",
+                    "cliStartupMs",
+                    "cliTimeToRequestMs",
+                    "modelFirstResponseMs",
+                    "cliReportedTtftMs",
+                    "thinkingStreamMs",
+                    "textOutputStreamMs",
+                    "reasoningAndOutputStreamingMs",
+                    "modelApiDurationMs",
+                    "modelCliTotalWallMs",
+                    "totalE2eWallMs"
+                  ],
+                  "additionalProperties": false
+                },
+                "tokens": {
+                  "type": "object",
+                  "properties": {
+                    "evidencePayloadBytes": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "evidencePayloadTokensEst": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "inputTokens": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "outputTokens": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "thinkingTokens": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "cacheReadInputTokens": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "cacheCreationInputTokens": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "evidencePayloadBytes",
+                    "evidencePayloadTokensEst",
+                    "inputTokens",
+                    "outputTokens",
+                    "thinkingTokens",
+                    "cacheReadInputTokens",
+                    "cacheCreationInputTokens"
+                  ],
+                  "additionalProperties": false
+                },
+                "cost": {
+                  "type": "object",
+                  "properties": {
+                    "costUsd": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "costBasis": {
+                      "type": "string",
+                      "enum": [
+                        "list",
+                        "unreported_subscription_or_quota"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "costUsd",
+                    "costBasis"
+                  ],
+                  "additionalProperties": false
+                },
+                "resources": {
+                  "type": "object",
+                  "properties": {
+                    "memoryCoverage": {
+                      "type": "string",
+                      "enum": [
+                        "cgroup_v2_tree_peak",
+                        "max_single_process_only_incomplete_tree",
+                        "none"
+                      ]
+                    },
+                    "cgroupTreePeakKb": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "maxSingleProcessRssKb": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "cgroupUserCpuMs": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "cgroupSysCpuMs": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "memoryCoverage",
+                    "maxSingleProcessRssKb"
+                  ],
+                  "additionalProperties": false
+                },
+                "diagnostics": {
+                  "type": "object",
+                  "properties": {
+                    "checksPassed": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "totalChecks": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "accuracyScore": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "falseConclusionsCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "falseConclusions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "checks": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "boolean"
+                      }
+                    },
+                    "summary": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "checksPassed",
+                    "totalChecks",
+                    "accuracyScore",
+                    "falseConclusionsCount",
+                    "falseConclusions",
+                    "checks",
+                    "summary"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "modelId",
+                "cli",
+                "effort",
+                "arm",
+                "timingsMs",
+                "tokens",
+                "cost",
+                "resources",
+                "diagnostics"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "benchStudyRef",
+          "captureMode",
+          "candidateReports",
+          "validatedFix",
+          "armPipelines",
+          "evaluations"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "summary": {
+      "type": "object",
+      "properties": {
+        "totalStudies": {
+          "type": "number",
+          "const": 4
+        },
+        "totalModels": {
+          "type": "number",
+          "const": 6
+        },
+        "totalEvaluations": {
+          "type": "number",
+          "const": 72
+        },
+        "totalClaudeApiCostUsd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "perModelSummary": {
+          "minItems": 6,
+          "maxItems": 6,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "modelId": {
+                "type": "string",
+                "enum": [
+                  "gemini-4-argon-high",
+                  "gemini-3.8-flash-high",
+                  "claude-fable-5-1",
+                  "claude-opus-5-5",
+                  "claude-sonnet-5-5",
+                  "claude-haiku-5-5"
+                ]
+              },
+              "cli": {
+                "type": "string",
+                "enum": [
+                  "agy",
+                  "claude"
+                ]
+              },
+              "effort": {
+                "type": "string",
+                "enum": [
+                  "high",
+                  "max"
+                ]
+              },
+              "arms": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "enum": [
+                    "raw",
+                    "mcp_digest",
+                    "compact_evidence"
+                  ]
+                },
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "meanAccuracyScore": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "totalChecksPassed": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "totalChecks": {
+                      "type": "number",
+                      "const": 20
+                    },
+                    "totalFalseConclusions": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "meanCliStartupMs": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "meanModelFirstResponseMs": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "meanReasoningAndOutputStreamingMs": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "meanModelApiDurationMs": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "meanTotalE2eWallMs": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "meanInputTokens": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "meanOutputTokens": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "meanThinkingTokens": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "totalCostUsd": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "meanAccuracyScore",
+                    "totalChecksPassed",
+                    "totalChecks",
+                    "totalFalseConclusions",
+                    "meanCliStartupMs",
+                    "meanModelFirstResponseMs",
+                    "meanReasoningAndOutputStreamingMs",
+                    "meanModelApiDurationMs",
+                    "meanTotalE2eWallMs",
+                    "meanInputTokens",
+                    "meanOutputTokens",
+                    "meanThinkingTokens",
+                    "totalCostUsd"
+                  ],
+                  "additionalProperties": false
+                },
+                "required": [
+                  "raw",
+                  "mcp_digest",
+                  "compact_evidence"
+                ]
+              }
+            },
+            "required": [
+              "modelId",
+              "cli",
+              "effort",
+              "arms"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "totalStudies",
+        "totalModels",
+        "totalEvaluations",
+        "totalClaudeApiCostUsd",
+        "perModelSummary"
+      ],
+      "additionalProperties": false
+    },
+    "claims": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "limits": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "required": [
+    "schema",
+    "createdAt",
+    "subject",
+    "host",
+    "preflightSmokeTests",
+    "models",
+    "studies",
+    "summary",
+    "claims",
+    "limits"
+  ],
+  "additionalProperties": false,
+  "$id": "https://github.com/onlyxItachi/perfdigest-plugin/bench/schema/multi-model-eval.v1.schema.json",
+  "title": "PerfDigest Multi-Model Real-Workload Evaluation Result v1"
+}
