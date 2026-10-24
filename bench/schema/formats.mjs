@@ -552,3 +552,32 @@ export const lifecycleBenchmarkResultSchema = z.object({
   limits: z.array(nonEmpty).min(1),
 }).strict();
 
+export const regressionCorpusSchema = z.object({
+  schema: z.literal('perfdigest.regression-corpus.v1'),
+  createdAt: z.iso.datetime(),
+  upstreamRepo: z.literal('onlyxItachi/PerfDigest-MCP-Bench'),
+  studies: z.array(z.object({
+    id: nonEmpty,
+    title: nonEmpty,
+    studyDoc: nonEmpty,
+    rawDir: nonEmpty,
+    question: nonEmpty,
+    expectedSelectedReportId: nonEmpty,
+    reports: z.array(z.object({
+      id: nonEmpty,
+      path: nonEmpty,
+      format: nonEmpty,
+      bytes: z.int().min(1),
+      sha256: sha256,
+      expectedDigest: z.object({
+        totalUnits: z.int().min(1),
+        topUnitName: nonEmpty,
+        topUnitIndex: z.int().min(0),
+        topUnitDomain: nonEmpty,
+        topUnitMetrics: z.record(z.string(), z.number().nullable()),
+      }).strict(),
+    }).strict()).min(1),
+  }).strict()).min(1),
+}).strict();
+
+

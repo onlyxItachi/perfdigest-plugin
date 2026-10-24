@@ -9,14 +9,14 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { manifestSchema, mcpReuseResultSchema, realWorkloadEvalResultSchema, resultSchema, lifecycleBenchmarkResultSchema } from './schema/formats.mjs';
+import { manifestSchema, mcpReuseResultSchema, realWorkloadEvalResultSchema, resultSchema, lifecycleBenchmarkResultSchema, regressionCorpusSchema } from './schema/formats.mjs';
 
 const benchDir = dirname(fileURLToPath(import.meta.url));
 const listJson = async (dir) => (await readdir(join(benchDir, dir)).catch(() => [])).filter((f) => f.endsWith('.json')).map((f) => join(benchDir, dir, f));
 const files = process.argv.slice(2).length ? process.argv.slice(2) : [...await listJson('manifests'), ...await listJson('results')];
 
 function expectedLayer(c) {
-  if (c.id === 'runtime.uvx.perfdigest-mcp') return 'engine';
+  if (c.id === 'runtime.uvx.perfdigest-mcp' || c.id.startsWith('engine.')) return 'engine';
   if (c.group === 'agent') return 'agent_e2e';
   return 'orchestration';
 }
@@ -33,6 +33,8 @@ function selectSchema(doc) {
       return { kind: 'real-workload-eval', schema: realWorkloadEvalResultSchema };
     case 'perfdigest.lifecycle-benchmark.v1':
       return { kind: 'lifecycle-benchmark', schema: lifecycleBenchmarkResultSchema };
+    case 'perfdigest.regression-corpus.v1':
+      return { kind: 'regression-corpus', schema: regressionCorpusSchema };
     default:
       return { kind: 'unknown', schema: resultSchema };
   }
@@ -136,7 +138,9 @@ for (const file of files) {
           ? `real-workload-eval, ${doc.studies.length} studies`
           : kind === 'lifecycle-benchmark'
             ? `lifecycle-benchmark, Table A: ${doc.tableA_workerReceipt.length} cells, Table B: ${doc.tableB_investigateOrchestration.length} cells, Table B2: ${(doc.tableB2_liveMcpEndToEnd ?? []).length} cells, Table C: ${doc.tableC_costSeparation.length} entries, Table D: ${(doc.tableD_mcpServerLifecycle ?? []).length} cells`
-            : `result, ${doc.cells.length} cells`;
+            : kind === 'regression-corpus'
+              ? `regression-corpus, ${doc.studies.length} studies`
+              : `result, ${doc.cells.length} cells`;
     console.log(`ok   ${file} (${summary})`);
   }
 }

@@ -17,7 +17,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -209,10 +208,8 @@ func validateEnvReference(p string, workspace string) (string, error) {
 		if info.Mode().Perm()&0o077 != 0 {
 			return "", errors.New("Env file must be owned by the current user and private; set its permissions to 600.")
 		}
-		if st, ok := info.Sys().(*syscall.Stat_t); ok {
-			if int(st.Uid) != os.Getuid() {
-				return "", errors.New("Env file must be owned by the current user and private; set its permissions to 600.")
-			}
+		if err := verifyFileOwnerMatch(info); err != nil {
+			return "", errors.New("Env file must be owned by the current user and private; set its permissions to 600.")
 		}
 	}
 	return reference, nil
@@ -624,12 +621,7 @@ func diagnosticsFor(ctx context.Context, cfg PluginConfiguration, workspace stri
 	}
 	for _, bc := range []binCheck{{"uvx", "uvx"}, {"codex", codexBin}} {
 		p, err := Executable(bc.binary, environment)
-		okExec := false
-		if err == nil {
-			if info, err := os.Stat(p); err == nil && info.Mode().IsRegular() && info.Mode()&0o111 != 0 {
-				okExec = true
-			}
-		}
+		okExec := err == nil && isExecutableFile(p)
 		if okExec {
 			msg := "Codex executable found; existing login was not checked."
 			if bc.name == "uvx" {

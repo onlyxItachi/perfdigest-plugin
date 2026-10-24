@@ -32,8 +32,12 @@ jobs:
         run: |
           uv tool install perfdigest-mcp==1.2.0 --with mcp==1.27.2
           UV_CACHE_DIR="$HOME/.cache/uv" uv tool run --from perfdigest-mcp==1.3.0 python -c "import perfdigest"
-      - name: Go unit tests, TypeScript 6 build, and network-mocked contract tests
-        run: go test ./... && npm run build && npm test
+      - name: Go unit tests, cross-platform binary build matrix, TypeScript 6 build, and network-mocked contract tests
+        run: go test ./... && node scripts/build-go.mjs --verify-cross && npm run build && npm test
+      - name: Checkout PerfDigest-MCP-Bench and run cross-repo schema & real-workload regression suite
+        run: |
+          git clone --depth 1 https://github.com/onlyxItachi/PerfDigest-MCP-Bench.git work/PerfDigest-MCP-Bench
+          node scripts/check-bench-regression.mjs --bench-dir work/PerfDigest-MCP-Bench
       - name: Real local MCP, CPU capture and independent verification
         run: npm run test:local
       - name: Real evidence through loopback Decisions HTTP and isolated Codex SDK orchestration
