@@ -1,7 +1,7 @@
 // Generate (default) or verify (--check) the committed JSON Schema files from formats.mjs.
 import { readFile, writeFile } from 'node:fs/promises';
 import { z } from 'zod';
-import { manifestSchema, mcpReuseResultSchema, realWorkloadEvalResultSchema, resultSchema, lifecycleBenchmarkResultSchema, regressionCorpusSchema } from './formats.mjs';
+import { manifestSchema, mcpReuseResultSchema, realWorkloadEvalResultSchema, resultSchema, lifecycleBenchmarkResultSchema, regressionCorpusSchema, multiModelEvalResultSchema } from './formats.mjs';
 
 const targets = [
   ['benchmark-result.v1.schema.json', resultSchema, 'PerfDigest benchmark result v1'],
@@ -10,6 +10,7 @@ const targets = [
   ['real-workload-eval.v1.schema.json', realWorkloadEvalResultSchema, 'PerfDigest real workload A/B/C evaluation result v1'],
   ['lifecycle-benchmark.v1.schema.json', lifecycleBenchmarkResultSchema, 'PerfDigest lifecycle and orchestration benchmark result v1'],
   ['regression-corpus.v1.schema.json', regressionCorpusSchema, 'PerfDigest Cross-Repo Real-Workload Regression Corpus v1'],
+  ['multi-model-eval.v1.schema.json', multiModelEvalResultSchema, 'PerfDigest Multi-Model Real-Workload Evaluation Result v1'],
 ];
 const check = process.argv.includes('--check');
 let stale = 0;

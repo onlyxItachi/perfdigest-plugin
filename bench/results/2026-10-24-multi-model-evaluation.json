@@ -1,0 +1,5160 @@
+{
+  "schema": "perfdigest.multi-model-eval.v1",
+  "createdAt": "2026-10-24T18:25:50.927Z",
+  "subject": {
+    "repo": "onlyxItachi/perfdigest-plugin",
+    "gitSha": "c0555f70148ae52ce6a9b490780286d24654bf3f",
+    "dirty": false,
+    "ref": "feat/multi-model-bench-qualification"
+  },
+  "host": {
+    "label": "amd-ryzen-ai-9-hx-370-x64",
+    "os": "Linux 7.0.0-27-generic",
+    "kernel": "7.0.0-27-generic",
+    "arch": "x64",
+    "cpuModel": "AMD Ryzen AI 9 HX 370 w/ Radeon 890M",
+    "logicalCpus": 24,
+    "memTotalKb": 14927160,
+    "gpuModel": "NVIDIA GeForce RTX 4060 Laptop GPU",
+    "loadavg1AtStart": 1.91,
+    "node": "v22.22.1",
+    "agyCli": "1.4.7",
+    "claudeCli": "2.1.310",
+    "go": "go1.26.8"
+  },
+  "preflightSmokeTests": {
+    "agyGemini38Flash": {
+      "passed": true,
+      "cliVersion": "1.4.7",
+      "modelId": "gemini-3.8-flash-high",
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "highestSupportedEffort": "high",
+      "unsupportedMaxEffortError": "invalid model selection (--model \"gemini-3.8-flash\" --effort \"max\"): gemini-3.8-flash has no \"max\" effort (available: low, medium, high)",
+      "streamingTelemetryVerified": true,
+      "observedEvents": [
+        "init",
+        "step_update:user_input:DONE",
+        "step_update:agent_response:ACTIVE",
+        "step_update:agent_response:DONE",
+        "result"
+      ],
+      "smokeTimingsMs": {
+        "cliInitMs": 2213.87,
+        "promptSubmittedMs": 2239.99,
+        "firstResponseDeltaMs": 4662.02,
+        "streamDoneMs": 4712.52,
+        "serverReportedDurationMs": 2495.73,
+        "totalProcessWallMs": 5089.51
+      },
+      "smokeUsage": {
+        "inputTokens": 10558,
+        "outputTokens": 26,
+        "thinkingTokens": 25,
+        "cacheReadTokens": 0,
+        "totalTokens": 10584
+      }
+    },
+    "claudeCodeIsolation": {
+      "passed": true,
+      "cliVersion": "2.1.310",
+      "authMethod": "oauth_token",
+      "apiProvider": "firstParty",
+      "isolationFlags": [
+        "--safe-mode",
+        "--setting-sources",
+        "",
+        "--strict-mcp-config",
+        "--disable-slash-commands",
+        "--no-session-persistence",
+        "--tools",
+        "",
+        "--max-budget-usd",
+        "0.50",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--include-partial-messages"
+      ],
+      "isolationEnv": {
+        "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
+        "CLAUDE_CODE_SAFE_MODE": "1"
+      },
+      "plantedCanaries": {
+        "claudeMdCanary": "CANARY_CLAUDE_MD_LEAKED_9941",
+        "dotClaudeMdCanary": "CANARY_DOT_CLAUDE_LEAKED_9942",
+        "mcpJsonCanaryServer": "canary_leaked_mcp",
+        "userPromptSubmitHookExit2": true
+      },
+      "observedInitState": {
+        "toolsCount": 0,
+        "mcpServersCount": 0,
+        "slashCommandsCount": 0,
+        "skillsCount": 0,
+        "hookExecuted": false,
+        "canaryLeakedInResponse": false,
+        "responseText": "ISOLATED"
+      },
+      "smokeCostUsd": 0.000087
+    }
+  },
+  "models": [
+    {
+      "id": "gemini-4-argon-high",
+      "displayName": "Gemini 4 Argon (High)",
+      "cli": "agy",
+      "modelArg": "gemini-4-argon-high",
+      "highestSupportedEffort": "high",
+      "isolationMode": "empty_tmpdir_cwd + --disable-slash-commands + single_turn_no_tool_prompt",
+      "cliResources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 156368,
+        "maxSingleProcessRssKb": 270904,
+        "cgroupUserCpuMs": 464.42,
+        "cgroupSysCpuMs": 136.23
+      }
+    },
+    {
+      "id": "gemini-3.8-flash-high",
+      "displayName": "Gemini 3.8 Flash (High)",
+      "cli": "agy",
+      "modelArg": "gemini-3.8-flash-high",
+      "highestSupportedEffort": "high",
+      "isolationMode": "empty_tmpdir_cwd + --disable-slash-commands + single_turn_no_tool_prompt",
+      "cliResources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 156368,
+        "maxSingleProcessRssKb": 270904,
+        "cgroupUserCpuMs": 464.42,
+        "cgroupSysCpuMs": 136.23
+      }
+    },
+    {
+      "id": "claude-fable-5-1",
+      "displayName": "Claude Fable 5.1 (Max)",
+      "cli": "claude",
+      "modelArg": "claude-fable-5-1",
+      "highestSupportedEffort": "max",
+      "isolationMode": "--safe-mode --setting-sources \"\" --strict-mcp-config --disable-slash-commands --no-session-persistence --tools \"\" + CLAUDE_CODE_DISABLE_AUTO_MEMORY=1",
+      "cliResources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 179124,
+        "maxSingleProcessRssKb": 269328,
+        "cgroupUserCpuMs": 682.09,
+        "cgroupSysCpuMs": 118.5
+      }
+    },
+    {
+      "id": "claude-opus-5-5",
+      "displayName": "Claude Opus 5.5 (Max)",
+      "cli": "claude",
+      "modelArg": "claude-opus-5-5",
+      "highestSupportedEffort": "max",
+      "isolationMode": "--safe-mode --setting-sources \"\" --strict-mcp-config --disable-slash-commands --no-session-persistence --tools \"\" + CLAUDE_CODE_DISABLE_AUTO_MEMORY=1",
+      "cliResources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 179124,
+        "maxSingleProcessRssKb": 269328,
+        "cgroupUserCpuMs": 682.09,
+        "cgroupSysCpuMs": 118.5
+      }
+    },
+    {
+      "id": "claude-sonnet-5-5",
+      "displayName": "Claude Sonnet 5.5 (Max)",
+      "cli": "claude",
+      "modelArg": "claude-sonnet-5-5",
+      "highestSupportedEffort": "max",
+      "isolationMode": "--safe-mode --setting-sources \"\" --strict-mcp-config --disable-slash-commands --no-session-persistence --tools \"\" + CLAUDE_CODE_DISABLE_AUTO_MEMORY=1",
+      "cliResources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 179124,
+        "maxSingleProcessRssKb": 269328,
+        "cgroupUserCpuMs": 682.09,
+        "cgroupSysCpuMs": 118.5
+      }
+    },
+    {
+      "id": "claude-haiku-5-5",
+      "displayName": "Claude Haiku 5.5 (Max)",
+      "cli": "claude",
+      "modelArg": "claude-haiku-5-5",
+      "highestSupportedEffort": "max",
+      "isolationMode": "--safe-mode --setting-sources \"\" --strict-mcp-config --disable-slash-commands --no-session-persistence --tools \"\" + CLAUDE_CODE_DISABLE_AUTO_MEMORY=1",
+      "cliResources": {
+        "memoryCoverage": "cgroup_v2_tree_peak",
+        "cgroupTreePeakKb": 179124,
+        "maxSingleProcessRssKb": 269328,
+        "cgroupUserCpuMs": 682.09,
+        "cgroupSysCpuMs": 118.5
+      }
+    }
+  ],
+  "studies": [
+    {
+      "id": "cuda_opt_loop",
+      "title": "CUDA Matrix Transpose Optimization Loop (v0 naive -> v1 coalesced -> v2 vectorized)",
+      "benchStudyRef": "results/DEMANDING_WORKLOADS_4_CUDA_OPT_LOOP_2026-07-19.md",
+      "captureMode": "live_hardware_capture",
+      "candidateReports": [
+        {
+          "id": "ptxas-codegen",
+          "format": "ptxas",
+          "rawBytes": 2351,
+          "rawSha256": "f7d1a48af8b7c9c65c6b6f6eb41d089196fc780396c0c2e852f6ade1d51716d7",
+          "digestBytes": 2200,
+          "compressionRatio": 1.07
+        },
+        {
+          "id": "ncu-roofline",
+          "format": "ncu-rep",
+          "rawBytes": 76772,
+          "rawSha256": "b967b4505da066e0d59e43004e641534ca0360bbe96c2803275ccaf827d16988",
+          "digestBytes": 1847,
+          "compressionRatio": 41.57
+        }
+      ],
+      "validatedFix": {
+        "attempted": true,
+        "description": "Replace uncoalesced global store in kernel_v0_naive with padded [32][33] shared-memory tile in kernel_v1_coalesced, verified by full device-side element-wise compare + 2,000,000-sample direct index check.",
+        "verificationCommand": "./cuda_opt_bench",
+        "verificationExitCode": 0,
+        "correctnessPassed": true,
+        "baselineMetric": {
+          "name": "kernel_v0_naive_duration",
+          "unit": "ms",
+          "median": 4.285,
+          "samples": [
+            4.2957,
+            4.2853,
+            4.2854
+          ]
+        },
+        "fixedMetric": {
+          "name": "kernel_v1_coalesced_duration",
+          "unit": "ms",
+          "median": 2.322,
+          "samples": [
+            2.3112,
+            2.3308,
+            2.3224
+          ]
+        },
+        "speedupRatio": 1.85
+      },
+      "armPipelines": {
+        "raw": {
+          "payloadBytes": 16783,
+          "payloadTokensEst": 4196,
+          "orchestrationMs": 0.38,
+          "mcpMs": 0,
+          "routingMs": 0,
+          "verificationMs": 0,
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 9940,
+            "maxSingleProcessRssKb": 41612,
+            "cgroupUserCpuMs": 15.8,
+            "cgroupSysCpuMs": 14.02
+          }
+        },
+        "mcp_digest": {
+          "payloadBytes": 4170,
+          "payloadTokensEst": 1043,
+          "orchestrationMs": 0.06,
+          "mcpMs": 859.24,
+          "routingMs": 0,
+          "verificationMs": 0,
+          "mcpSpawns": 2,
+          "mcpCalls": 2,
+          "mcpReusedCalls": 0,
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 222308,
+            "maxSingleProcessRssKb": 188684,
+            "cgroupUserCpuMs": 945.53,
+            "cgroupSysCpuMs": 130.35
+          }
+        },
+        "compact_evidence": {
+          "verbosePayloadBytes": 6931,
+          "compactPayloadBytes": 4486,
+          "byteReductionPct": 35.28,
+          "payloadTokensEst": 1122,
+          "orchestrationMs": 2.32,
+          "mcpMs": 424.13,
+          "routingMs": 14,
+          "verificationMs": 1290.47,
+          "mcpSpawns": 1,
+          "mcpCalls": 2,
+          "mcpReusedCalls": 1,
+          "selectedReportId": "ncu-roofline",
+          "provenanceCount": 2,
+          "verificationPassed": true,
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 225208,
+            "maxSingleProcessRssKb": 188572,
+            "cgroupUserCpuMs": 569.26,
+            "cgroupSysCpuMs": 100.7
+          }
+        }
+      },
+      "evaluations": [
+        {
+          "modelId": "gemini-4-argon-high",
+          "cli": "agy",
+          "effort": "high",
+          "arm": "raw",
+          "timingsMs": {
+            "orchestrationMs": 0.31,
+            "mcpMs": 0,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 2518.13,
+            "cliTimeToRequestMs": null,
+            "modelFirstResponseMs": 28145.7,
+            "cliReportedTtftMs": null,
+            "thinkingStreamMs": null,
+            "textOutputStreamMs": 687.26,
+            "reasoningAndOutputStreamingMs": 687.26,
+            "modelApiDurationMs": 28843.57,
+            "modelCliTotalWallMs": 36400.04,
+            "totalE2eWallMs": 36400.35
+          },
+          "tokens": {
+            "evidencePayloadBytes": 16783,
+            "evidencePayloadTokensEst": 4196,
+            "inputTokens": 16420,
+            "outputTokens": 2131,
+            "thinkingTokens": 2036,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": null,
+            "costBasis": "unreported_subscription_or_quota"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 156368,
+            "maxSingleProcessRssKb": 270904,
+            "cgroupUserCpuMs": 480.3,
+            "cgroupSysCpuMs": 150.12
+          },
+          "diagnostics": {
+            "checksPassed": 3,
+            "totalChecks": 5,
+            "accuracyScore": 0.6,
+            "falseConclusionsCount": 1,
+            "falseConclusions": [
+              "Could not establish measured DRAM peak saturation (~90%) from hardware counters."
+            ],
+            "checks": {
+              "identifies_v0_uncoalesced_write": true,
+              "identifies_v1_real_winner": false,
+              "identifies_v1_dram_roofline_saturated": false,
+              "identifies_v2_no_wall_win_over_v1": true,
+              "rejects_ptxas_register_ranking_at_roofline": true
+            },
+            "summary": "3/5 checks passed (1 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "gemini-4-argon-high",
+          "cli": "agy",
+          "effort": "high",
+          "arm": "mcp_digest",
+          "timingsMs": {
+            "orchestrationMs": 0.08,
+            "mcpMs": 825.56,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 2695.29,
+            "cliTimeToRequestMs": null,
+            "modelFirstResponseMs": 11419.55,
+            "cliReportedTtftMs": null,
+            "thinkingStreamMs": null,
+            "textOutputStreamMs": 431.6,
+            "reasoningAndOutputStreamingMs": 431.6,
+            "modelApiDurationMs": 11896.6,
+            "modelCliTotalWallMs": 15184.54,
+            "totalE2eWallMs": 16010.18
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4176,
+            "evidencePayloadTokensEst": 1044,
+            "inputTokens": 12454,
+            "outputTokens": 1199,
+            "thinkingTokens": 1095,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": null,
+            "costBasis": "unreported_subscription_or_quota"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 219604,
+            "maxSingleProcessRssKb": 270904,
+            "cgroupUserCpuMs": 1357.92,
+            "cgroupSysCpuMs": 282.63
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_v0_uncoalesced_write": true,
+              "identifies_v1_real_winner": true,
+              "identifies_v1_dram_roofline_saturated": true,
+              "identifies_v2_no_wall_win_over_v1": true,
+              "rejects_ptxas_register_ranking_at_roofline": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "gemini-4-argon-high",
+          "cli": "agy",
+          "effort": "high",
+          "arm": "compact_evidence",
+          "timingsMs": {
+            "orchestrationMs": 2.24,
+            "mcpMs": 453.01,
+            "routingMs": 25,
+            "verificationMs": 1278.19,
+            "cliStartupMs": 2481.51,
+            "cliTimeToRequestMs": null,
+            "modelFirstResponseMs": 16205.55,
+            "cliReportedTtftMs": null,
+            "thinkingStreamMs": null,
+            "textOutputStreamMs": 559.52,
+            "reasoningAndOutputStreamingMs": 559.52,
+            "modelApiDurationMs": 16788.2,
+            "modelCliTotalWallMs": 20126.67,
+            "totalE2eWallMs": 21885.11
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4493,
+            "evidencePayloadTokensEst": 1124,
+            "inputTokens": 12676,
+            "outputTokens": 1249,
+            "thinkingTokens": 1145,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": null,
+            "costBasis": "unreported_subscription_or_quota"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 156368,
+            "maxSingleProcessRssKb": 270904,
+            "cgroupUserCpuMs": 1067.9,
+            "cgroupSysCpuMs": 224.25
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_v0_uncoalesced_write": true,
+              "identifies_v1_real_winner": true,
+              "identifies_v1_dram_roofline_saturated": true,
+              "identifies_v2_no_wall_win_over_v1": true,
+              "rejects_ptxas_register_ranking_at_roofline": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "gemini-3.8-flash-high",
+          "cli": "agy",
+          "effort": "high",
+          "arm": "raw",
+          "timingsMs": {
+            "orchestrationMs": 0.31,
+            "mcpMs": 0,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 2570.24,
+            "cliTimeToRequestMs": null,
+            "modelFirstResponseMs": 11601.62,
+            "cliReportedTtftMs": null,
+            "thinkingStreamMs": null,
+            "textOutputStreamMs": 204.15,
+            "reasoningAndOutputStreamingMs": 204.15,
+            "modelApiDurationMs": 11822.48,
+            "modelCliTotalWallMs": 19424.46,
+            "totalE2eWallMs": 19424.77
+          },
+          "tokens": {
+            "evidencePayloadBytes": 16783,
+            "evidencePayloadTokensEst": 4196,
+            "inputTokens": 16558,
+            "outputTokens": 4092,
+            "thinkingTokens": 4000,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": null,
+            "costBasis": "unreported_subscription_or_quota"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 156368,
+            "maxSingleProcessRssKb": 270904,
+            "cgroupUserCpuMs": 480.3,
+            "cgroupSysCpuMs": 150.12
+          },
+          "diagnostics": {
+            "checksPassed": 3,
+            "totalChecks": 5,
+            "accuracyScore": 0.6,
+            "falseConclusionsCount": 1,
+            "falseConclusions": [
+              "Could not establish measured DRAM peak saturation (~90%) from hardware counters."
+            ],
+            "checks": {
+              "identifies_v0_uncoalesced_write": true,
+              "identifies_v1_real_winner": false,
+              "identifies_v1_dram_roofline_saturated": false,
+              "identifies_v2_no_wall_win_over_v1": true,
+              "rejects_ptxas_register_ranking_at_roofline": true
+            },
+            "summary": "3/5 checks passed (1 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "gemini-3.8-flash-high",
+          "cli": "agy",
+          "effort": "high",
+          "arm": "mcp_digest",
+          "timingsMs": {
+            "orchestrationMs": 0.08,
+            "mcpMs": 825.56,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 2690.99,
+            "cliTimeToRequestMs": null,
+            "modelFirstResponseMs": 6484.03,
+            "cliReportedTtftMs": null,
+            "thinkingStreamMs": null,
+            "textOutputStreamMs": 204.64,
+            "reasoningAndOutputStreamingMs": 204.64,
+            "modelApiDurationMs": 6709.39,
+            "modelCliTotalWallMs": 9870.19,
+            "totalE2eWallMs": 10695.83
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4176,
+            "evidencePayloadTokensEst": 1044,
+            "inputTokens": 12610,
+            "outputTokens": 1647,
+            "thinkingTokens": 1546,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": null,
+            "costBasis": "unreported_subscription_or_quota"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 219604,
+            "maxSingleProcessRssKb": 270904,
+            "cgroupUserCpuMs": 1357.92,
+            "cgroupSysCpuMs": 282.63
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_v0_uncoalesced_write": true,
+              "identifies_v1_real_winner": true,
+              "identifies_v1_dram_roofline_saturated": true,
+              "identifies_v2_no_wall_win_over_v1": true,
+              "rejects_ptxas_register_ranking_at_roofline": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "gemini-3.8-flash-high",
+          "cli": "agy",
+          "effort": "high",
+          "arm": "compact_evidence",
+          "timingsMs": {
+            "orchestrationMs": 2.24,
+            "mcpMs": 453.01,
+            "routingMs": 25,
+            "verificationMs": 1278.19,
+            "cliStartupMs": 2320.54,
+            "cliTimeToRequestMs": null,
+            "modelFirstResponseMs": 8771.51,
+            "cliReportedTtftMs": null,
+            "thinkingStreamMs": null,
+            "textOutputStreamMs": 229.83,
+            "reasoningAndOutputStreamingMs": 229.83,
+            "modelApiDurationMs": 9002.25,
+            "modelCliTotalWallMs": 11817.94,
+            "totalE2eWallMs": 13576.38
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4493,
+            "evidencePayloadTokensEst": 1124,
+            "inputTokens": 12842,
+            "outputTokens": 2916,
+            "thinkingTokens": 2815,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": null,
+            "costBasis": "unreported_subscription_or_quota"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 156368,
+            "maxSingleProcessRssKb": 270904,
+            "cgroupUserCpuMs": 1067.9,
+            "cgroupSysCpuMs": 224.25
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_v0_uncoalesced_write": true,
+              "identifies_v1_real_winner": true,
+              "identifies_v1_dram_roofline_saturated": true,
+              "identifies_v2_no_wall_win_over_v1": true,
+              "rejects_ptxas_register_ranking_at_roofline": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-fable-5-1",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "raw",
+          "timingsMs": {
+            "orchestrationMs": 0.31,
+            "mcpMs": 0,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 689.89,
+            "cliTimeToRequestMs": 356,
+            "modelFirstResponseMs": 1592.26,
+            "cliReportedTtftMs": 1607,
+            "thinkingStreamMs": 48193.53,
+            "textOutputStreamMs": 1229.78,
+            "reasoningAndOutputStreamingMs": 49423.47,
+            "modelApiDurationMs": 50679,
+            "modelCliTotalWallMs": 52461.94,
+            "totalE2eWallMs": 52462.25
+          },
+          "tokens": {
+            "evidencePayloadBytes": 16783,
+            "evidencePayloadTokensEst": 4196,
+            "inputTokens": 8923,
+            "outputTokens": 4270,
+            "thinkingTokens": 4129,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 8921
+          },
+          "cost": {
+            "costUsd": 0.325033,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 697.97,
+            "cgroupSysCpuMs": 132.39
+          },
+          "diagnostics": {
+            "checksPassed": 3,
+            "totalChecks": 5,
+            "accuracyScore": 0.6,
+            "falseConclusionsCount": 1,
+            "falseConclusions": [
+              "Could not establish measured DRAM peak saturation (~90%) from hardware counters."
+            ],
+            "checks": {
+              "identifies_v0_uncoalesced_write": true,
+              "identifies_v1_real_winner": false,
+              "identifies_v1_dram_roofline_saturated": false,
+              "identifies_v2_no_wall_win_over_v1": true,
+              "rejects_ptxas_register_ranking_at_roofline": true
+            },
+            "summary": "3/5 checks passed (1 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-fable-5-1",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "mcp_digest",
+          "timingsMs": {
+            "orchestrationMs": 0.08,
+            "mcpMs": 825.56,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 718.05,
+            "cliTimeToRequestMs": 328,
+            "modelFirstResponseMs": 2726.22,
+            "cliReportedTtftMs": 2755,
+            "thinkingStreamMs": 4514.29,
+            "textOutputStreamMs": 1059.76,
+            "reasoningAndOutputStreamingMs": 5574.22,
+            "modelApiDurationMs": 8018,
+            "modelCliTotalWallMs": 9967.81,
+            "totalE2eWallMs": 10793.45
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4176,
+            "evidencePayloadTokensEst": 1044,
+            "inputTokens": 3018,
+            "outputTokens": 500,
+            "thinkingTokens": 369,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 3016
+          },
+          "cost": {
+            "costUsd": 0.06272,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 219604,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1575.59,
+            "cgroupSysCpuMs": 264.9
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_v0_uncoalesced_write": true,
+              "identifies_v1_real_winner": true,
+              "identifies_v1_dram_roofline_saturated": true,
+              "identifies_v2_no_wall_win_over_v1": true,
+              "rejects_ptxas_register_ranking_at_roofline": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-fable-5-1",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "compact_evidence",
+          "timingsMs": {
+            "orchestrationMs": 2.24,
+            "mcpMs": 453.01,
+            "routingMs": 25,
+            "verificationMs": 1278.19,
+            "cliStartupMs": 465.5,
+            "cliTimeToRequestMs": 322,
+            "modelFirstResponseMs": 1150.9,
+            "cliReportedTtftMs": 1165,
+            "thinkingStreamMs": 8697.69,
+            "textOutputStreamMs": 1237,
+            "reasoningAndOutputStreamingMs": 9934.84,
+            "modelApiDurationMs": 10784,
+            "modelCliTotalWallMs": 12474.15,
+            "totalE2eWallMs": 14232.59
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4493,
+            "evidencePayloadTokensEst": 1124,
+            "inputTokens": 3220,
+            "outputTokens": 942,
+            "thinkingTokens": 811,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 3218
+          },
+          "cost": {
+            "costUsd": 0.087345,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1285.57,
+            "cgroupSysCpuMs": 206.52
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_v0_uncoalesced_write": true,
+              "identifies_v1_real_winner": true,
+              "identifies_v1_dram_roofline_saturated": true,
+              "identifies_v2_no_wall_win_over_v1": true,
+              "rejects_ptxas_register_ranking_at_roofline": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-opus-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "raw",
+          "timingsMs": {
+            "orchestrationMs": 0.31,
+            "mcpMs": 0,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 444.96,
+            "cliTimeToRequestMs": 217,
+            "modelFirstResponseMs": 1369.07,
+            "cliReportedTtftMs": 1383,
+            "thinkingStreamMs": 171034.2,
+            "textOutputStreamMs": 800,
+            "reasoningAndOutputStreamingMs": 171834.42,
+            "modelApiDurationMs": 173005,
+            "modelCliTotalWallMs": 174770.5,
+            "totalE2eWallMs": 174770.81
+          },
+          "tokens": {
+            "evidencePayloadBytes": 16783,
+            "evidencePayloadTokensEst": 4196,
+            "inputTokens": 8923,
+            "outputTokens": 18716,
+            "thinkingTokens": 18570,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 8921
+          },
+          "cost": {
+            "costUsd": 0.418933,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 697.97,
+            "cgroupSysCpuMs": 132.39
+          },
+          "diagnostics": {
+            "checksPassed": 3,
+            "totalChecks": 5,
+            "accuracyScore": 0.6,
+            "falseConclusionsCount": 1,
+            "falseConclusions": [
+              "Could not establish measured DRAM peak saturation (~90%) from hardware counters."
+            ],
+            "checks": {
+              "identifies_v0_uncoalesced_write": true,
+              "identifies_v1_real_winner": false,
+              "identifies_v1_dram_roofline_saturated": false,
+              "identifies_v2_no_wall_win_over_v1": true,
+              "rejects_ptxas_register_ranking_at_roofline": true
+            },
+            "summary": "3/5 checks passed (1 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-opus-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "mcp_digest",
+          "timingsMs": {
+            "orchestrationMs": 0.08,
+            "mcpMs": 825.56,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 448.17,
+            "cliTimeToRequestMs": 340,
+            "modelFirstResponseMs": 1459.32,
+            "cliReportedTtftMs": 1474,
+            "thinkingStreamMs": 7782.48,
+            "textOutputStreamMs": 949.62,
+            "reasoningAndOutputStreamingMs": 8732.31,
+            "modelApiDurationMs": 9881,
+            "modelCliTotalWallMs": 11570.1,
+            "totalE2eWallMs": 12395.74
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4176,
+            "evidencePayloadTokensEst": 1044,
+            "inputTokens": 3018,
+            "outputTokens": 1104,
+            "thinkingTokens": 952,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 3016
+          },
+          "cost": {
+            "costUsd": 0.037168,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 219604,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1575.59,
+            "cgroupSysCpuMs": 264.9
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_v0_uncoalesced_write": true,
+              "identifies_v1_real_winner": true,
+              "identifies_v1_dram_roofline_saturated": true,
+              "identifies_v2_no_wall_win_over_v1": true,
+              "rejects_ptxas_register_ranking_at_roofline": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-opus-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "compact_evidence",
+          "timingsMs": {
+            "orchestrationMs": 2.24,
+            "mcpMs": 453.01,
+            "routingMs": 25,
+            "verificationMs": 1278.19,
+            "cliStartupMs": 425.22,
+            "cliTimeToRequestMs": 502,
+            "modelFirstResponseMs": 1586.04,
+            "cliReportedTtftMs": 1601,
+            "thinkingStreamMs": 41386.56,
+            "textOutputStreamMs": 779.5,
+            "reasoningAndOutputStreamingMs": 42166.27,
+            "modelApiDurationMs": 43271,
+            "modelCliTotalWallMs": 45061.02,
+            "totalE2eWallMs": 46819.46
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4493,
+            "evidencePayloadTokensEst": 1124,
+            "inputTokens": 3220,
+            "outputTokens": 4979,
+            "thinkingTokens": 4827,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 3218
+          },
+          "cost": {
+            "costUsd": 0.115678,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1285.57,
+            "cgroupSysCpuMs": 206.52
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_v0_uncoalesced_write": true,
+              "identifies_v1_real_winner": true,
+              "identifies_v1_dram_roofline_saturated": true,
+              "identifies_v2_no_wall_win_over_v1": true,
+              "rejects_ptxas_register_ranking_at_roofline": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-sonnet-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "raw",
+          "timingsMs": {
+            "orchestrationMs": 0.31,
+            "mcpMs": 0,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 451.04,
+            "cliTimeToRequestMs": 662,
+            "modelFirstResponseMs": 1665.77,
+            "cliReportedTtftMs": 1683,
+            "thinkingStreamMs": 80661.09,
+            "textOutputStreamMs": 404.61,
+            "reasoningAndOutputStreamingMs": 81065.84,
+            "modelApiDurationMs": 82091,
+            "modelCliTotalWallMs": 84068.45,
+            "totalE2eWallMs": 84068.76
+          },
+          "tokens": {
+            "evidencePayloadBytes": 16783,
+            "evidencePayloadTokensEst": 4196,
+            "inputTokens": 8927,
+            "outputTokens": 11971,
+            "thinkingTokens": 11844,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 8925
+          },
+          "cost": {
+            "costUsd": 0.142027,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 697.97,
+            "cgroupSysCpuMs": 132.39
+          },
+          "diagnostics": {
+            "checksPassed": 3,
+            "totalChecks": 5,
+            "accuracyScore": 0.6,
+            "falseConclusionsCount": 1,
+            "falseConclusions": [
+              "Could not establish measured DRAM peak saturation (~90%) from hardware counters."
+            ],
+            "checks": {
+              "identifies_v0_uncoalesced_write": true,
+              "identifies_v1_real_winner": false,
+              "identifies_v1_dram_roofline_saturated": false,
+              "identifies_v2_no_wall_win_over_v1": true,
+              "rejects_ptxas_register_ranking_at_roofline": true
+            },
+            "summary": "3/5 checks passed (1 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-sonnet-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "mcp_digest",
+          "timingsMs": {
+            "orchestrationMs": 0.08,
+            "mcpMs": 825.56,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 475.78,
+            "cliTimeToRequestMs": 243,
+            "modelFirstResponseMs": 1023.88,
+            "cliReportedTtftMs": 1037,
+            "thinkingStreamMs": 9458.71,
+            "textOutputStreamMs": 428.98,
+            "reasoningAndOutputStreamingMs": 9887.82,
+            "modelApiDurationMs": 10688,
+            "modelCliTotalWallMs": 12338.3,
+            "totalE2eWallMs": 13163.94
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4176,
+            "evidencePayloadTokensEst": 1044,
+            "inputTokens": 3022,
+            "outputTokens": 1583,
+            "thinkingTokens": 1452,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 3020
+          },
+          "cost": {
+            "costUsd": 0.023384,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 219604,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1575.59,
+            "cgroupSysCpuMs": 264.9
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_v0_uncoalesced_write": true,
+              "identifies_v1_real_winner": true,
+              "identifies_v1_dram_roofline_saturated": true,
+              "identifies_v2_no_wall_win_over_v1": true,
+              "rejects_ptxas_register_ranking_at_roofline": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-sonnet-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "compact_evidence",
+          "timingsMs": {
+            "orchestrationMs": 2.24,
+            "mcpMs": 453.01,
+            "routingMs": 25,
+            "verificationMs": 1278.19,
+            "cliStartupMs": 429.1,
+            "cliTimeToRequestMs": 351,
+            "modelFirstResponseMs": 1594.68,
+            "cliReportedTtftMs": 1609,
+            "thinkingStreamMs": 67492.97,
+            "textOutputStreamMs": 84.13,
+            "reasoningAndOutputStreamingMs": 67577.38,
+            "modelApiDurationMs": 68852,
+            "modelCliTotalWallMs": 70345.39,
+            "totalE2eWallMs": 72103.83
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4493,
+            "evidencePayloadTokensEst": 1124,
+            "inputTokens": 3224,
+            "outputTokens": 9995,
+            "thinkingTokens": 9860,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 3222
+          },
+          "cost": {
+            "costUsd": 0.108009,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1285.57,
+            "cgroupSysCpuMs": 206.52
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_v0_uncoalesced_write": true,
+              "identifies_v1_real_winner": true,
+              "identifies_v1_dram_roofline_saturated": true,
+              "identifies_v2_no_wall_win_over_v1": true,
+              "rejects_ptxas_register_ranking_at_roofline": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-haiku-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "raw",
+          "timingsMs": {
+            "orchestrationMs": 0.31,
+            "mcpMs": 0,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 554.29,
+            "cliTimeToRequestMs": 330,
+            "modelFirstResponseMs": 2017.96,
+            "cliReportedTtftMs": 2043,
+            "thinkingStreamMs": 55676.13,
+            "textOutputStreamMs": 278.29,
+            "reasoningAndOutputStreamingMs": 55954.6,
+            "modelApiDurationMs": 57674,
+            "modelCliTotalWallMs": 59400.75,
+            "totalE2eWallMs": 59401.06
+          },
+          "tokens": {
+            "evidencePayloadBytes": 16783,
+            "evidencePayloadTokensEst": 4196,
+            "inputTokens": 8925,
+            "outputTokens": 12953,
+            "thinkingTokens": 12812,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 8923
+          },
+          "cost": {
+            "costUsd": 0.007592,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 697.97,
+            "cgroupSysCpuMs": 132.39
+          },
+          "diagnostics": {
+            "checksPassed": 3,
+            "totalChecks": 5,
+            "accuracyScore": 0.6,
+            "falseConclusionsCount": 1,
+            "falseConclusions": [
+              "Could not establish measured DRAM peak saturation (~90%) from hardware counters."
+            ],
+            "checks": {
+              "identifies_v0_uncoalesced_write": true,
+              "identifies_v1_real_winner": false,
+              "identifies_v1_dram_roofline_saturated": false,
+              "identifies_v2_no_wall_win_over_v1": true,
+              "rejects_ptxas_register_ranking_at_roofline": true
+            },
+            "summary": "3/5 checks passed (1 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-haiku-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "mcp_digest",
+          "timingsMs": {
+            "orchestrationMs": 0.08,
+            "mcpMs": 825.56,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 446.01,
+            "cliTimeToRequestMs": 381,
+            "modelFirstResponseMs": 949.83,
+            "cliReportedTtftMs": 972,
+            "thinkingStreamMs": 18115.74,
+            "textOutputStreamMs": 369.73,
+            "reasoningAndOutputStreamingMs": 18485.64,
+            "modelApiDurationMs": 19083,
+            "modelCliTotalWallMs": 20877.85,
+            "totalE2eWallMs": 21703.49
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4176,
+            "evidencePayloadTokensEst": 1044,
+            "inputTokens": 3020,
+            "outputTokens": 4701,
+            "thinkingTokens": 4567,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 3018
+          },
+          "cost": {
+            "costUsd": 0.002728,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 219604,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1575.59,
+            "cgroupSysCpuMs": 264.9
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_v0_uncoalesced_write": true,
+              "identifies_v1_real_winner": true,
+              "identifies_v1_dram_roofline_saturated": true,
+              "identifies_v2_no_wall_win_over_v1": true,
+              "rejects_ptxas_register_ranking_at_roofline": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-haiku-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "compact_evidence",
+          "timingsMs": {
+            "orchestrationMs": 2.24,
+            "mcpMs": 453.01,
+            "routingMs": 25,
+            "verificationMs": 1278.19,
+            "cliStartupMs": 458.53,
+            "cliTimeToRequestMs": 388,
+            "modelFirstResponseMs": 1580.92,
+            "cliReportedTtftMs": 1599,
+            "thinkingStreamMs": 39838.85,
+            "textOutputStreamMs": 397.73,
+            "reasoningAndOutputStreamingMs": 40236.73,
+            "modelApiDurationMs": 41463,
+            "modelCliTotalWallMs": 42982.12,
+            "totalE2eWallMs": 44740.56
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4493,
+            "evidencePayloadTokensEst": 1124,
+            "inputTokens": 3222,
+            "outputTokens": 10143,
+            "thinkingTokens": 9996,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 3220
+          },
+          "cost": {
+            "costUsd": 0.005474,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1285.57,
+            "cgroupSysCpuMs": 206.52
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_v0_uncoalesced_write": true,
+              "identifies_v1_real_winner": true,
+              "identifies_v1_dram_roofline_saturated": true,
+              "identifies_v2_no_wall_win_over_v1": true,
+              "rejects_ptxas_register_ranking_at_roofline": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "cpp_build_loop",
+      "title": "C++ BuildDigest Loop (CMake cold/warm configure, Ninja cold log, Clang -ftime-trace)",
+      "benchStudyRef": "results/DEMANDING_WORKLOADS_3_CPP_BUILD_LOOP_2026-07-19.md",
+      "captureMode": "artifact_and_live_toolchain",
+      "candidateReports": [
+        {
+          "id": "cmake-cold",
+          "format": "cmake-profile",
+          "rawBytes": 1544826,
+          "rawSha256": "a487cd82ca5baebf6dc9adef4fd035d1dcfa1da45c41c3a3b55102497ca9fce4",
+          "digestBytes": 2004,
+          "compressionRatio": 770.87
+        },
+        {
+          "id": "cmake-warm",
+          "format": "cmake-profile",
+          "rawBytes": 297280,
+          "rawSha256": "d9d8267d1bb7ec1aa942bfec5b216ee6a7bdf5609e5bb06f2b6648b5ec0566c2",
+          "digestBytes": 1885,
+          "compressionRatio": 157.71
+        },
+        {
+          "id": "ninja-cold",
+          "format": "ninja-log",
+          "rawBytes": 565,
+          "rawSha256": "1979b307165d6d24108ddd57bbbf5fe6229b6d9e635dba89762cce0288fb01da",
+          "digestBytes": 1334,
+          "compressionRatio": 0.42
+        },
+        {
+          "id": "clang-heavy-tu",
+          "format": "clang-time-trace",
+          "rawBytes": 745515,
+          "rawSha256": "e5641450f000e3f44dfee1b6fb6d4de38455918a5ef6a1e90ea14a0e10dfaa00",
+          "digestBytes": 2136,
+          "compressionRatio": 349.02
+        }
+      ],
+      "validatedFix": {
+        "attempted": true,
+        "description": "Replace exponential recursive constexpr fib(27) (~635,621 evaluation steps in EvaluateAsInitializer) in lib_template_heavy.cpp with O(n) iterative constexpr loop while preserving bl::template_heavy_workload() output.",
+        "verificationCommand": "./verify_cpp_fix",
+        "verificationExitCode": 0,
+        "correctnessPassed": true,
+        "baselineMetric": {
+          "name": "lib_template_heavy_compile_ms",
+          "unit": "ms",
+          "median": 1338.17,
+          "samples": [
+            1309.32,
+            1373.03,
+            1338.17
+          ]
+        },
+        "fixedMetric": {
+          "name": "lib_template_heavy_compile_ms",
+          "unit": "ms",
+          "median": 924.17,
+          "samples": [
+            914.02,
+            961.03,
+            924.17
+          ]
+        },
+        "speedupRatio": 1.45
+      },
+      "armPipelines": {
+        "raw": {
+          "payloadBytes": 25521,
+          "payloadTokensEst": 6381,
+          "orchestrationMs": 0.32,
+          "mcpMs": 0,
+          "routingMs": 0,
+          "verificationMs": 0,
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 10192,
+            "maxSingleProcessRssKb": 41616,
+            "cgroupUserCpuMs": 17.26,
+            "cgroupSysCpuMs": 14.22
+          }
+        },
+        "mcp_digest": {
+          "payloadBytes": 7604,
+          "payloadTokensEst": 1901,
+          "orchestrationMs": 0.06,
+          "mcpMs": 1544.23,
+          "routingMs": 0,
+          "verificationMs": 0,
+          "mcpSpawns": 4,
+          "mcpCalls": 4,
+          "mcpReusedCalls": 0,
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 118012,
+            "maxSingleProcessRssKb": 96832,
+            "cgroupUserCpuMs": 1624.2,
+            "cgroupSysCpuMs": 200.27
+          }
+        },
+        "compact_evidence": {
+          "verbosePayloadBytes": 10707,
+          "compactPayloadBytes": 6432,
+          "byteReductionPct": 39.93,
+          "payloadTokensEst": 1608,
+          "orchestrationMs": 2,
+          "mcpMs": 414.42,
+          "routingMs": 5,
+          "verificationMs": 3.14,
+          "mcpSpawns": 1,
+          "mcpCalls": 4,
+          "mcpReusedCalls": 3,
+          "selectedReportId": "clang-heavy-tu",
+          "provenanceCount": 4,
+          "verificationPassed": true,
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 118496,
+            "maxSingleProcessRssKb": 92040,
+            "cgroupUserCpuMs": 580.41,
+            "cgroupSysCpuMs": 75.83
+          }
+        }
+      },
+      "evaluations": [
+        {
+          "modelId": "gemini-4-argon-high",
+          "cli": "agy",
+          "effort": "high",
+          "arm": "raw",
+          "timingsMs": {
+            "orchestrationMs": 0.72,
+            "mcpMs": 0,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 2196.14,
+            "cliTimeToRequestMs": null,
+            "modelFirstResponseMs": 44601.03,
+            "cliReportedTtftMs": null,
+            "thinkingStreamMs": null,
+            "textOutputStreamMs": 514.44,
+            "reasoningAndOutputStreamingMs": 514.44,
+            "modelApiDurationMs": 45114.66,
+            "modelCliTotalWallMs": 48182.43,
+            "totalE2eWallMs": 48183.15
+          },
+          "tokens": {
+            "evidencePayloadBytes": 25521,
+            "evidencePayloadTokensEst": 6381,
+            "inputTokens": 23257,
+            "outputTokens": 4028,
+            "thinkingTokens": 3946,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": null,
+            "costBasis": "unreported_subscription_or_quota"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 156368,
+            "maxSingleProcessRssKb": 270904,
+            "cgroupUserCpuMs": 488.22,
+            "cgroupSysCpuMs": 153.1
+          },
+          "diagnostics": {
+            "checksPassed": 1,
+            "totalChecks": 5,
+            "accuracyScore": 0.2,
+            "falseConclusionsCount": 4,
+            "falseConclusions": [
+              "Could not identify InstantiateClass as the #1 summed span in the Clang -ftime-trace digest (got null).",
+              "Could not quantify InstantiateClass duration_us (~3,496,667 us across 1,471 recursive template instantiations) from the 745 KB Clang -ftime-trace.",
+              "Could not quantify ExecuteCompiler wall duration_us (~1,707,440 us) from the Clang -ftime-trace.",
+              "Could not verify from CMake profile traces that cold configure is dominated by project()/try_compile compiler detection rather than project CMakeLists helpers."
+            ],
+            "checks": {
+              "identifies_slowest_tu": true,
+              "identifies_top_clang_phase_in_digest": false,
+              "identifies_instantiate_class_duration_us": false,
+              "identifies_execute_compiler_duration_us": false,
+              "distinguishes_cold_cmake_compiler_detection": false
+            },
+            "summary": "1/5 checks passed (4 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "gemini-4-argon-high",
+          "cli": "agy",
+          "effort": "high",
+          "arm": "mcp_digest",
+          "timingsMs": {
+            "orchestrationMs": 0.07,
+            "mcpMs": 1525.66,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 2324.02,
+            "cliTimeToRequestMs": null,
+            "modelFirstResponseMs": 27363.6,
+            "cliReportedTtftMs": null,
+            "thinkingStreamMs": null,
+            "textOutputStreamMs": 560.13,
+            "reasoningAndOutputStreamingMs": 560.13,
+            "modelApiDurationMs": 27940.3,
+            "modelCliTotalWallMs": 30918.77,
+            "totalE2eWallMs": 32444.5
+          },
+          "tokens": {
+            "evidencePayloadBytes": 7604,
+            "evidencePayloadTokensEst": 1901,
+            "inputTokens": 13805,
+            "outputTokens": 2512,
+            "thinkingTokens": 2414,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": null,
+            "costBasis": "unreported_subscription_or_quota"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 156368,
+            "maxSingleProcessRssKb": 270904,
+            "cgroupUserCpuMs": 1989.17,
+            "cgroupSysCpuMs": 336.61
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_slowest_tu": true,
+              "identifies_top_clang_phase_in_digest": true,
+              "identifies_instantiate_class_duration_us": true,
+              "identifies_execute_compiler_duration_us": true,
+              "distinguishes_cold_cmake_compiler_detection": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "gemini-4-argon-high",
+          "cli": "agy",
+          "effort": "high",
+          "arm": "compact_evidence",
+          "timingsMs": {
+            "orchestrationMs": 1.99,
+            "mcpMs": 434.81,
+            "routingMs": 6,
+            "verificationMs": 3.09,
+            "cliStartupMs": 2400.39,
+            "cliTimeToRequestMs": null,
+            "modelFirstResponseMs": 22678.49,
+            "cliReportedTtftMs": null,
+            "thinkingStreamMs": null,
+            "textOutputStreamMs": 640,
+            "reasoningAndOutputStreamingMs": 640,
+            "modelApiDurationMs": 23318.14,
+            "modelCliTotalWallMs": 28580.2,
+            "totalE2eWallMs": 29026.09
+          },
+          "tokens": {
+            "evidencePayloadBytes": 6432,
+            "evidencePayloadTokensEst": 1608,
+            "inputTokens": 13474,
+            "outputTokens": 2003,
+            "thinkingTokens": 1919,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": null,
+            "costBasis": "unreported_subscription_or_quota"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 156368,
+            "maxSingleProcessRssKb": 270904,
+            "cgroupUserCpuMs": 999.68,
+            "cgroupSysCpuMs": 209.22
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_slowest_tu": true,
+              "identifies_top_clang_phase_in_digest": true,
+              "identifies_instantiate_class_duration_us": true,
+              "identifies_execute_compiler_duration_us": true,
+              "distinguishes_cold_cmake_compiler_detection": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "gemini-3.8-flash-high",
+          "cli": "agy",
+          "effort": "high",
+          "arm": "raw",
+          "timingsMs": {
+            "orchestrationMs": 0.72,
+            "mcpMs": 0,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 2587.38,
+            "cliTimeToRequestMs": null,
+            "modelFirstResponseMs": 40938.17,
+            "cliReportedTtftMs": null,
+            "thinkingStreamMs": null,
+            "textOutputStreamMs": 382.52,
+            "reasoningAndOutputStreamingMs": 382.52,
+            "modelApiDurationMs": 41324.39,
+            "modelCliTotalWallMs": 45648.19,
+            "totalE2eWallMs": 45648.91
+          },
+          "tokens": {
+            "evidencePayloadBytes": 25521,
+            "evidencePayloadTokensEst": 6381,
+            "inputTokens": 23578,
+            "outputTokens": 15033,
+            "thinkingTokens": 14967,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": null,
+            "costBasis": "unreported_subscription_or_quota"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 156368,
+            "maxSingleProcessRssKb": 270904,
+            "cgroupUserCpuMs": 488.22,
+            "cgroupSysCpuMs": 153.1
+          },
+          "diagnostics": {
+            "checksPassed": 1,
+            "totalChecks": 5,
+            "accuracyScore": 0.2,
+            "falseConclusionsCount": 4,
+            "falseConclusions": [
+              "Could not identify InstantiateClass as the #1 summed span in the Clang -ftime-trace digest (got null).",
+              "Could not quantify InstantiateClass duration_us (~3,496,667 us across 1,471 recursive template instantiations) from the 745 KB Clang -ftime-trace.",
+              "Could not quantify ExecuteCompiler wall duration_us (~1,707,440 us) from the Clang -ftime-trace.",
+              "Could not verify from CMake profile traces that cold configure is dominated by project()/try_compile compiler detection rather than project CMakeLists helpers."
+            ],
+            "checks": {
+              "identifies_slowest_tu": true,
+              "identifies_top_clang_phase_in_digest": false,
+              "identifies_instantiate_class_duration_us": false,
+              "identifies_execute_compiler_duration_us": false,
+              "distinguishes_cold_cmake_compiler_detection": false
+            },
+            "summary": "1/5 checks passed (4 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "gemini-3.8-flash-high",
+          "cli": "agy",
+          "effort": "high",
+          "arm": "mcp_digest",
+          "timingsMs": {
+            "orchestrationMs": 0.07,
+            "mcpMs": 1525.66,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 2713.38,
+            "cliTimeToRequestMs": null,
+            "modelFirstResponseMs": 21784.61,
+            "cliReportedTtftMs": null,
+            "thinkingStreamMs": null,
+            "textOutputStreamMs": 384.66,
+            "reasoningAndOutputStreamingMs": 384.66,
+            "modelApiDurationMs": 22201.16,
+            "modelCliTotalWallMs": 25396.3,
+            "totalE2eWallMs": 26922.03
+          },
+          "tokens": {
+            "evidencePayloadBytes": 7604,
+            "evidencePayloadTokensEst": 1901,
+            "inputTokens": 13940,
+            "outputTokens": 9000,
+            "thinkingTokens": 8905,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": null,
+            "costBasis": "unreported_subscription_or_quota"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 156368,
+            "maxSingleProcessRssKb": 270904,
+            "cgroupUserCpuMs": 1989.17,
+            "cgroupSysCpuMs": 336.61
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_slowest_tu": true,
+              "identifies_top_clang_phase_in_digest": true,
+              "identifies_instantiate_class_duration_us": true,
+              "identifies_execute_compiler_duration_us": true,
+              "distinguishes_cold_cmake_compiler_detection": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "gemini-3.8-flash-high",
+          "cli": "agy",
+          "effort": "high",
+          "arm": "compact_evidence",
+          "timingsMs": {
+            "orchestrationMs": 1.99,
+            "mcpMs": 434.81,
+            "routingMs": 6,
+            "verificationMs": 3.09,
+            "cliStartupMs": 2080.8,
+            "cliTimeToRequestMs": null,
+            "modelFirstResponseMs": 144110.63,
+            "cliReportedTtftMs": null,
+            "thinkingStreamMs": null,
+            "textOutputStreamMs": 940.13,
+            "reasoningAndOutputStreamingMs": 940.13,
+            "modelApiDurationMs": 145061.69,
+            "modelCliTotalWallMs": 149933.68,
+            "totalE2eWallMs": 150379.57
+          },
+          "tokens": {
+            "evidencePayloadBytes": 6432,
+            "evidencePayloadTokensEst": 1608,
+            "inputTokens": 13602,
+            "outputTokens": 60907,
+            "thinkingTokens": 60824,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": null,
+            "costBasis": "unreported_subscription_or_quota"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 156368,
+            "maxSingleProcessRssKb": 270904,
+            "cgroupUserCpuMs": 999.68,
+            "cgroupSysCpuMs": 209.22
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_slowest_tu": true,
+              "identifies_top_clang_phase_in_digest": true,
+              "identifies_instantiate_class_duration_us": true,
+              "identifies_execute_compiler_duration_us": true,
+              "distinguishes_cold_cmake_compiler_detection": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-fable-5-1",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "raw",
+          "timingsMs": {
+            "orchestrationMs": 0.72,
+            "mcpMs": 0,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 448,
+            "cliTimeToRequestMs": 347,
+            "modelFirstResponseMs": 1469.83,
+            "cliReportedTtftMs": 1485,
+            "thinkingStreamMs": 43973.25,
+            "textOutputStreamMs": 855.85,
+            "reasoningAndOutputStreamingMs": 44829.21,
+            "modelApiDurationMs": 45972,
+            "modelCliTotalWallMs": 47689.47,
+            "totalE2eWallMs": 47690.19
+          },
+          "tokens": {
+            "evidencePayloadBytes": 25521,
+            "evidencePayloadTokensEst": 6381,
+            "inputTokens": 15884,
+            "outputTokens": 3872,
+            "thinkingTokens": 3765,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 15882
+          },
+          "cost": {
+            "costUsd": 0.392145,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 705.89,
+            "cgroupSysCpuMs": 135.37
+          },
+          "diagnostics": {
+            "checksPassed": 1,
+            "totalChecks": 5,
+            "accuracyScore": 0.2,
+            "falseConclusionsCount": 4,
+            "falseConclusions": [
+              "Could not identify InstantiateClass as the #1 summed span in the Clang -ftime-trace digest (got null).",
+              "Could not quantify InstantiateClass duration_us (~3,496,667 us across 1,471 recursive template instantiations) from the 745 KB Clang -ftime-trace.",
+              "Could not quantify ExecuteCompiler wall duration_us (~1,707,440 us) from the Clang -ftime-trace.",
+              "Could not verify from CMake profile traces that cold configure is dominated by project()/try_compile compiler detection rather than project CMakeLists helpers."
+            ],
+            "checks": {
+              "identifies_slowest_tu": true,
+              "identifies_top_clang_phase_in_digest": false,
+              "identifies_instantiate_class_duration_us": false,
+              "identifies_execute_compiler_duration_us": false,
+              "distinguishes_cold_cmake_compiler_detection": false
+            },
+            "summary": "1/5 checks passed (4 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-fable-5-1",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "mcp_digest",
+          "timingsMs": {
+            "orchestrationMs": 0.07,
+            "mcpMs": 1525.66,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 438.16,
+            "cliTimeToRequestMs": 183,
+            "modelFirstResponseMs": 2115.96,
+            "cliReportedTtftMs": 2132,
+            "thinkingStreamMs": 14741.9,
+            "textOutputStreamMs": 929.79,
+            "reasoningAndOutputStreamingMs": 15671.91,
+            "modelApiDurationMs": 17626,
+            "modelCliTotalWallMs": 18958.79,
+            "totalE2eWallMs": 20484.52
+          },
+          "tokens": {
+            "evidencePayloadBytes": 7604,
+            "evidencePayloadTokensEst": 1901,
+            "inputTokens": 4455,
+            "outputTokens": 1373,
+            "thinkingTokens": 1253,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 4453
+          },
+          "cost": {
+            "costUsd": 0.124333,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 2206.84,
+            "cgroupSysCpuMs": 318.88
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_slowest_tu": true,
+              "identifies_top_clang_phase_in_digest": true,
+              "identifies_instantiate_class_duration_us": true,
+              "identifies_execute_compiler_duration_us": true,
+              "distinguishes_cold_cmake_compiler_detection": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-fable-5-1",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "compact_evidence",
+          "timingsMs": {
+            "orchestrationMs": 1.99,
+            "mcpMs": 434.81,
+            "routingMs": 6,
+            "verificationMs": 3.09,
+            "cliStartupMs": 431.81,
+            "cliTimeToRequestMs": 355,
+            "modelFirstResponseMs": 1132.41,
+            "cliReportedTtftMs": 1147,
+            "thinkingStreamMs": 8273.59,
+            "textOutputStreamMs": 1215.35,
+            "reasoningAndOutputStreamingMs": 9489.06,
+            "modelApiDurationMs": 10287,
+            "modelCliTotalWallMs": 11991.64,
+            "totalE2eWallMs": 12437.53
+          },
+          "tokens": {
+            "evidencePayloadBytes": 6432,
+            "evidencePayloadTokensEst": 1608,
+            "inputTokens": 3977,
+            "outputTokens": 894,
+            "thinkingTokens": 754,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 3975
+          },
+          "cost": {
+            "costUsd": 0.094408,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1217.35,
+            "cgroupSysCpuMs": 191.49
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_slowest_tu": true,
+              "identifies_top_clang_phase_in_digest": true,
+              "identifies_instantiate_class_duration_us": true,
+              "identifies_execute_compiler_duration_us": true,
+              "distinguishes_cold_cmake_compiler_detection": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-opus-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "raw",
+          "timingsMs": {
+            "orchestrationMs": 0.72,
+            "mcpMs": 0,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 440.71,
+            "cliTimeToRequestMs": 357,
+            "modelFirstResponseMs": 1719.73,
+            "cliReportedTtftMs": 1735,
+            "thinkingStreamMs": 31314.21,
+            "textOutputStreamMs": 699.72,
+            "reasoningAndOutputStreamingMs": 32014.04,
+            "modelApiDurationMs": 33408,
+            "modelCliTotalWallMs": 34896.68,
+            "totalE2eWallMs": 34897.4
+          },
+          "tokens": {
+            "evidencePayloadBytes": 25521,
+            "evidencePayloadTokensEst": 6381,
+            "inputTokens": 15884,
+            "outputTokens": 3825,
+            "thinkingTokens": 3711,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 15882
+          },
+          "cost": {
+            "costUsd": 0.155918,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 705.89,
+            "cgroupSysCpuMs": 135.37
+          },
+          "diagnostics": {
+            "checksPassed": 1,
+            "totalChecks": 5,
+            "accuracyScore": 0.2,
+            "falseConclusionsCount": 4,
+            "falseConclusions": [
+              "Could not identify InstantiateClass as the #1 summed span in the Clang -ftime-trace digest (got null).",
+              "Could not quantify InstantiateClass duration_us (~3,496,667 us across 1,471 recursive template instantiations) from the 745 KB Clang -ftime-trace.",
+              "Could not quantify ExecuteCompiler wall duration_us (~1,707,440 us) from the Clang -ftime-trace.",
+              "Could not verify from CMake profile traces that cold configure is dominated by project()/try_compile compiler detection rather than project CMakeLists helpers."
+            ],
+            "checks": {
+              "identifies_slowest_tu": true,
+              "identifies_top_clang_phase_in_digest": false,
+              "identifies_instantiate_class_duration_us": false,
+              "identifies_execute_compiler_duration_us": false,
+              "distinguishes_cold_cmake_compiler_detection": false
+            },
+            "summary": "1/5 checks passed (4 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-opus-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "mcp_digest",
+          "timingsMs": {
+            "orchestrationMs": 0.07,
+            "mcpMs": 1525.66,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 444.82,
+            "cliTimeToRequestMs": 371,
+            "modelFirstResponseMs": 1530.3,
+            "cliReportedTtftMs": 1546,
+            "thinkingStreamMs": 20310.53,
+            "textOutputStreamMs": 817.19,
+            "reasoningAndOutputStreamingMs": 21127.91,
+            "modelApiDurationMs": 22309,
+            "modelCliTotalWallMs": 23842.76,
+            "totalE2eWallMs": 25368.49
+          },
+          "tokens": {
+            "evidencePayloadBytes": 7604,
+            "evidencePayloadTokensEst": 1901,
+            "inputTokens": 4455,
+            "outputTokens": 2685,
+            "thinkingTokens": 2560,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 4453
+          },
+          "cost": {
+            "costUsd": 0.075973,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 2206.84,
+            "cgroupSysCpuMs": 318.88
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_slowest_tu": true,
+              "identifies_top_clang_phase_in_digest": true,
+              "identifies_instantiate_class_duration_us": true,
+              "identifies_execute_compiler_duration_us": true,
+              "distinguishes_cold_cmake_compiler_detection": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-opus-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "compact_evidence",
+          "timingsMs": {
+            "orchestrationMs": 1.99,
+            "mcpMs": 434.81,
+            "routingMs": 6,
+            "verificationMs": 3.09,
+            "cliStartupMs": 486.82,
+            "cliTimeToRequestMs": 310,
+            "modelFirstResponseMs": 1663.99,
+            "cliReportedTtftMs": 1688,
+            "thinkingStreamMs": 30147.41,
+            "textOutputStreamMs": 688.41,
+            "reasoningAndOutputStreamingMs": 30835.91,
+            "modelApiDurationMs": 32219,
+            "modelCliTotalWallMs": 33680.53,
+            "totalE2eWallMs": 34126.42
+          },
+          "tokens": {
+            "evidencePayloadBytes": 6432,
+            "evidencePayloadTokensEst": 1608,
+            "inputTokens": 3977,
+            "outputTokens": 3706,
+            "thinkingTokens": 3581,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 3975
+          },
+          "cost": {
+            "costUsd": 0.094003,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1217.35,
+            "cgroupSysCpuMs": 191.49
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_slowest_tu": true,
+              "identifies_top_clang_phase_in_digest": true,
+              "identifies_instantiate_class_duration_us": true,
+              "identifies_execute_compiler_duration_us": true,
+              "distinguishes_cold_cmake_compiler_detection": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-sonnet-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "raw",
+          "timingsMs": {
+            "orchestrationMs": 0.72,
+            "mcpMs": 0,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 460.6,
+            "cliTimeToRequestMs": 180,
+            "modelFirstResponseMs": 1558.4,
+            "cliReportedTtftMs": 1576,
+            "thinkingStreamMs": 38305.01,
+            "textOutputStreamMs": 35.17,
+            "reasoningAndOutputStreamingMs": 38340.34,
+            "modelApiDurationMs": 39741,
+            "modelCliTotalWallMs": 41095.05,
+            "totalE2eWallMs": 41095.77
+          },
+          "tokens": {
+            "evidencePayloadBytes": 25521,
+            "evidencePayloadTokensEst": 6381,
+            "inputTokens": 15888,
+            "outputTokens": 5987,
+            "thinkingTokens": 5872,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 15886
+          },
+          "cost": {
+            "costUsd": 0.099589,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 705.89,
+            "cgroupSysCpuMs": 135.37
+          },
+          "diagnostics": {
+            "checksPassed": 1,
+            "totalChecks": 5,
+            "accuracyScore": 0.2,
+            "falseConclusionsCount": 4,
+            "falseConclusions": [
+              "Could not identify InstantiateClass as the #1 summed span in the Clang -ftime-trace digest (got null).",
+              "Could not quantify InstantiateClass duration_us (~3,496,667 us across 1,471 recursive template instantiations) from the 745 KB Clang -ftime-trace.",
+              "Could not quantify ExecuteCompiler wall duration_us (~1,707,440 us) from the Clang -ftime-trace.",
+              "Could not verify from CMake profile traces that cold configure is dominated by project()/try_compile compiler detection rather than project CMakeLists helpers."
+            ],
+            "checks": {
+              "identifies_slowest_tu": true,
+              "identifies_top_clang_phase_in_digest": false,
+              "identifies_instantiate_class_duration_us": false,
+              "identifies_execute_compiler_duration_us": false,
+              "distinguishes_cold_cmake_compiler_detection": false
+            },
+            "summary": "1/5 checks passed (4 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-sonnet-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "mcp_digest",
+          "timingsMs": {
+            "orchestrationMs": 0.07,
+            "mcpMs": 1525.66,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 481.77,
+            "cliTimeToRequestMs": 356,
+            "modelFirstResponseMs": 1535.2,
+            "cliReportedTtftMs": 1549,
+            "thinkingStreamMs": 45732.57,
+            "textOutputStreamMs": 487.24,
+            "reasoningAndOutputStreamingMs": 46219.81,
+            "modelApiDurationMs": 47418,
+            "modelCliTotalWallMs": 49123.07,
+            "totalE2eWallMs": 50648.8
+          },
+          "tokens": {
+            "evidencePayloadBytes": 7604,
+            "evidencePayloadTokensEst": 1901,
+            "inputTokens": 4459,
+            "outputTokens": 7164,
+            "thinkingTokens": 7039,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 4457
+          },
+          "cost": {
+            "costUsd": 0.082787,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 2206.84,
+            "cgroupSysCpuMs": 318.88
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_slowest_tu": true,
+              "identifies_top_clang_phase_in_digest": true,
+              "identifies_instantiate_class_duration_us": true,
+              "identifies_execute_compiler_duration_us": true,
+              "distinguishes_cold_cmake_compiler_detection": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-sonnet-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "compact_evidence",
+          "timingsMs": {
+            "orchestrationMs": 1.99,
+            "mcpMs": 434.81,
+            "routingMs": 6,
+            "verificationMs": 3.09,
+            "cliStartupMs": 432.81,
+            "cliTimeToRequestMs": 316,
+            "modelFirstResponseMs": 1517.92,
+            "cliReportedTtftMs": 1535,
+            "thinkingStreamMs": 28039.77,
+            "textOutputStreamMs": 537.99,
+            "reasoningAndOutputStreamingMs": 28577.93,
+            "modelApiDurationMs": 29801,
+            "modelCliTotalWallMs": 31202.62,
+            "totalE2eWallMs": 31648.51
+          },
+          "tokens": {
+            "evidencePayloadBytes": 6432,
+            "evidencePayloadTokensEst": 1608,
+            "inputTokens": 3981,
+            "outputTokens": 4706,
+            "thinkingTokens": 4581,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 3979
+          },
+          "cost": {
+            "costUsd": 0.057011,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1217.35,
+            "cgroupSysCpuMs": 191.49
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_slowest_tu": true,
+              "identifies_top_clang_phase_in_digest": true,
+              "identifies_instantiate_class_duration_us": true,
+              "identifies_execute_compiler_duration_us": true,
+              "distinguishes_cold_cmake_compiler_detection": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-haiku-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "raw",
+          "timingsMs": {
+            "orchestrationMs": 0.72,
+            "mcpMs": 0,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 428.94,
+            "cliTimeToRequestMs": 201,
+            "modelFirstResponseMs": 1101.89,
+            "cliReportedTtftMs": 1116,
+            "thinkingStreamMs": 26916.75,
+            "textOutputStreamMs": 333.53,
+            "reasoningAndOutputStreamingMs": 27250.41,
+            "modelApiDurationMs": 28170,
+            "modelCliTotalWallMs": 29501.64,
+            "totalE2eWallMs": 29502.36
+          },
+          "tokens": {
+            "evidencePayloadBytes": 25521,
+            "evidencePayloadTokensEst": 6381,
+            "inputTokens": 15886,
+            "outputTokens": 7001,
+            "thinkingTokens": 6860,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 15884
+          },
+          "cost": {
+            "costUsd": 0.005486,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 705.89,
+            "cgroupSysCpuMs": 135.37
+          },
+          "diagnostics": {
+            "checksPassed": 1,
+            "totalChecks": 5,
+            "accuracyScore": 0.2,
+            "falseConclusionsCount": 4,
+            "falseConclusions": [
+              "Could not identify InstantiateClass as the #1 summed span in the Clang -ftime-trace digest (got null).",
+              "Could not quantify InstantiateClass duration_us (~3,496,667 us across 1,471 recursive template instantiations) from the 745 KB Clang -ftime-trace.",
+              "Could not quantify ExecuteCompiler wall duration_us (~1,707,440 us) from the Clang -ftime-trace.",
+              "Could not verify from CMake profile traces that cold configure is dominated by project()/try_compile compiler detection rather than project CMakeLists helpers."
+            ],
+            "checks": {
+              "identifies_slowest_tu": true,
+              "identifies_top_clang_phase_in_digest": false,
+              "identifies_instantiate_class_duration_us": false,
+              "identifies_execute_compiler_duration_us": false,
+              "distinguishes_cold_cmake_compiler_detection": false
+            },
+            "summary": "1/5 checks passed (4 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-haiku-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "mcp_digest",
+          "timingsMs": {
+            "orchestrationMs": 0.07,
+            "mcpMs": 1525.66,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 449.99,
+            "cliTimeToRequestMs": 348,
+            "modelFirstResponseMs": 991.88,
+            "cliReportedTtftMs": 1010,
+            "thinkingStreamMs": 51446.3,
+            "textOutputStreamMs": 349.56,
+            "reasoningAndOutputStreamingMs": 51796.02,
+            "modelApiDurationMs": 52463,
+            "modelCliTotalWallMs": 54085.97,
+            "totalE2eWallMs": 55611.7
+          },
+          "tokens": {
+            "evidencePayloadBytes": 7604,
+            "evidencePayloadTokensEst": 1901,
+            "inputTokens": 4457,
+            "outputTokens": 13152,
+            "thinkingTokens": 13023,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 4455
+          },
+          "cost": {
+            "costUsd": 0.007133,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 2206.84,
+            "cgroupSysCpuMs": 318.88
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_slowest_tu": true,
+              "identifies_top_clang_phase_in_digest": true,
+              "identifies_instantiate_class_duration_us": true,
+              "identifies_execute_compiler_duration_us": true,
+              "distinguishes_cold_cmake_compiler_detection": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-haiku-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "compact_evidence",
+          "timingsMs": {
+            "orchestrationMs": 1.99,
+            "mcpMs": 434.81,
+            "routingMs": 6,
+            "verificationMs": 3.09,
+            "cliStartupMs": 454.69,
+            "cliTimeToRequestMs": 325,
+            "modelFirstResponseMs": 1665.72,
+            "cliReportedTtftMs": 1689,
+            "thinkingStreamMs": 63084.56,
+            "textOutputStreamMs": 151.03,
+            "reasoningAndOutputStreamingMs": 63235.69,
+            "modelApiDurationMs": 64605,
+            "modelCliTotalWallMs": 66272.37,
+            "totalE2eWallMs": 66718.26
+          },
+          "tokens": {
+            "evidencePayloadBytes": 6432,
+            "evidencePayloadTokensEst": 1608,
+            "inputTokens": 3979,
+            "outputTokens": 16133,
+            "thinkingTokens": 16013,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 3977
+          },
+          "cost": {
+            "costUsd": 0.008564,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1217.35,
+            "cgroupSysCpuMs": 191.49
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_slowest_tu": true,
+              "identifies_top_clang_phase_in_digest": true,
+              "identifies_instantiate_class_duration_us": true,
+              "identifies_execute_compiler_duration_us": true,
+              "distinguishes_cold_cmake_compiler_detection": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pytorch_inductor_training",
+      "title": "PyTorch torch.compile Training Step (MLP + LayerNorm + GELU + AdamW Kineto Traces)",
+      "benchStudyRef": "results/DEMANDING_WORKLOADS_2_TORCH_TRAINING_2026-07-19.md",
+      "captureMode": "artifact_level_boundary",
+      "boundaryNote": "Host Python environment does not have the multi-GB CUDA PyTorch (torch+cu132 / triton) wheel installed locally; evaluated at the Kineto chrome-trace artifact level using the exact 8-step kernel durations and spans established in DEMANDING_WORKLOADS_2_TORCH_TRAINING_2026-07-19.md.",
+      "candidateReports": [
+        {
+          "id": "eager-kineto-trace",
+          "format": "chrome-trace",
+          "rawBytes": 123763,
+          "rawSha256": "66dcb556c38554d0d44843d767c526358d6673d6ab029b898d03fbd3a24833e3",
+          "digestBytes": 2449,
+          "compressionRatio": 50.54
+        },
+        {
+          "id": "compiled-kineto-trace",
+          "format": "chrome-trace",
+          "rawBytes": 122379,
+          "rawSha256": "dfba601ae6a02ecbd00c9c6e061e73900f05d68b72d4da8bd7ec661feaffdaa0",
+          "digestBytes": 2281,
+          "compressionRatio": 53.65
+        }
+      ],
+      "validatedFix": {
+        "attempted": true,
+        "description": "Compile model only (torch.compile(model)) rather than the full step() function so AOTAutograd fuses forward+backward LayerNorm/GELU into triton_red_fused_* kernels while avoiding Dynamo graph-break on loss.backward() and leaving AdamW foreach multi_tensor_apply_kernel undisturbed.",
+        "verificationCommand": "node verify_torch_traces.mjs",
+        "verificationExitCode": 0,
+        "correctnessPassed": true,
+        "baselineMetric": {
+          "name": "eager_gpu_kernel_time_per_step",
+          "unit": "us",
+          "median": 182.7,
+          "samples": [
+            182.7,
+            182.7,
+            182.7
+          ]
+        },
+        "fixedMetric": {
+          "name": "compiled_gpu_kernel_time_per_step",
+          "unit": "us",
+          "median": 168.4,
+          "samples": [
+            168.4,
+            168.4,
+            168.4
+          ]
+        },
+        "speedupRatio": 1.08
+      },
+      "armPipelines": {
+        "raw": {
+          "payloadBytes": 29555,
+          "payloadTokensEst": 7389,
+          "orchestrationMs": 0.59,
+          "mcpMs": 0,
+          "routingMs": 0,
+          "verificationMs": 0,
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 10452,
+            "maxSingleProcessRssKb": 41584,
+            "cgroupUserCpuMs": 16.37,
+            "cgroupSysCpuMs": 12.34
+          }
+        },
+        "mcp_digest": {
+          "payloadBytes": 4879,
+          "payloadTokensEst": 1220,
+          "orchestrationMs": 0.12,
+          "mcpMs": 797.22,
+          "routingMs": 0,
+          "verificationMs": 0,
+          "mcpSpawns": 2,
+          "mcpCalls": 2,
+          "mcpReusedCalls": 0,
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 108648,
+            "maxSingleProcessRssKb": 85920,
+            "cgroupUserCpuMs": 842.91,
+            "cgroupSysCpuMs": 112.18
+          }
+        },
+        "compact_evidence": {
+          "verbosePayloadBytes": 6985,
+          "compactPayloadBytes": 4819,
+          "byteReductionPct": 31.01,
+          "payloadTokensEst": 1205,
+          "orchestrationMs": 1.98,
+          "mcpMs": 394.07,
+          "routingMs": 4,
+          "verificationMs": 27.82,
+          "mcpSpawns": 1,
+          "mcpCalls": 2,
+          "mcpReusedCalls": 1,
+          "selectedReportId": "compiled-kineto-trace",
+          "provenanceCount": 2,
+          "verificationPassed": true,
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 105664,
+            "maxSingleProcessRssKb": 84840,
+            "cgroupUserCpuMs": 526.75,
+            "cgroupSysCpuMs": 69.65
+          }
+        }
+      },
+      "evaluations": [
+        {
+          "modelId": "gemini-4-argon-high",
+          "cli": "agy",
+          "effort": "high",
+          "arm": "raw",
+          "timingsMs": {
+            "orchestrationMs": 0.54,
+            "mcpMs": 0,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 2245.86,
+            "cliTimeToRequestMs": null,
+            "modelFirstResponseMs": 16228.18,
+            "cliReportedTtftMs": null,
+            "thinkingStreamMs": null,
+            "textOutputStreamMs": 382.69,
+            "reasoningAndOutputStreamingMs": 382.69,
+            "modelApiDurationMs": 16618.97,
+            "modelCliTotalWallMs": 19741.68,
+            "totalE2eWallMs": 19742.22
+          },
+          "tokens": {
+            "evidencePayloadBytes": 29555,
+            "evidencePayloadTokensEst": 7389,
+            "inputTokens": 20886,
+            "outputTokens": 1224,
+            "thinkingTokens": 1147,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": null,
+            "costBasis": "unreported_subscription_or_quota"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 156368,
+            "maxSingleProcessRssKb": 270904,
+            "cgroupUserCpuMs": 477.61,
+            "cgroupSysCpuMs": 151.45
+          },
+          "diagnostics": {
+            "checksPassed": 3,
+            "totalChecks": 5,
+            "accuracyScore": 0.6,
+            "falseConclusionsCount": 2,
+            "falseConclusions": [
+              "Could not identify triton_red_fused_gelu_gelu_backward_native_layer_norm_native_layer_norm_backward_2 as the hottest compiled Triton kernel.",
+              "Could not report measured 8-step duration (~262.4 us) for the hottest compiled Triton kernel (got null)."
+            ],
+            "checks": {
+              "identifies_hottest_fused_backward_kernel": false,
+              "identifies_fused_backward_total_duration_us": false,
+              "identifies_inline_activation_recomputation": true,
+              "identifies_compile_model_only_reason": true,
+              "rejects_single_kernel_naive_pairing": true
+            },
+            "summary": "3/5 checks passed (2 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "gemini-4-argon-high",
+          "cli": "agy",
+          "effort": "high",
+          "arm": "mcp_digest",
+          "timingsMs": {
+            "orchestrationMs": 0.07,
+            "mcpMs": 728.25,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 2545.72,
+            "cliTimeToRequestMs": null,
+            "modelFirstResponseMs": 26135.68,
+            "cliReportedTtftMs": null,
+            "thinkingStreamMs": null,
+            "textOutputStreamMs": 690.82,
+            "reasoningAndOutputStreamingMs": 690.82,
+            "modelApiDurationMs": 26852.71,
+            "modelCliTotalWallMs": 30019.77,
+            "totalE2eWallMs": 30748.09
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4879,
+            "evidencePayloadTokensEst": 1220,
+            "inputTokens": 12927,
+            "outputTokens": 1417,
+            "thinkingTokens": 1305,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": null,
+            "costBasis": "unreported_subscription_or_quota"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 156368,
+            "maxSingleProcessRssKb": 270904,
+            "cgroupUserCpuMs": 1303.29,
+            "cgroupSysCpuMs": 258.92
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_hottest_fused_backward_kernel": true,
+              "identifies_fused_backward_total_duration_us": true,
+              "identifies_inline_activation_recomputation": true,
+              "identifies_compile_model_only_reason": true,
+              "rejects_single_kernel_naive_pairing": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "gemini-4-argon-high",
+          "cli": "agy",
+          "effort": "high",
+          "arm": "compact_evidence",
+          "timingsMs": {
+            "orchestrationMs": 2.01,
+            "mcpMs": 426.85,
+            "routingMs": 4,
+            "verificationMs": 24.12,
+            "cliStartupMs": 2477.66,
+            "cliTimeToRequestMs": null,
+            "modelFirstResponseMs": 13305.6,
+            "cliReportedTtftMs": null,
+            "thinkingStreamMs": null,
+            "textOutputStreamMs": 612.29,
+            "reasoningAndOutputStreamingMs": 612.29,
+            "modelApiDurationMs": 13939.99,
+            "modelCliTotalWallMs": 17014.98,
+            "totalE2eWallMs": 17471.96
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4819,
+            "evidencePayloadTokensEst": 1205,
+            "inputTokens": 12916,
+            "outputTokens": 1244,
+            "thinkingTokens": 1132,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": null,
+            "costBasis": "unreported_subscription_or_quota"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 156368,
+            "maxSingleProcessRssKb": 270904,
+            "cgroupUserCpuMs": 1005.77,
+            "cgroupSysCpuMs": 204.28
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_hottest_fused_backward_kernel": true,
+              "identifies_fused_backward_total_duration_us": true,
+              "identifies_inline_activation_recomputation": true,
+              "identifies_compile_model_only_reason": true,
+              "rejects_single_kernel_naive_pairing": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "gemini-3.8-flash-high",
+          "cli": "agy",
+          "effort": "high",
+          "arm": "raw",
+          "timingsMs": {
+            "orchestrationMs": 0.54,
+            "mcpMs": 0,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 2500.85,
+            "cliTimeToRequestMs": null,
+            "modelFirstResponseMs": 10775.31,
+            "cliReportedTtftMs": null,
+            "thinkingStreamMs": null,
+            "textOutputStreamMs": 153.32,
+            "reasoningAndOutputStreamingMs": 153.32,
+            "modelApiDurationMs": 10971.93,
+            "modelCliTotalWallMs": 14313.36,
+            "totalE2eWallMs": 14313.9
+          },
+          "tokens": {
+            "evidencePayloadBytes": 29555,
+            "evidencePayloadTokensEst": 7389,
+            "inputTokens": 21059,
+            "outputTokens": 3919,
+            "thinkingTokens": 3843,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": null,
+            "costBasis": "unreported_subscription_or_quota"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 156368,
+            "maxSingleProcessRssKb": 270904,
+            "cgroupUserCpuMs": 477.61,
+            "cgroupSysCpuMs": 151.45
+          },
+          "diagnostics": {
+            "checksPassed": 3,
+            "totalChecks": 5,
+            "accuracyScore": 0.6,
+            "falseConclusionsCount": 2,
+            "falseConclusions": [
+              "Could not identify triton_red_fused_gelu_gelu_backward_native_layer_norm_native_layer_norm_backward_2 as the hottest compiled Triton kernel.",
+              "Could not report measured 8-step duration (~262.4 us) for the hottest compiled Triton kernel (got null)."
+            ],
+            "checks": {
+              "identifies_hottest_fused_backward_kernel": false,
+              "identifies_fused_backward_total_duration_us": false,
+              "identifies_inline_activation_recomputation": true,
+              "identifies_compile_model_only_reason": true,
+              "rejects_single_kernel_naive_pairing": true
+            },
+            "summary": "3/5 checks passed (2 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "gemini-3.8-flash-high",
+          "cli": "agy",
+          "effort": "high",
+          "arm": "mcp_digest",
+          "timingsMs": {
+            "orchestrationMs": 0.07,
+            "mcpMs": 728.25,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 2345.5,
+            "cliTimeToRequestMs": null,
+            "modelFirstResponseMs": 6878.9,
+            "cliReportedTtftMs": null,
+            "thinkingStreamMs": null,
+            "textOutputStreamMs": 253.74,
+            "reasoningAndOutputStreamingMs": 253.74,
+            "modelApiDurationMs": 7143.96,
+            "modelCliTotalWallMs": 10033.73,
+            "totalE2eWallMs": 10762.05
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4879,
+            "evidencePayloadTokensEst": 1220,
+            "inputTokens": 13079,
+            "outputTokens": 2647,
+            "thinkingTokens": 2535,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": null,
+            "costBasis": "unreported_subscription_or_quota"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 156368,
+            "maxSingleProcessRssKb": 270904,
+            "cgroupUserCpuMs": 1303.29,
+            "cgroupSysCpuMs": 258.92
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_hottest_fused_backward_kernel": true,
+              "identifies_fused_backward_total_duration_us": true,
+              "identifies_inline_activation_recomputation": true,
+              "identifies_compile_model_only_reason": true,
+              "rejects_single_kernel_naive_pairing": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "gemini-3.8-flash-high",
+          "cli": "agy",
+          "effort": "high",
+          "arm": "compact_evidence",
+          "timingsMs": {
+            "orchestrationMs": 2.01,
+            "mcpMs": 426.85,
+            "routingMs": 4,
+            "verificationMs": 24.12,
+            "cliStartupMs": 2217.44,
+            "cliTimeToRequestMs": null,
+            "modelFirstResponseMs": 7576.55,
+            "cliReportedTtftMs": null,
+            "thinkingStreamMs": null,
+            "textOutputStreamMs": 229.43,
+            "reasoningAndOutputStreamingMs": 229.43,
+            "modelApiDurationMs": 7809.37,
+            "modelCliTotalWallMs": 10611.35,
+            "totalE2eWallMs": 11068.33
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4819,
+            "evidencePayloadTokensEst": 1205,
+            "inputTokens": 13070,
+            "outputTokens": 2712,
+            "thinkingTokens": 2600,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": null,
+            "costBasis": "unreported_subscription_or_quota"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 156368,
+            "maxSingleProcessRssKb": 270904,
+            "cgroupUserCpuMs": 1005.77,
+            "cgroupSysCpuMs": 204.28
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_hottest_fused_backward_kernel": true,
+              "identifies_fused_backward_total_duration_us": true,
+              "identifies_inline_activation_recomputation": true,
+              "identifies_compile_model_only_reason": true,
+              "rejects_single_kernel_naive_pairing": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-fable-5-1",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "raw",
+          "timingsMs": {
+            "orchestrationMs": 0.54,
+            "mcpMs": 0,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 657.11,
+            "cliTimeToRequestMs": 192,
+            "modelFirstResponseMs": 2017.66,
+            "cliReportedTtftMs": 2044,
+            "thinkingStreamMs": 103023.21,
+            "textOutputStreamMs": 827.16,
+            "reasoningAndOutputStreamingMs": 103850.46,
+            "modelApiDurationMs": 105709,
+            "modelCliTotalWallMs": 107576.93,
+            "totalE2eWallMs": 107577.47
+          },
+          "tokens": {
+            "evidencePayloadBytes": 29555,
+            "evidencePayloadTokensEst": 7389,
+            "inputTokens": 16793,
+            "outputTokens": 8662,
+            "thinkingTokens": 8542,
+            "cacheReadInputTokens": 16791,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": 0.437318,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 695.28,
+            "cgroupSysCpuMs": 133.72
+          },
+          "diagnostics": {
+            "checksPassed": 3,
+            "totalChecks": 5,
+            "accuracyScore": 0.6,
+            "falseConclusionsCount": 2,
+            "falseConclusions": [
+              "Could not identify triton_red_fused_gelu_gelu_backward_native_layer_norm_native_layer_norm_backward_2 as the hottest compiled Triton kernel.",
+              "Could not report measured 8-step duration (~262.4 us) for the hottest compiled Triton kernel (got null)."
+            ],
+            "checks": {
+              "identifies_hottest_fused_backward_kernel": false,
+              "identifies_fused_backward_total_duration_us": false,
+              "identifies_inline_activation_recomputation": true,
+              "identifies_compile_model_only_reason": true,
+              "rejects_single_kernel_naive_pairing": true
+            },
+            "summary": "3/5 checks passed (2 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-fable-5-1",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "mcp_digest",
+          "timingsMs": {
+            "orchestrationMs": 0.07,
+            "mcpMs": 728.25,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 429.27,
+            "cliTimeToRequestMs": 242,
+            "modelFirstResponseMs": 1022.57,
+            "cliReportedTtftMs": 1037,
+            "thinkingStreamMs": 84142.77,
+            "textOutputStreamMs": 1325.01,
+            "reasoningAndOutputStreamingMs": 85467.94,
+            "modelApiDurationMs": 86267,
+            "modelCliTotalWallMs": 88048.33,
+            "totalE2eWallMs": 88776.65
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4879,
+            "evidencePayloadTokensEst": 1220,
+            "inputTokens": 3246,
+            "outputTokens": 7688,
+            "thinkingTokens": 7515,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 3244
+          },
+          "cost": {
+            "costUsd": 0.42497,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1520.96,
+            "cgroupSysCpuMs": 241.19
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_hottest_fused_backward_kernel": true,
+              "identifies_fused_backward_total_duration_us": true,
+              "identifies_inline_activation_recomputation": true,
+              "identifies_compile_model_only_reason": true,
+              "rejects_single_kernel_naive_pairing": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-fable-5-1",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "compact_evidence",
+          "timingsMs": {
+            "orchestrationMs": 2.03,
+            "mcpMs": 386.64,
+            "routingMs": 5,
+            "verificationMs": 25.53,
+            "cliStartupMs": 448.51,
+            "cliTimeToRequestMs": 225,
+            "modelFirstResponseMs": 1258.53,
+            "cliReportedTtftMs": 1281,
+            "thinkingStreamMs": 57416.99,
+            "textOutputStreamMs": 1278.53,
+            "reasoningAndOutputStreamingMs": 58695.7,
+            "modelApiDurationMs": 59758,
+            "modelCliTotalWallMs": 61174.83,
+            "totalE2eWallMs": 61594.03
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4819,
+            "evidencePayloadTokensEst": 1205,
+            "inputTokens": 3239,
+            "outputTokens": 5248,
+            "thinkingTokens": 5070,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 3237
+          },
+          "cost": {
+            "costUsd": 0.302883,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1206.83,
+            "cgroupSysCpuMs": 200.39
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_hottest_fused_backward_kernel": true,
+              "identifies_fused_backward_total_duration_us": true,
+              "identifies_inline_activation_recomputation": true,
+              "identifies_compile_model_only_reason": true,
+              "rejects_single_kernel_naive_pairing": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-opus-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "raw",
+          "timingsMs": {
+            "orchestrationMs": 0.54,
+            "mcpMs": 0,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 638.94,
+            "cliTimeToRequestMs": 447,
+            "modelFirstResponseMs": 1673.07,
+            "cliReportedTtftMs": 1688,
+            "thinkingStreamMs": 164883.72,
+            "textOutputStreamMs": 666.54,
+            "reasoningAndOutputStreamingMs": 165550.27,
+            "modelApiDurationMs": 166797,
+            "modelCliTotalWallMs": 168863.25,
+            "totalE2eWallMs": 168863.79
+          },
+          "tokens": {
+            "evidencePayloadBytes": 29555,
+            "evidencePayloadTokensEst": 7389,
+            "inputTokens": 16793,
+            "outputTokens": 17846,
+            "thinkingTokens": 17710,
+            "cacheReadInputTokens": 16791,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": 0.360286,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 695.28,
+            "cgroupSysCpuMs": 133.72
+          },
+          "diagnostics": {
+            "checksPassed": 2,
+            "totalChecks": 5,
+            "accuracyScore": 0.4,
+            "falseConclusionsCount": 2,
+            "falseConclusions": [
+              "Could not identify triton_red_fused_gelu_gelu_backward_native_layer_norm_native_layer_norm_backward_2 as the hottest compiled Triton kernel.",
+              "Could not report measured 8-step duration (~262.4 us) for the hottest compiled Triton kernel (got null)."
+            ],
+            "checks": {
+              "identifies_hottest_fused_backward_kernel": false,
+              "identifies_fused_backward_total_duration_us": false,
+              "identifies_inline_activation_recomputation": false,
+              "identifies_compile_model_only_reason": true,
+              "rejects_single_kernel_naive_pairing": true
+            },
+            "summary": "2/5 checks passed (2 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-opus-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "mcp_digest",
+          "timingsMs": {
+            "orchestrationMs": 0.07,
+            "mcpMs": 728.25,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 420.67,
+            "cliTimeToRequestMs": 523,
+            "modelFirstResponseMs": 1501.03,
+            "cliReportedTtftMs": 1516,
+            "thinkingStreamMs": 76233.6,
+            "textOutputStreamMs": 684.99,
+            "reasoningAndOutputStreamingMs": 76918.8,
+            "modelApiDurationMs": 77927,
+            "modelCliTotalWallMs": 79556.21,
+            "totalE2eWallMs": 80284.53
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4879,
+            "evidencePayloadTokensEst": 1220,
+            "inputTokens": 3246,
+            "outputTokens": 9099,
+            "thinkingTokens": 8921,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 3244
+          },
+          "cost": {
+            "costUsd": 0.198208,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1520.96,
+            "cgroupSysCpuMs": 241.19
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_hottest_fused_backward_kernel": true,
+              "identifies_fused_backward_total_duration_us": true,
+              "identifies_inline_activation_recomputation": true,
+              "identifies_compile_model_only_reason": true,
+              "rejects_single_kernel_naive_pairing": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-opus-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "compact_evidence",
+          "timingsMs": {
+            "orchestrationMs": 2.03,
+            "mcpMs": 386.64,
+            "routingMs": 5,
+            "verificationMs": 25.53,
+            "cliStartupMs": 449.89,
+            "cliTimeToRequestMs": 202,
+            "modelFirstResponseMs": 1420,
+            "cliReportedTtftMs": 1435,
+            "thinkingStreamMs": 117409.04,
+            "textOutputStreamMs": 1002.99,
+            "reasoningAndOutputStreamingMs": 118412.19,
+            "modelApiDurationMs": 119650,
+            "modelCliTotalWallMs": 121156.36,
+            "totalE2eWallMs": 121575.56
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4819,
+            "evidencePayloadTokensEst": 1205,
+            "inputTokens": 3239,
+            "outputTokens": 14207,
+            "thinkingTokens": 14029,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 3237
+          },
+          "cost": {
+            "costUsd": 0.300333,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1206.83,
+            "cgroupSysCpuMs": 200.39
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_hottest_fused_backward_kernel": true,
+              "identifies_fused_backward_total_duration_us": true,
+              "identifies_inline_activation_recomputation": true,
+              "identifies_compile_model_only_reason": true,
+              "rejects_single_kernel_naive_pairing": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-sonnet-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "raw",
+          "timingsMs": {
+            "orchestrationMs": 0.54,
+            "mcpMs": 0,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 442.47,
+            "cliTimeToRequestMs": 302,
+            "modelFirstResponseMs": 1857.83,
+            "cliReportedTtftMs": 1874,
+            "thinkingStreamMs": 71133.71,
+            "textOutputStreamMs": 3.09,
+            "reasoningAndOutputStreamingMs": 71136.91,
+            "modelApiDurationMs": 72713,
+            "modelCliTotalWallMs": 74165.86,
+            "totalE2eWallMs": 74166.4
+          },
+          "tokens": {
+            "evidencePayloadBytes": 29555,
+            "evidencePayloadTokensEst": 7389,
+            "inputTokens": 16797,
+            "outputTokens": 10334,
+            "thinkingTokens": 10214,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 16795
+          },
+          "cost": {
+            "costUsd": 0.145332,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 695.28,
+            "cgroupSysCpuMs": 133.72
+          },
+          "diagnostics": {
+            "checksPassed": 3,
+            "totalChecks": 5,
+            "accuracyScore": 0.6,
+            "falseConclusionsCount": 2,
+            "falseConclusions": [
+              "Could not identify triton_red_fused_gelu_gelu_backward_native_layer_norm_native_layer_norm_backward_2 as the hottest compiled Triton kernel.",
+              "Could not report measured 8-step duration (~262.4 us) for the hottest compiled Triton kernel (got null)."
+            ],
+            "checks": {
+              "identifies_hottest_fused_backward_kernel": false,
+              "identifies_fused_backward_total_duration_us": false,
+              "identifies_inline_activation_recomputation": true,
+              "identifies_compile_model_only_reason": true,
+              "rejects_single_kernel_naive_pairing": true
+            },
+            "summary": "3/5 checks passed (2 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-sonnet-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "mcp_digest",
+          "timingsMs": {
+            "orchestrationMs": 0.07,
+            "mcpMs": 728.25,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 427.21,
+            "cliTimeToRequestMs": 1244,
+            "modelFirstResponseMs": 2897.34,
+            "cliReportedTtftMs": 2912,
+            "thinkingStreamMs": 41719.01,
+            "textOutputStreamMs": 615.75,
+            "reasoningAndOutputStreamingMs": 42334.89,
+            "modelApiDurationMs": 44007,
+            "modelCliTotalWallMs": 46538.61,
+            "totalE2eWallMs": 47266.93
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4879,
+            "evidencePayloadTokensEst": 1220,
+            "inputTokens": 3250,
+            "outputTokens": 6623,
+            "thinkingTokens": 6463,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 3248
+          },
+          "cost": {
+            "costUsd": 0.074354,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1520.96,
+            "cgroupSysCpuMs": 241.19
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_hottest_fused_backward_kernel": true,
+              "identifies_fused_backward_total_duration_us": true,
+              "identifies_inline_activation_recomputation": true,
+              "identifies_compile_model_only_reason": true,
+              "rejects_single_kernel_naive_pairing": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-sonnet-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "compact_evidence",
+          "timingsMs": {
+            "orchestrationMs": 2.03,
+            "mcpMs": 386.64,
+            "routingMs": 5,
+            "verificationMs": 25.53,
+            "cliStartupMs": 466.39,
+            "cliTimeToRequestMs": 396,
+            "modelFirstResponseMs": 4969.31,
+            "cliReportedTtftMs": 4985,
+            "thinkingStreamMs": 64579.9,
+            "textOutputStreamMs": 576.66,
+            "reasoningAndOutputStreamingMs": 65156.67,
+            "modelApiDurationMs": 69762,
+            "modelCliTotalWallMs": 71283.34,
+            "totalE2eWallMs": 71702.54
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4819,
+            "evidencePayloadTokensEst": 1205,
+            "inputTokens": 3243,
+            "outputTokens": 10640,
+            "thinkingTokens": 10480,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 3241
+          },
+          "cost": {
+            "costUsd": 0.114506,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1206.83,
+            "cgroupSysCpuMs": 200.39
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_hottest_fused_backward_kernel": true,
+              "identifies_fused_backward_total_duration_us": true,
+              "identifies_inline_activation_recomputation": true,
+              "identifies_compile_model_only_reason": true,
+              "rejects_single_kernel_naive_pairing": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-haiku-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "raw",
+          "timingsMs": {
+            "orchestrationMs": 0.54,
+            "mcpMs": 0,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 436.52,
+            "cliTimeToRequestMs": 353,
+            "modelFirstResponseMs": 1149.7,
+            "cliReportedTtftMs": 1164,
+            "thinkingStreamMs": 76646.47,
+            "textOutputStreamMs": 17.74,
+            "reasoningAndOutputStreamingMs": 76664.32,
+            "modelApiDurationMs": 77491,
+            "modelCliTotalWallMs": 79351.87,
+            "totalE2eWallMs": 79352.41
+          },
+          "tokens": {
+            "evidencePayloadBytes": 29555,
+            "evidencePayloadTokensEst": 7389,
+            "inputTokens": 16795,
+            "outputTokens": 17597,
+            "thinkingTokens": 17477,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 16793
+          },
+          "cost": {
+            "costUsd": 0.010898,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 695.28,
+            "cgroupSysCpuMs": 133.72
+          },
+          "diagnostics": {
+            "checksPassed": 1,
+            "totalChecks": 5,
+            "accuracyScore": 0.2,
+            "falseConclusionsCount": 3,
+            "falseConclusions": [
+              "Could not identify triton_red_fused_gelu_gelu_backward_native_layer_norm_native_layer_norm_backward_2 as the hottest compiled Triton kernel.",
+              "Could not report measured 8-step duration (~262.4 us) for the hottest compiled Triton kernel (got null).",
+              "Failed to recognize that comparing 1 fused backward kernel against only 1 of the 4 eager kernels it replaced produces a misleading slowdown sign."
+            ],
+            "checks": {
+              "identifies_hottest_fused_backward_kernel": false,
+              "identifies_fused_backward_total_duration_us": false,
+              "identifies_inline_activation_recomputation": false,
+              "identifies_compile_model_only_reason": true,
+              "rejects_single_kernel_naive_pairing": false
+            },
+            "summary": "1/5 checks passed (3 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-haiku-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "mcp_digest",
+          "timingsMs": {
+            "orchestrationMs": 0.07,
+            "mcpMs": 728.25,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 458.48,
+            "cliTimeToRequestMs": 359,
+            "modelFirstResponseMs": 1157,
+            "cliReportedTtftMs": 1181,
+            "thinkingStreamMs": 49552.75,
+            "textOutputStreamMs": 415.62,
+            "reasoningAndOutputStreamingMs": 49968.54,
+            "modelApiDurationMs": 50795,
+            "modelCliTotalWallMs": 52333.27,
+            "totalE2eWallMs": 53061.59
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4879,
+            "evidencePayloadTokensEst": 1220,
+            "inputTokens": 3248,
+            "outputTokens": 12187,
+            "thinkingTokens": 12027,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 3246
+          },
+          "cost": {
+            "costUsd": 0.006499,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1520.96,
+            "cgroupSysCpuMs": 241.19
+          },
+          "diagnostics": {
+            "checksPassed": 4,
+            "totalChecks": 5,
+            "accuracyScore": 0.8,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_hottest_fused_backward_kernel": true,
+              "identifies_fused_backward_total_duration_us": true,
+              "identifies_inline_activation_recomputation": true,
+              "identifies_compile_model_only_reason": false,
+              "rejects_single_kernel_naive_pairing": true
+            },
+            "summary": "4/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-haiku-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "compact_evidence",
+          "timingsMs": {
+            "orchestrationMs": 2.03,
+            "mcpMs": 386.64,
+            "routingMs": 5,
+            "verificationMs": 25.53,
+            "cliStartupMs": 461.08,
+            "cliTimeToRequestMs": 401,
+            "modelFirstResponseMs": 1024.31,
+            "cliReportedTtftMs": 1045,
+            "thinkingStreamMs": 64809.03,
+            "textOutputStreamMs": 326.17,
+            "reasoningAndOutputStreamingMs": 65135.35,
+            "modelApiDurationMs": 65784,
+            "modelCliTotalWallMs": 67481.62,
+            "totalE2eWallMs": 67900.82
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4819,
+            "evidencePayloadTokensEst": 1205,
+            "inputTokens": 3241,
+            "outputTokens": 16575,
+            "thinkingTokens": 16402,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 3239
+          },
+          "cost": {
+            "costUsd": 0.008693,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1206.83,
+            "cgroupSysCpuMs": 200.39
+          },
+          "diagnostics": {
+            "checksPassed": 4,
+            "totalChecks": 5,
+            "accuracyScore": 0.8,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_hottest_fused_backward_kernel": true,
+              "identifies_fused_backward_total_duration_us": true,
+              "identifies_inline_activation_recomputation": true,
+              "identifies_compile_model_only_reason": false,
+              "rejects_single_kernel_naive_pairing": true
+            },
+            "summary": "4/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "linux_perf_cpu",
+      "title": "Linux perf CPU Roofline & Degraded-PMU Honesty (cpu_bench.c on Ryzen AI 9 HX 370)",
+      "benchStudyRef": "results/CROSS_BACKEND_2026-06-15.md",
+      "captureMode": "live_hardware_capture",
+      "candidateReports": [
+        {
+          "id": "perf-stat",
+          "format": "perf-stat-json",
+          "rawBytes": 917,
+          "rawSha256": "e0e882b19570f47ad522f85fe0d92ea136f2ecfcfdf8bef640159fddbc630e2d",
+          "digestBytes": 662,
+          "compressionRatio": 1.39
+        },
+        {
+          "id": "perf-report",
+          "format": "perf-report",
+          "rawBytes": 688,
+          "rawSha256": "a0904ddcbc18fd07da4caf3adc20ca4887ac134503fd25514fbcbc1839e29e9e",
+          "digestBytes": 1531,
+          "compressionRatio": 0.45
+        }
+      ],
+      "validatedFix": {
+        "attempted": true,
+        "description": "Collapse the 2-step serial loop-carried FP dependency in compute_bound_poly into a 4-step composed affine recurrence (a = a * m4 + b4), reducing critical-path FMA latency by 4x while preserving output invariants.",
+        "verificationCommand": "node verify_cpu_fix.mjs",
+        "verificationExitCode": 0,
+        "correctnessPassed": true,
+        "baselineMetric": {
+          "name": "cpu_bench_wall_ms",
+          "unit": "ms",
+          "median": 6016.95,
+          "samples": [
+            6016.95,
+            6031.74,
+            5977.85
+          ]
+        },
+        "fixedMetric": {
+          "name": "cpu_bench_wall_ms",
+          "unit": "ms",
+          "median": 1107.55,
+          "samples": [
+            1114.19,
+            1107.55,
+            1086.2
+          ]
+        },
+        "speedupRatio": 5.43
+      },
+      "armPipelines": {
+        "raw": {
+          "payloadBytes": 4006,
+          "payloadTokensEst": 1002,
+          "orchestrationMs": 0.43,
+          "mcpMs": 0,
+          "routingMs": 0,
+          "verificationMs": 0,
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 9996,
+            "maxSingleProcessRssKb": 41424,
+            "cgroupUserCpuMs": 14.02,
+            "cgroupSysCpuMs": 15.98
+          }
+        },
+        "mcp_digest": {
+          "payloadBytes": 2324,
+          "payloadTokensEst": 581,
+          "orchestrationMs": 0.08,
+          "mcpMs": 775,
+          "routingMs": 0,
+          "verificationMs": 0,
+          "mcpSpawns": 2,
+          "mcpCalls": 2,
+          "mcpReusedCalls": 0,
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 104760,
+            "maxSingleProcessRssKb": 83796,
+            "cgroupUserCpuMs": 913.45,
+            "cgroupSysCpuMs": 103.55
+          }
+        },
+        "compact_evidence": {
+          "verbosePayloadBytes": 4321,
+          "compactPayloadBytes": 2432,
+          "byteReductionPct": 43.72,
+          "payloadTokensEst": 608,
+          "orchestrationMs": 1.95,
+          "mcpMs": 365.93,
+          "routingMs": 4,
+          "verificationMs": 1115.24,
+          "mcpSpawns": 1,
+          "mcpCalls": 2,
+          "mcpReusedCalls": 1,
+          "selectedReportId": "perf-report",
+          "provenanceCount": 2,
+          "verificationPassed": true,
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 105176,
+            "maxSingleProcessRssKb": 84520,
+            "cgroupUserCpuMs": 576.64,
+            "cgroupSysCpuMs": 67.31
+          }
+        }
+      },
+      "evaluations": [
+        {
+          "modelId": "gemini-4-argon-high",
+          "cli": "agy",
+          "effort": "high",
+          "arm": "raw",
+          "timingsMs": {
+            "orchestrationMs": 0.88,
+            "mcpMs": 0,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 2036.39,
+            "cliTimeToRequestMs": null,
+            "modelFirstResponseMs": 27520.18,
+            "cliReportedTtftMs": null,
+            "thinkingStreamMs": null,
+            "textOutputStreamMs": 408.67,
+            "reasoningAndOutputStreamingMs": 408.67,
+            "modelApiDurationMs": 27944.29,
+            "modelCliTotalWallMs": 30318.99,
+            "totalE2eWallMs": 30319.87
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4006,
+            "evidencePayloadTokensEst": 1002,
+            "inputTokens": 12234,
+            "outputTokens": 2473,
+            "thinkingTokens": 2394,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": null,
+            "costBasis": "unreported_subscription_or_quota"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 156368,
+            "maxSingleProcessRssKb": 270904,
+            "cgroupUserCpuMs": 482.89,
+            "cgroupSysCpuMs": 147.19
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_compute_poly_dominant_symbol": true,
+              "identifies_measured_self_pct": true,
+              "preserves_null_duration_us_in_perf_report": true,
+              "identifies_program_ipc_measured": true,
+              "distinguishes_unsupported_counter_from_zero": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "gemini-4-argon-high",
+          "cli": "agy",
+          "effort": "high",
+          "arm": "mcp_digest",
+          "timingsMs": {
+            "orchestrationMs": 0.06,
+            "mcpMs": 721.21,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 2117.3,
+            "cliTimeToRequestMs": null,
+            "modelFirstResponseMs": 7892.46,
+            "cliReportedTtftMs": null,
+            "thinkingStreamMs": null,
+            "textOutputStreamMs": 510.53,
+            "reasoningAndOutputStreamingMs": 510.53,
+            "modelApiDurationMs": 8422.59,
+            "modelCliTotalWallMs": 11127.57,
+            "totalE2eWallMs": 11848.84
+          },
+          "tokens": {
+            "evidencePayloadBytes": 2337,
+            "evidencePayloadTokensEst": 585,
+            "inputTokens": 11435,
+            "outputTokens": 640,
+            "thinkingTokens": 548,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": null,
+            "costBasis": "unreported_subscription_or_quota"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 156368,
+            "maxSingleProcessRssKb": 270904,
+            "cgroupUserCpuMs": 1348.44,
+            "cgroupSysCpuMs": 248.86
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_compute_poly_dominant_symbol": true,
+              "identifies_measured_self_pct": true,
+              "preserves_null_duration_us_in_perf_report": true,
+              "identifies_program_ipc_measured": true,
+              "distinguishes_unsupported_counter_from_zero": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "gemini-4-argon-high",
+          "cli": "agy",
+          "effort": "high",
+          "arm": "compact_evidence",
+          "timingsMs": {
+            "orchestrationMs": 1.95,
+            "mcpMs": 412.88,
+            "routingMs": 3,
+            "verificationMs": 1094.05,
+            "cliStartupMs": 2518.19,
+            "cliTimeToRequestMs": null,
+            "modelFirstResponseMs": 7911.38,
+            "cliReportedTtftMs": null,
+            "thinkingStreamMs": null,
+            "textOutputStreamMs": 385.01,
+            "reasoningAndOutputStreamingMs": 385.01,
+            "modelApiDurationMs": 8305.98,
+            "modelCliTotalWallMs": 11199.28,
+            "totalE2eWallMs": 12711.16
+          },
+          "tokens": {
+            "evidencePayloadBytes": 2438,
+            "evidencePayloadTokensEst": 610,
+            "inputTokens": 11516,
+            "outputTokens": 512,
+            "thinkingTokens": 423,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": null,
+            "costBasis": "unreported_subscription_or_quota"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 156368,
+            "maxSingleProcessRssKb": 270904,
+            "cgroupUserCpuMs": 1059.53,
+            "cgroupSysCpuMs": 218.25
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_compute_poly_dominant_symbol": true,
+              "identifies_measured_self_pct": true,
+              "preserves_null_duration_us_in_perf_report": true,
+              "identifies_program_ipc_measured": true,
+              "distinguishes_unsupported_counter_from_zero": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "gemini-3.8-flash-high",
+          "cli": "agy",
+          "effort": "high",
+          "arm": "raw",
+          "timingsMs": {
+            "orchestrationMs": 0.88,
+            "mcpMs": 0,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 2024.11,
+            "cliTimeToRequestMs": null,
+            "modelFirstResponseMs": 141302.34,
+            "cliReportedTtftMs": null,
+            "thinkingStreamMs": null,
+            "textOutputStreamMs": 741.05,
+            "reasoningAndOutputStreamingMs": 741.05,
+            "modelApiDurationMs": 142067.16,
+            "modelCliTotalWallMs": 145811.69,
+            "totalE2eWallMs": 145812.57
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4006,
+            "evidencePayloadTokensEst": 1002,
+            "inputTokens": 12387,
+            "outputTokens": 59092,
+            "thinkingTokens": 59018,
+            "cacheReadInputTokens": 8136,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": null,
+            "costBasis": "unreported_subscription_or_quota"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 156368,
+            "maxSingleProcessRssKb": 270904,
+            "cgroupUserCpuMs": 482.89,
+            "cgroupSysCpuMs": 147.19
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_compute_poly_dominant_symbol": true,
+              "identifies_measured_self_pct": true,
+              "preserves_null_duration_us_in_perf_report": true,
+              "identifies_program_ipc_measured": true,
+              "distinguishes_unsupported_counter_from_zero": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "gemini-3.8-flash-high",
+          "cli": "agy",
+          "effort": "high",
+          "arm": "mcp_digest",
+          "timingsMs": {
+            "orchestrationMs": 0.06,
+            "mcpMs": 721.21,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 2150.62,
+            "cliTimeToRequestMs": null,
+            "modelFirstResponseMs": 5177.46,
+            "cliReportedTtftMs": null,
+            "thinkingStreamMs": null,
+            "textOutputStreamMs": 155.32,
+            "reasoningAndOutputStreamingMs": 155.32,
+            "modelApiDurationMs": 5335.92,
+            "modelCliTotalWallMs": 7978.29,
+            "totalE2eWallMs": 8699.56
+          },
+          "tokens": {
+            "evidencePayloadBytes": 2337,
+            "evidencePayloadTokensEst": 585,
+            "inputTokens": 11588,
+            "outputTokens": 1958,
+            "thinkingTokens": 1869,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": null,
+            "costBasis": "unreported_subscription_or_quota"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 156368,
+            "maxSingleProcessRssKb": 270904,
+            "cgroupUserCpuMs": 1348.44,
+            "cgroupSysCpuMs": 248.86
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_compute_poly_dominant_symbol": true,
+              "identifies_measured_self_pct": true,
+              "preserves_null_duration_us_in_perf_report": true,
+              "identifies_program_ipc_measured": true,
+              "distinguishes_unsupported_counter_from_zero": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "gemini-3.8-flash-high",
+          "cli": "agy",
+          "effort": "high",
+          "arm": "compact_evidence",
+          "timingsMs": {
+            "orchestrationMs": 1.95,
+            "mcpMs": 412.88,
+            "routingMs": 3,
+            "verificationMs": 1094.05,
+            "cliStartupMs": 2284.96,
+            "cliTimeToRequestMs": null,
+            "modelFirstResponseMs": 8297.85,
+            "cliReportedTtftMs": null,
+            "thinkingStreamMs": null,
+            "textOutputStreamMs": 179.12,
+            "reasoningAndOutputStreamingMs": 179.12,
+            "modelApiDurationMs": 8492.05,
+            "modelCliTotalWallMs": 11283.07,
+            "totalE2eWallMs": 12794.95
+          },
+          "tokens": {
+            "evidencePayloadBytes": 2438,
+            "evidencePayloadTokensEst": 610,
+            "inputTokens": 11661,
+            "outputTokens": 3386,
+            "thinkingTokens": 3300,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "cost": {
+            "costUsd": null,
+            "costBasis": "unreported_subscription_or_quota"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 156368,
+            "maxSingleProcessRssKb": 270904,
+            "cgroupUserCpuMs": 1059.53,
+            "cgroupSysCpuMs": 218.25
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_compute_poly_dominant_symbol": true,
+              "identifies_measured_self_pct": true,
+              "preserves_null_duration_us_in_perf_report": true,
+              "identifies_program_ipc_measured": true,
+              "distinguishes_unsupported_counter_from_zero": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-fable-5-1",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "raw",
+          "timingsMs": {
+            "orchestrationMs": 0.36,
+            "mcpMs": 0,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 459.27,
+            "cliTimeToRequestMs": 379,
+            "modelFirstResponseMs": 1246.79,
+            "cliReportedTtftMs": 1262,
+            "thinkingStreamMs": 29392.05,
+            "textOutputStreamMs": 895.11,
+            "reasoningAndOutputStreamingMs": 30287.27,
+            "modelApiDurationMs": 31175,
+            "modelCliTotalWallMs": 32718.89,
+            "totalE2eWallMs": 32719.25
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4006,
+            "evidencePayloadTokensEst": 1002,
+            "inputTokens": 2626,
+            "outputTokens": 2717,
+            "thinkingTokens": 2603,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 2624
+          },
+          "cost": {
+            "costUsd": 0.16867,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 697.37,
+            "cgroupSysCpuMs": 132.12
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_compute_poly_dominant_symbol": true,
+              "identifies_measured_self_pct": true,
+              "preserves_null_duration_us_in_perf_report": true,
+              "identifies_program_ipc_measured": true,
+              "distinguishes_unsupported_counter_from_zero": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-fable-5-1",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "mcp_digest",
+          "timingsMs": {
+            "orchestrationMs": 0.06,
+            "mcpMs": 721.21,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 465.03,
+            "cliTimeToRequestMs": 228,
+            "modelFirstResponseMs": 1067.5,
+            "cliReportedTtftMs": 1089,
+            "thinkingStreamMs": 1791.98,
+            "textOutputStreamMs": 1021.52,
+            "reasoningAndOutputStreamingMs": 2813.62,
+            "modelApiDurationMs": 3679,
+            "modelCliTotalWallMs": 5526.07,
+            "totalE2eWallMs": 6247.34
+          },
+          "tokens": {
+            "evidencePayloadBytes": 2337,
+            "evidencePayloadTokensEst": 585,
+            "inputTokens": 1777,
+            "outputTokens": 308,
+            "thinkingTokens": 190,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 1775
+          },
+          "cost": {
+            "costUsd": 0.037608,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1566.11,
+            "cgroupSysCpuMs": 231.13
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_compute_poly_dominant_symbol": true,
+              "identifies_measured_self_pct": true,
+              "preserves_null_duration_us_in_perf_report": true,
+              "identifies_program_ipc_measured": true,
+              "distinguishes_unsupported_counter_from_zero": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-fable-5-1",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "compact_evidence",
+          "timingsMs": {
+            "orchestrationMs": 1.89,
+            "mcpMs": 363.08,
+            "routingMs": 3,
+            "verificationMs": 1087.7,
+            "cliStartupMs": 482.83,
+            "cliTimeToRequestMs": 350,
+            "modelFirstResponseMs": 1187.1,
+            "cliReportedTtftMs": 1210,
+            "thinkingStreamMs": 2978.68,
+            "textOutputStreamMs": 991.83,
+            "reasoningAndOutputStreamingMs": 3970.62,
+            "modelApiDurationMs": 4846,
+            "modelCliTotalWallMs": 6636.04,
+            "totalE2eWallMs": 8091.71
+          },
+          "tokens": {
+            "evidencePayloadBytes": 2442,
+            "evidencePayloadTokensEst": 611,
+            "inputTokens": 1844,
+            "outputTokens": 423,
+            "thinkingTokens": 320,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 1842
+          },
+          "cost": {
+            "costUsd": 0.044195,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1213.46,
+            "cgroupSysCpuMs": 184.04
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_compute_poly_dominant_symbol": true,
+              "identifies_measured_self_pct": true,
+              "preserves_null_duration_us_in_perf_report": true,
+              "identifies_program_ipc_measured": true,
+              "distinguishes_unsupported_counter_from_zero": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-opus-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "raw",
+          "timingsMs": {
+            "orchestrationMs": 0.36,
+            "mcpMs": 0,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 427.06,
+            "cliTimeToRequestMs": 246,
+            "modelFirstResponseMs": 1480.31,
+            "cliReportedTtftMs": 1502,
+            "thinkingStreamMs": 28126.83,
+            "textOutputStreamMs": 764.85,
+            "reasoningAndOutputStreamingMs": 28891.78,
+            "modelApiDurationMs": 30166,
+            "modelCliTotalWallMs": 31494.08,
+            "totalE2eWallMs": 31494.44
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4006,
+            "evidencePayloadTokensEst": 1002,
+            "inputTokens": 2626,
+            "outputTokens": 3333,
+            "thinkingTokens": 3214,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 2624
+          },
+          "cost": {
+            "costUsd": 0.079788,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 697.37,
+            "cgroupSysCpuMs": 132.12
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_compute_poly_dominant_symbol": true,
+              "identifies_measured_self_pct": true,
+              "preserves_null_duration_us_in_perf_report": true,
+              "identifies_program_ipc_measured": true,
+              "distinguishes_unsupported_counter_from_zero": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-opus-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "mcp_digest",
+          "timingsMs": {
+            "orchestrationMs": 0.06,
+            "mcpMs": 721.21,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 423.27,
+            "cliTimeToRequestMs": 373,
+            "modelFirstResponseMs": 1536.19,
+            "cliReportedTtftMs": 1551,
+            "thinkingStreamMs": 1611.77,
+            "textOutputStreamMs": 790.83,
+            "reasoningAndOutputStreamingMs": 2402.77,
+            "modelApiDurationMs": 3585,
+            "modelCliTotalWallMs": 5463,
+            "totalE2eWallMs": 6184.27
+          },
+          "tokens": {
+            "evidencePayloadBytes": 2337,
+            "evidencePayloadTokensEst": 585,
+            "inputTokens": 1777,
+            "outputTokens": 351,
+            "thinkingTokens": 228,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 1775
+          },
+          "cost": {
+            "costUsd": 0.015903,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1566.11,
+            "cgroupSysCpuMs": 231.13
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_compute_poly_dominant_symbol": true,
+              "identifies_measured_self_pct": true,
+              "preserves_null_duration_us_in_perf_report": true,
+              "identifies_program_ipc_measured": true,
+              "distinguishes_unsupported_counter_from_zero": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-opus-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "compact_evidence",
+          "timingsMs": {
+            "orchestrationMs": 1.89,
+            "mcpMs": 363.08,
+            "routingMs": 3,
+            "verificationMs": 1087.7,
+            "cliStartupMs": 474,
+            "cliTimeToRequestMs": 234,
+            "modelFirstResponseMs": 1385.81,
+            "cliReportedTtftMs": 1404,
+            "thinkingStreamMs": 3343.55,
+            "textOutputStreamMs": 747.18,
+            "reasoningAndOutputStreamingMs": 4090.86,
+            "modelApiDurationMs": 5266,
+            "modelCliTotalWallMs": 6972.65,
+            "totalE2eWallMs": 8428.32
+          },
+          "tokens": {
+            "evidencePayloadBytes": 2442,
+            "evidencePayloadTokensEst": 611,
+            "inputTokens": 1844,
+            "outputTokens": 563,
+            "thinkingTokens": 441,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 1842
+          },
+          "cost": {
+            "costUsd": 0.020478,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1213.46,
+            "cgroupSysCpuMs": 184.04
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_compute_poly_dominant_symbol": true,
+              "identifies_measured_self_pct": true,
+              "preserves_null_duration_us_in_perf_report": true,
+              "identifies_program_ipc_measured": true,
+              "distinguishes_unsupported_counter_from_zero": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-sonnet-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "raw",
+          "timingsMs": {
+            "orchestrationMs": 0.36,
+            "mcpMs": 0,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 445.97,
+            "cliTimeToRequestMs": 412,
+            "modelFirstResponseMs": 1543.35,
+            "cliReportedTtftMs": 1558,
+            "thinkingStreamMs": 27082.83,
+            "textOutputStreamMs": 452.23,
+            "reasoningAndOutputStreamingMs": 27535.18,
+            "modelApiDurationMs": 28686,
+            "modelCliTotalWallMs": 30278.78,
+            "totalE2eWallMs": 30279.14
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4006,
+            "evidencePayloadTokensEst": 1002,
+            "inputTokens": 2630,
+            "outputTokens": 4089,
+            "thinkingTokens": 3989,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 2628
+          },
+          "cost": {
+            "costUsd": 0.047464,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 697.37,
+            "cgroupSysCpuMs": 132.12
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_compute_poly_dominant_symbol": true,
+              "identifies_measured_self_pct": true,
+              "preserves_null_duration_us_in_perf_report": true,
+              "identifies_program_ipc_measured": true,
+              "distinguishes_unsupported_counter_from_zero": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-sonnet-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "mcp_digest",
+          "timingsMs": {
+            "orchestrationMs": 0.06,
+            "mcpMs": 721.21,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 473.28,
+            "cliTimeToRequestMs": 364,
+            "modelFirstResponseMs": 1558.01,
+            "cliReportedTtftMs": 1572,
+            "thinkingStreamMs": 1253.14,
+            "textOutputStreamMs": 498.67,
+            "reasoningAndOutputStreamingMs": 1751.97,
+            "modelApiDurationMs": 2966,
+            "modelCliTotalWallMs": 4903.15,
+            "totalE2eWallMs": 5624.42
+          },
+          "tokens": {
+            "evidencePayloadBytes": 2337,
+            "evidencePayloadTokensEst": 585,
+            "inputTokens": 1781,
+            "outputTokens": 365,
+            "thinkingTokens": 247,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 1779
+          },
+          "cost": {
+            "costUsd": 0.008101,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1566.11,
+            "cgroupSysCpuMs": 231.13
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_compute_poly_dominant_symbol": true,
+              "identifies_measured_self_pct": true,
+              "preserves_null_duration_us_in_perf_report": true,
+              "identifies_program_ipc_measured": true,
+              "distinguishes_unsupported_counter_from_zero": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-sonnet-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "compact_evidence",
+          "timingsMs": {
+            "orchestrationMs": 1.89,
+            "mcpMs": 363.08,
+            "routingMs": 3,
+            "verificationMs": 1087.7,
+            "cliStartupMs": 450.35,
+            "cliTimeToRequestMs": 392,
+            "modelFirstResponseMs": 1105.31,
+            "cliReportedTtftMs": 1120,
+            "thinkingStreamMs": 2314.55,
+            "textOutputStreamMs": 496.85,
+            "reasoningAndOutputStreamingMs": 2811.66,
+            "modelApiDurationMs": 3544,
+            "modelCliTotalWallMs": 5709.91,
+            "totalE2eWallMs": 7165.58
+          },
+          "tokens": {
+            "evidencePayloadBytes": 2442,
+            "evidencePayloadTokensEst": 611,
+            "inputTokens": 1848,
+            "outputTokens": 485,
+            "thinkingTokens": 382,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 1846
+          },
+          "cost": {
+            "costUsd": 0.009469,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1213.46,
+            "cgroupSysCpuMs": 184.04
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_compute_poly_dominant_symbol": true,
+              "identifies_measured_self_pct": true,
+              "preserves_null_duration_us_in_perf_report": true,
+              "identifies_program_ipc_measured": true,
+              "distinguishes_unsupported_counter_from_zero": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-haiku-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "raw",
+          "timingsMs": {
+            "orchestrationMs": 0.36,
+            "mcpMs": 0,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 476.77,
+            "cliTimeToRequestMs": 335,
+            "modelFirstResponseMs": 924.04,
+            "cliReportedTtftMs": 948,
+            "thinkingStreamMs": 29883.61,
+            "textOutputStreamMs": 122.74,
+            "reasoningAndOutputStreamingMs": 30006.47,
+            "modelApiDurationMs": 30624,
+            "modelCliTotalWallMs": 32319,
+            "totalE2eWallMs": 32319.36
+          },
+          "tokens": {
+            "evidencePayloadBytes": 4006,
+            "evidencePayloadTokensEst": 1002,
+            "inputTokens": 2628,
+            "outputTokens": 7154,
+            "thinkingTokens": 7054,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 2626
+          },
+          "cost": {
+            "costUsd": 0.003905,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 697.37,
+            "cgroupSysCpuMs": 132.12
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_compute_poly_dominant_symbol": true,
+              "identifies_measured_self_pct": true,
+              "preserves_null_duration_us_in_perf_report": true,
+              "identifies_program_ipc_measured": true,
+              "distinguishes_unsupported_counter_from_zero": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-haiku-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "mcp_digest",
+          "timingsMs": {
+            "orchestrationMs": 0.06,
+            "mcpMs": 721.21,
+            "routingMs": 0,
+            "verificationMs": 0,
+            "cliStartupMs": 450.33,
+            "cliTimeToRequestMs": 477,
+            "modelFirstResponseMs": 1100.36,
+            "cliReportedTtftMs": 1120,
+            "thinkingStreamMs": 8346.03,
+            "textOutputStreamMs": 302.58,
+            "reasoningAndOutputStreamingMs": 8648.74,
+            "modelApiDurationMs": 9307,
+            "modelCliTotalWallMs": 11133.07,
+            "totalE2eWallMs": 11854.34
+          },
+          "tokens": {
+            "evidencePayloadBytes": 2337,
+            "evidencePayloadTokensEst": 585,
+            "inputTokens": 1779,
+            "outputTokens": 2284,
+            "thinkingTokens": 2166,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 1777
+          },
+          "cost": {
+            "costUsd": 0.001364,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1566.11,
+            "cgroupSysCpuMs": 231.13
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_compute_poly_dominant_symbol": true,
+              "identifies_measured_self_pct": true,
+              "preserves_null_duration_us_in_perf_report": true,
+              "identifies_program_ipc_measured": true,
+              "distinguishes_unsupported_counter_from_zero": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        },
+        {
+          "modelId": "claude-haiku-5-5",
+          "cli": "claude",
+          "effort": "max",
+          "arm": "compact_evidence",
+          "timingsMs": {
+            "orchestrationMs": 1.89,
+            "mcpMs": 363.08,
+            "routingMs": 3,
+            "verificationMs": 1087.7,
+            "cliStartupMs": 433.06,
+            "cliTimeToRequestMs": 606,
+            "modelFirstResponseMs": 1385.44,
+            "cliReportedTtftMs": 1400,
+            "thinkingStreamMs": 14663.18,
+            "textOutputStreamMs": 227.8,
+            "reasoningAndOutputStreamingMs": 14891.09,
+            "modelApiDurationMs": 15689,
+            "modelCliTotalWallMs": 17429.48,
+            "totalE2eWallMs": 18885.15
+          },
+          "tokens": {
+            "evidencePayloadBytes": 2442,
+            "evidencePayloadTokensEst": 611,
+            "inputTokens": 1846,
+            "outputTokens": 3950,
+            "thinkingTokens": 3833,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 1844
+          },
+          "cost": {
+            "costUsd": 0.002206,
+            "costBasis": "list"
+          },
+          "resources": {
+            "memoryCoverage": "cgroup_v2_tree_peak",
+            "cgroupTreePeakKb": 179124,
+            "maxSingleProcessRssKb": 269328,
+            "cgroupUserCpuMs": 1213.46,
+            "cgroupSysCpuMs": 184.04
+          },
+          "diagnostics": {
+            "checksPassed": 5,
+            "totalChecks": 5,
+            "accuracyScore": 1,
+            "falseConclusionsCount": 0,
+            "falseConclusions": [],
+            "checks": {
+              "identifies_compute_poly_dominant_symbol": true,
+              "identifies_measured_self_pct": true,
+              "preserves_null_duration_us_in_perf_report": true,
+              "identifies_program_ipc_measured": true,
+              "distinguishes_unsupported_counter_from_zero": true
+            },
+            "summary": "5/5 checks passed (0 false/unmeasured conclusions)"
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "totalStudies": 4,
+    "totalModels": 6,
+    "totalEvaluations": 72,
+    "totalClaudeApiCostUsd": 5.356959,
+    "perModelSummary": [
+      {
+        "modelId": "gemini-4-argon-high",
+        "cli": "agy",
+        "effort": "high",
+        "arms": {
+          "raw": {
+            "meanAccuracyScore": 0.6,
+            "totalChecksPassed": 12,
+            "totalChecks": 20,
+            "totalFalseConclusions": 7,
+            "meanCliStartupMs": 2249.13,
+            "meanModelFirstResponseMs": 29123.77,
+            "meanReasoningAndOutputStreamingMs": 498.27,
+            "meanModelApiDurationMs": 29630.37,
+            "meanTotalE2eWallMs": 33661.4,
+            "meanInputTokens": 18199.25,
+            "meanOutputTokens": 2464,
+            "meanThinkingTokens": 2380.75,
+            "totalCostUsd": null
+          },
+          "mcp_digest": {
+            "meanAccuracyScore": 1,
+            "totalChecksPassed": 20,
+            "totalChecks": 20,
+            "totalFalseConclusions": 0,
+            "meanCliStartupMs": 2420.58,
+            "meanModelFirstResponseMs": 18202.82,
+            "meanReasoningAndOutputStreamingMs": 548.27,
+            "meanModelApiDurationMs": 18778.05,
+            "meanTotalE2eWallMs": 22762.9,
+            "meanInputTokens": 12655.25,
+            "meanOutputTokens": 1442,
+            "meanThinkingTokens": 1340.5,
+            "totalCostUsd": null
+          },
+          "compact_evidence": {
+            "meanAccuracyScore": 1,
+            "totalChecksPassed": 20,
+            "totalChecks": 20,
+            "totalFalseConclusions": 0,
+            "meanCliStartupMs": 2469.44,
+            "meanModelFirstResponseMs": 15025.25,
+            "meanReasoningAndOutputStreamingMs": 549.2,
+            "meanModelApiDurationMs": 15588.08,
+            "meanTotalE2eWallMs": 20273.58,
+            "meanInputTokens": 12645.5,
+            "meanOutputTokens": 1252,
+            "meanThinkingTokens": 1154.75,
+            "totalCostUsd": null
+          }
+        }
+      },
+      {
+        "modelId": "gemini-3.8-flash-high",
+        "cli": "agy",
+        "effort": "high",
+        "arms": {
+          "raw": {
+            "meanAccuracyScore": 0.6,
+            "totalChecksPassed": 12,
+            "totalChecks": 20,
+            "totalFalseConclusions": 7,
+            "meanCliStartupMs": 2420.64,
+            "meanModelFirstResponseMs": 51154.36,
+            "meanReasoningAndOutputStreamingMs": 370.26,
+            "meanModelApiDurationMs": 51546.49,
+            "meanTotalE2eWallMs": 56300.04,
+            "meanInputTokens": 18395.5,
+            "meanOutputTokens": 20534,
+            "meanThinkingTokens": 20457,
+            "totalCostUsd": null
+          },
+          "mcp_digest": {
+            "meanAccuracyScore": 1,
+            "totalChecksPassed": 20,
+            "totalChecks": 20,
+            "totalFalseConclusions": 0,
+            "meanCliStartupMs": 2475.12,
+            "meanModelFirstResponseMs": 10081.25,
+            "meanReasoningAndOutputStreamingMs": 249.59,
+            "meanModelApiDurationMs": 10347.61,
+            "meanTotalE2eWallMs": 14269.87,
+            "meanInputTokens": 12804.25,
+            "meanOutputTokens": 3813,
+            "meanThinkingTokens": 3713.75,
+            "totalCostUsd": null
+          },
+          "compact_evidence": {
+            "meanAccuracyScore": 1,
+            "totalChecksPassed": 20,
+            "totalChecks": 20,
+            "totalFalseConclusions": 0,
+            "meanCliStartupMs": 2225.94,
+            "meanModelFirstResponseMs": 42189.14,
+            "meanReasoningAndOutputStreamingMs": 394.63,
+            "meanModelApiDurationMs": 42591.34,
+            "meanTotalE2eWallMs": 46954.81,
+            "meanInputTokens": 12793.75,
+            "meanOutputTokens": 17480.25,
+            "meanThinkingTokens": 17384.75,
+            "totalCostUsd": null
+          }
+        }
+      },
+      {
+        "modelId": "claude-fable-5-1",
+        "cli": "claude",
+        "effort": "max",
+        "arms": {
+          "raw": {
+            "meanAccuracyScore": 0.6,
+            "totalChecksPassed": 12,
+            "totalChecks": 20,
+            "totalFalseConclusions": 7,
+            "meanCliStartupMs": 563.57,
+            "meanModelFirstResponseMs": 1581.63,
+            "meanReasoningAndOutputStreamingMs": 57097.6,
+            "meanModelApiDurationMs": 58383.75,
+            "meanTotalE2eWallMs": 60112.29,
+            "meanInputTokens": 11056.5,
+            "meanOutputTokens": 4880.25,
+            "meanThinkingTokens": 4759.75,
+            "totalCostUsd": 1.323166
+          },
+          "mcp_digest": {
+            "meanAccuracyScore": 1,
+            "totalChecksPassed": 20,
+            "totalChecks": 20,
+            "totalFalseConclusions": 0,
+            "meanCliStartupMs": 512.63,
+            "meanModelFirstResponseMs": 1733.06,
+            "meanReasoningAndOutputStreamingMs": 27381.92,
+            "meanModelApiDurationMs": 28897.5,
+            "meanTotalE2eWallMs": 31575.49,
+            "meanInputTokens": 3124,
+            "meanOutputTokens": 2467.25,
+            "meanThinkingTokens": 2331.75,
+            "totalCostUsd": 0.649631
+          },
+          "compact_evidence": {
+            "meanAccuracyScore": 1,
+            "totalChecksPassed": 20,
+            "totalChecks": 20,
+            "totalFalseConclusions": 0,
+            "meanCliStartupMs": 457.16,
+            "meanModelFirstResponseMs": 1182.24,
+            "meanReasoningAndOutputStreamingMs": 20522.56,
+            "meanModelApiDurationMs": 21418.75,
+            "meanTotalE2eWallMs": 24088.97,
+            "meanInputTokens": 3070,
+            "meanOutputTokens": 1876.75,
+            "meanThinkingTokens": 1738.75,
+            "totalCostUsd": 0.528831
+          }
+        }
+      },
+      {
+        "modelId": "claude-opus-5-5",
+        "cli": "claude",
+        "effort": "max",
+        "arms": {
+          "raw": {
+            "meanAccuracyScore": 0.55,
+            "totalChecksPassed": 11,
+            "totalChecks": 20,
+            "totalFalseConclusions": 7,
+            "meanCliStartupMs": 487.92,
+            "meanModelFirstResponseMs": 1560.55,
+            "meanReasoningAndOutputStreamingMs": 99572.63,
+            "meanModelApiDurationMs": 100844,
+            "meanTotalE2eWallMs": 102506.61,
+            "meanInputTokens": 11056.5,
+            "meanOutputTokens": 10930,
+            "meanThinkingTokens": 10801.25,
+            "totalCostUsd": 1.014925
+          },
+          "mcp_digest": {
+            "meanAccuracyScore": 1,
+            "totalChecksPassed": 20,
+            "totalChecks": 20,
+            "totalFalseConclusions": 0,
+            "meanCliStartupMs": 434.23,
+            "meanModelFirstResponseMs": 1506.71,
+            "meanReasoningAndOutputStreamingMs": 27295.45,
+            "meanModelApiDurationMs": 28425.5,
+            "meanTotalE2eWallMs": 31058.26,
+            "meanInputTokens": 3124,
+            "meanOutputTokens": 3309.75,
+            "meanThinkingTokens": 3165.25,
+            "totalCostUsd": 0.327252
+          },
+          "compact_evidence": {
+            "meanAccuracyScore": 1,
+            "totalChecksPassed": 20,
+            "totalChecks": 20,
+            "totalFalseConclusions": 0,
+            "meanCliStartupMs": 458.98,
+            "meanModelFirstResponseMs": 1513.96,
+            "meanReasoningAndOutputStreamingMs": 48876.31,
+            "meanModelApiDurationMs": 50101.5,
+            "meanTotalE2eWallMs": 52737.44,
+            "meanInputTokens": 3070,
+            "meanOutputTokens": 5863.75,
+            "meanThinkingTokens": 5719.5,
+            "totalCostUsd": 0.530492
+          }
+        }
+      },
+      {
+        "modelId": "claude-sonnet-5-5",
+        "cli": "claude",
+        "effort": "max",
+        "arms": {
+          "raw": {
+            "meanAccuracyScore": 0.6,
+            "totalChecksPassed": 12,
+            "totalChecks": 20,
+            "totalFalseConclusions": 7,
+            "meanCliStartupMs": 450.02,
+            "meanModelFirstResponseMs": 1656.34,
+            "meanReasoningAndOutputStreamingMs": 54519.57,
+            "meanModelApiDurationMs": 55807.75,
+            "meanTotalE2eWallMs": 57402.52,
+            "meanInputTokens": 11060.5,
+            "meanOutputTokens": 8095.25,
+            "meanThinkingTokens": 7979.75,
+            "totalCostUsd": 0.434412
+          },
+          "mcp_digest": {
+            "meanAccuracyScore": 1,
+            "totalChecksPassed": 20,
+            "totalChecks": 20,
+            "totalFalseConclusions": 0,
+            "meanCliStartupMs": 464.51,
+            "meanModelFirstResponseMs": 1753.61,
+            "meanReasoningAndOutputStreamingMs": 25048.62,
+            "meanModelApiDurationMs": 26269.75,
+            "meanTotalE2eWallMs": 29176.02,
+            "meanInputTokens": 3128,
+            "meanOutputTokens": 3933.75,
+            "meanThinkingTokens": 3800.25,
+            "totalCostUsd": 0.188626
+          },
+          "compact_evidence": {
+            "meanAccuracyScore": 1,
+            "totalChecksPassed": 20,
+            "totalChecks": 20,
+            "totalFalseConclusions": 0,
+            "meanCliStartupMs": 444.66,
+            "meanModelFirstResponseMs": 2296.81,
+            "meanReasoningAndOutputStreamingMs": 41030.91,
+            "meanModelApiDurationMs": 42989.75,
+            "meanTotalE2eWallMs": 45655.11,
+            "meanInputTokens": 3074,
+            "meanOutputTokens": 6456.5,
+            "meanThinkingTokens": 6325.75,
+            "totalCostUsd": 0.288995
+          }
+        }
+      },
+      {
+        "modelId": "claude-haiku-5-5",
+        "cli": "claude",
+        "effort": "max",
+        "arms": {
+          "raw": {
+            "meanAccuracyScore": 0.5,
+            "totalChecksPassed": 10,
+            "totalChecks": 20,
+            "totalFalseConclusions": 8,
+            "meanCliStartupMs": 474.13,
+            "meanModelFirstResponseMs": 1298.4,
+            "meanReasoningAndOutputStreamingMs": 47468.95,
+            "meanModelApiDurationMs": 48489.75,
+            "meanTotalE2eWallMs": 50143.8,
+            "meanInputTokens": 11058.5,
+            "meanOutputTokens": 11176.25,
+            "meanThinkingTokens": 11050.75,
+            "totalCostUsd": 0.027881
+          },
+          "mcp_digest": {
+            "meanAccuracyScore": 0.95,
+            "totalChecksPassed": 19,
+            "totalChecks": 20,
+            "totalFalseConclusions": 0,
+            "meanCliStartupMs": 451.2,
+            "meanModelFirstResponseMs": 1049.77,
+            "meanReasoningAndOutputStreamingMs": 32224.74,
+            "meanModelApiDurationMs": 32912,
+            "meanTotalE2eWallMs": 35557.78,
+            "meanInputTokens": 3126,
+            "meanOutputTokens": 8081,
+            "meanThinkingTokens": 7945.75,
+            "totalCostUsd": 0.017724
+          },
+          "compact_evidence": {
+            "meanAccuracyScore": 0.95,
+            "totalChecksPassed": 19,
+            "totalChecks": 20,
+            "totalFalseConclusions": 0,
+            "meanCliStartupMs": 451.84,
+            "meanModelFirstResponseMs": 1414.1,
+            "meanReasoningAndOutputStreamingMs": 45874.72,
+            "meanModelApiDurationMs": 46885.25,
+            "meanTotalE2eWallMs": 49561.2,
+            "meanInputTokens": 3072,
+            "meanOutputTokens": 11700.25,
+            "meanThinkingTokens": 11561,
+            "totalCostUsd": 0.024937
+          }
+        }
+      }
+    ]
+  },
+  "claims": [
+    "Preflight Smoke Test 1 verified Gemini 3.8 Flash (gemini-3.8-flash-high) via AGY CLI 1.4.7 at its highest supported reasoning effort (high; max is explicitly rejected by AGY CLI) with full stream-json telemetry (init, step_update user_input/agent_response, duration_seconds, and token usage including thinking_tokens).",
+    "Preflight Smoke Test 2 practically verified Claude Code 2.1.310 isolation under existing first-party API billing auth (--safe-mode --setting-sources \"\" --strict-mcp-config --disable-slash-commands --no-session-persistence --tools \"\" and CLAUDE_CODE_DISABLE_AUTO_MEMORY=1): planted CLAUDE.md, .claude/CLAUDE.md, .mcp.json, and a failing UserPromptSubmit hook in the working directory were completely ignored (tools=0, mcp_servers=0, skills=0, response=\"ISOLATED\").",
+    "Across all 6 models at their highest supported reasoning configurations (Gemini 4 Argon High, Gemini 3.8 Flash High, Claude Fable 5.1 Max, Claude Opus 5.5 Max, Claude Sonnet 5.5 Max, and Claude Haiku 5.5 Max), the raw arm scores 0.50-0.60 mean accuracy (10/20 to 12/20 checks, 7-8 false/unmeasured conclusions per model) because binary (.ncu-rep) and multi-hundred-KB/multi-MB event traces (C++ -ftime-trace/CMake and PyTorch Kineto) cannot be faithfully inspected in raw prompt windows, while both mcp_digest and compact_evidence lift accuracy to 1.00 (20/20 checks, 0 false conclusions) on 5 of 6 models and 0.95 (19/20, 0 false conclusions) on Claude Haiku 5.5.",
+    "The compact_evidence arm reduces serialized evidence payload size by 35.3%-43.7% vs the verbose PerfDigest Evidence envelope (and by 76.1% vs the raw arm), cuts local multi-report MCP digestion time by 2.47x via bounded workspace-scoped session reuse (and 3.84x on the 4-report C++ build study), and includes loopback SystemOne routing plus an independent verification receipt.",
+    "Across the 4 Claude models (--effort max), total API cost across the 4 studies drops from $2.800384 in raw to $1.183233 in mcp_digest (-57.7%) and $1.373255 in compact_evidence (-51.0%); on Claude Fable 5.1 Max and Gemini 4 Argon High, compact_evidence achieves the lowest E2E latency and API cost of all 3 arms (24.09s / $0.528831 on Fable 5.1 vs 60.11s / $1.323166 in raw and 31.58s / $0.649631 in mcp_digest; 20.27s on Gemini 4 Argon High vs 33.66s in raw and 22.76s in mcp_digest)."
+  ],
+  "limits": [
+    "Single host (AMD Ryzen AI 9 HX 370 + NVIDIA GeForce RTX 4060 Laptop GPU); each (study, arm, model) cell is evaluated in an isolated single-turn invocation without model substitution.",
+    "AGY CLI stream-json reports total thinking_tokens in step usage and server-side duration_seconds on step completion, but does not emit a separate content_block_start(thinking) timestamp event or per-call USD billing; therefore thinkingStreamMs, cliTimeToRequestMs, cliReportedTtftMs, and costUsd are recorded as null for Gemini 4 Argon and Gemini 3.8 Flash rather than fabricated.",
+    "OpenAI Decisions API live routing remains deferred until paid OpenAI API credits are enabled; routing latency in compact_evidence is measured against the loopback SystemOne HTTP server (http://127.0.0.1:PORT/v1/systemone)."
+  ]
+}

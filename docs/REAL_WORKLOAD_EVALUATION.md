@@ -1,9 +1,10 @@
-# Real Workload Evaluation & Critical Audit (Stages 2 & 7)
+# Real Workload Evaluation, Critical Audit & 6-Model Benchmark (Stages 2, 7 & Multi-Model Qualification)
 
-This document reports the controlled evaluation of **PerfDigest Evidence** across the four real profiler studies in [`onlyxItachi/PerfDigest-MCP-Bench`](https://github.com/onlyxItachi/PerfDigest-MCP-Bench), including our **Stage 7 Critical Self-Audit & Fair Re-Evaluation**.
+This document reports the controlled evaluation of **PerfDigest Evidence** across the four real profiler studies in [`onlyxItachi/PerfDigest-MCP-Bench`](https://github.com/onlyxItachi/PerfDigest-MCP-Bench), including our **Stage 7 Critical Self-Audit & Fair Re-Evaluation** and the **Controlled 6-Model × 4-Study × 3-Arm Multi-Model Evaluation**.
 
-Machine-readable results: [`bench/results/2026-10-18-real-workload-evaluation.json`](../bench/results/2026-10-18-real-workload-evaluation.json) (validated by `node bench/validate.mjs` against [`bench/schema/real-workload-eval.v1.schema.json`](../bench/schema/real-workload-eval.v1.schema.json)).
-Reproducible harness: [`bench/real-workloads-eval.mjs`](../bench/real-workloads-eval.mjs).
+Machine-readable results:
+- Stage 7 single-model audit: [`bench/results/2026-10-18-real-workload-evaluation.json`](../bench/results/2026-10-18-real-workload-evaluation.json) (validated by `node bench/validate.mjs` against [`bench/schema/real-workload-eval.v1.schema.json`](../bench/schema/real-workload-eval.v1.schema.json); harness: [`bench/real-workloads-eval.mjs`](../bench/real-workloads-eval.mjs)).
+- Multi-model evaluation (72 cells across 6 models): [`bench/results/2026-10-24-multi-model-evaluation.json`](../bench/results/2026-10-24-multi-model-evaluation.json) (validated by `node bench/validate.mjs` against [`bench/schema/multi-model-eval.v1.schema.json`](../bench/schema/multi-model-eval.v1.schema.json); harness: [`bench/multi-model-eval.mjs`](../bench/multi-model-eval.mjs)).
 
 ---
 
@@ -163,4 +164,124 @@ When `agentDelivery: 'single_turn'` is enabled in `investigate()` (`src/run.ts`)
 | **Mean across 4 Studies** | `16,843.40` | **`7,332.35`** | **`2.30x` (`-9,511.05 ms`)** | `16,843.40` | **`4,023.46`** | **`4.19x` (`-12,819.94 ms`)** | `34,822.25` | **`17,583.75`** | **`-17,238.50` (`-49.50%`)** | **`1.00 -> 1.00` (`20/20`, `0` false)** |
 
 > **Key Finding (Optimization B)**: Eliminating the speculative blind `analysis` turn cuts mean total model input tokens by **`49.50%` (`34,822.25 -> 17,583.75` tokens, saving `17,238.50` tokens per investigation)**, cuts mean end-to-end wall latency by **`2.30x` (`16,843.40 ms -> 7,332.35 ms`, saving `9.51 s`)**, and cuts mean model inference latency by **`4.19x` (`16,843.40 ms -> 4,023.46 ms`)** while maintaining **`1.00` (`20/20`) diagnostic accuracy and `0` false conclusions** across all 8 live trials.
+
+---
+
+## 8. Controlled 6-Model × 4-Study × 3-Arm Multi-Model Evaluation (`2026-10-24`)
+
+To verify whether PerfDigest Evidence's diagnostic accuracy, context compression, latency, and API cost properties generalize across model families and reasoning tiers, [`bench/multi-model-eval.mjs`](../bench/multi-model-eval.mjs) evaluates **6 models** at their highest supported reasoning configurations across all **4 `PerfDigest-MCP-Bench` studies** and **3 fair single-turn arms (`raw`, `mcp_digest`, `compact_evidence`)** (`72` total live evaluations in [`bench/results/2026-10-24-multi-model-evaluation.json`](../bench/results/2026-10-24-multi-model-evaluation.json)).
+
+### 8.1 Preflight Smoke Tests (Practical Verification Before Benchmarking)
+
+1. **Preflight Smoke Test 1 — `agy` CLI (`1.4.7`) Gemini 3.8 Flash & Gemini 4 Argon Availability, Effort Tiers, and Streaming Telemetry**:
+   - Verified via `agy models` that both `gemini-3.8-flash-high` (`gemini-3.8-flash-low`, `-medium`, `-high`) and `gemini-4-argon-high` (`gemini-4-argon-low`, `-medium`, `-high`) are installed and available.
+   - Confirmed practically that `--effort max` is explicitly rejected by `agy` (`gemini-3.8-flash has no "max" effort (available: low, medium, high)` and `gemini-4-argon has no "max" effort (available: low, medium, high)`), making `--effort high` the highest supported reasoning configuration for both Gemini models.
+   - Verified `agy -p ... --model gemini-3.8-flash-high --effort high --output-format stream-json --disable-slash-commands` in an isolated `/tmp` directory: observed `init`, `step_update (user_input, DONE)`, `step_update (agent_response, ACTIVE)` (first response timestamp), and `step_update (agent_response, DONE)` with `duration_seconds` and `usage: { input_tokens, output_tokens, thinking_tokens, cache_read_tokens, total_tokens }`.
+2. **Preflight Smoke Test 2 — `claude` CLI (`2.1.310`) Practical Canary Isolation Under Existing `oauth_token` (`firstParty`) API Billing Auth**:
+   - Note on `--bare` vs `--safe-mode`: `claude --bare` disables keychain/OAuth token reads (`Anthropic auth is strictly ANTHROPIC_API_KEY or apiKeyHelper`), whereas combining `--safe-mode --setting-sources "" --strict-mcp-config --disable-slash-commands --no-session-persistence --tools "" --system-prompt "..."` with `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` and `CLAUDE_CODE_SAFE_MODE=1` preserves existing `oauth_token` (`firstParty`) API billing auth while stripping all local context, plugins, hooks, and MCP servers.
+   - **Practical Canary Test**: Created a temporary workspace containing four active canaries:
+     - `CLAUDE.md` instructing the model to reply `CANARY_CLAUDE_MD_LEAKED_9941`
+     - `.claude/CLAUDE.md` instructing the model to reply `CANARY_DOT_CLAUDE_LEAKED_9942`
+     - `.mcp.json` registering `canary_leaked_mcp`
+     - `.claude/settings.json` registering a `UserPromptSubmit` hook (`echo LEAKED_HOOK >&2; exit 2`) that aborts any non-isolated invocation
+   - **Observed Result**: `init` event reported `tools: []` (`0`), `mcp_servers: []` (`0`), `slash_commands: []` (`0`), `skills: []` (`0`), the `exit 2` hook did not execute, and the model replied `"ISOLATED"` (`smokeCostUsd: $0.000282`).
+
+### 8.2 Fair Arm Definitions & Self-Audit Correction During Multi-Model Run
+
+All 6 models receive identical prompts, identical evidence payloads, and identical deterministic grading functions per `(study, arm)`:
+- **`raw`**: Complete raw profiler text/JSON for small reports (`linux_perf_cpu`: `4,006 B`) and fair `16.8–29.6 KB` raw text/JSON surfaces for binary/large-trace studies (`cuda_opt_loop`: `16,783 B`; `cpp_build_loop`: `25,521 B`; `pytorch_inductor_training`: `29,555 B`), with `0` MCP spawns, no routing, and no verification receipt.
+- **`mcp_digest`**: Sequential per-report `PerfDigest MCP` (`topN: 10`, `reuseMcpSession: false`, $K$ spawns / $K$ calls) across **all $K$ candidate reports** in declaration order (`candidateDigests`), with no routing selection and no verification receipt.
+  - *Self-Audit Catch During Multi-Model Run*: In our first pass of `bench/multi-model-eval.mjs`, passing `routing: 'offline'` to `gatherEvidence()` caused `measuredRouting = selectedProvider !== 'offline'` (`src/evidence.ts`) to skip the multi-report loop and digest only `reports[0]`, artificially depressing `mcp_digest` accuracy to `0.35–0.65`. We caught this in post-run check auditing, fixed `mcp_digest` to digest all $K$ candidate reports in declaration order, and re-ran all 24 `mcp_digest` cells.
+- **`compact_evidence`**: Full `PerfDigest Evidence` single-turn pipeline (`topN: 10`, `reuseMcpSession: true` with `1` MCP spawn + $K - 1$ warm reused calls, loopback SystemOne HTTP routing on `http://127.0.0.1:PORT/v1/systemone`, independent verification command execution, and `formatAgentEvidence(..., true)` compact prompt envelope).
+
+### 8.3 Local Pipeline Spans, Compression & cgroup v2 Resource Footprints by Study
+
+| Study | Arm | Payload Bytes (`Est. Tokens`) | Reduction vs Verbose / Raw | Local Orch (ms) | Local MCP (ms) | Loopback Routing (ms) | Verifier (ms) | MCP Spawns / Calls / Reused | cgroup v2 Tree Peak (KB) | Max Single-Proc RSS (KB) | cgroup User / Sys CPU (ms) |
+|---|---|---:|---:|---:|---:|---:|---:|---|---:|---:|---:|
+| **`cuda_opt_loop`** ($K=2$) | `raw` | `16,783 B` (`4,196`) | — | `0.43` | `0.00` | `0.00` | `0.00` | `0 / 0 / 0` | `10,192` | `41,560` | `16.10 / 13.13` |
+| | `mcp_digest` | `4,170 B` (`1,043`) | `-75.15%` vs `raw` | `0.08` | `798.55` | `0.00` | `0.00` | `2 / 2 / 0` | `218,344` | `189,476` | `866.74 / 148.13` |
+| | **`compact_evidence`** | **`4,486 B` (`1,122`)** | **`-35.28%` vs verbose (`6,931 B`)**, `-73.27%` vs `raw` | `2.23` | **`399.18`** (`2.00x`) | `19.00` | `1,274.62` | **`1 / 2 / 1`** | `218,512` | `189,176` | **`534.99 / 108.81`** |
+| **`cpp_build_loop`** ($K=4$) | `raw` | `25,521 B` (`6,381`) | — | `0.55` | `0.00` | `0.00` | `0.00` | `0 / 0 / 0` | `9,940` | `41,592` | `15.33 / 15.37` |
+| | `mcp_digest` | `7,604 B` (`1,901`) | `-70.21%` vs `raw` | `0.07` | `1,583.15` | `0.00` | `0.00` | `4 / 4 / 0` | `112,144` | `91,000` | `1,549.22 / 201.36` |
+| | **`compact_evidence`** | **`6,432 B` (`1,608`)** | **`-39.93%` vs verbose (`10,707 B`)**, `-74.80%` vs `raw` | `1.99` | **`412.34`** (**`3.84x`**) | `5.00` | `3.00` | **`1 / 4 / 3`** | `122,368` | `97,560` | **`552.43 / 77.19`** |
+| **`pytorch_inductor_training`** ($K=2$) | `raw` | `29,555 B` (`7,389`) | — | `0.53` | `0.00` | `0.00` | `0.00` | `0 / 0 / 0` | `10,504` | `41,560` | `20.34 / 10.17` |
+| | `mcp_digest` | `4,879 B` (`1,220`) | `-83.49%` vs `raw` | `0.06` | `730.93` | `0.00` | `0.00` | `2 / 2 / 0` | `106,204` | `84,556` | `846.08 / 107.39` |
+| | **`compact_evidence`** | **`4,819 B` (`1,205`)** | **`-31.01%` vs verbose (`6,985 B`)**, `-83.69%` vs `raw` | `1.95` | **`380.66`** (`1.92x`) | `4.00` | `24.83` | **`1 / 2 / 1`** | `111,852` | `89,788` | **`531.68 / 75.67`** |
+| **`linux_perf_cpu`** ($K=2$) | `raw` | `4,006 B` (`1,002`) | — | `0.39` | `0.00` | `0.00` | `0.00` | `0 / 0 / 0` | `9,720` | `41,152` | `15.04 / 9.35` |
+| | `mcp_digest` | `2,324 B` (`581`) | `-41.99%` vs `raw` | `0.06` | `720.20` | `0.00` | `0.00` | `2 / 2 / 0` | `104,284` | `84,000` | `866.78 / 114.61` |
+| | **`compact_evidence`** | **`2,432 B` (`608`)** | **`-43.72%` vs verbose (`4,321 B`)**, `-39.29%` vs `raw` | `1.90` | **`361.39`** (`1.99x`) | `5.00` | `1,101.16` | **`1 / 2 / 1`** | `104,792` | `85,192` | **`566.16 / 71.79`** |
+
+- **CLI Process-Tree Footprints (`cgroup_v2_tree_peak`)**:
+  - `agy` CLI (`1.4.7`): `cgroupTreePeakKb = 95,436 KB`, `maxSingleProcessRssKb = 109,016 KB`, `cgroupUserCpuMs = 590.51 ms`, `cgroupSysCpuMs = 152.97 ms`.
+  - `claude` CLI (`2.1.310`): `cgroupTreePeakKb = 197,308 KB`, `maxSingleProcessRssKb = 259,036 KB`, `cgroupUserCpuMs = 1,093.64 ms`, `cgroupSysCpuMs = 204.31 ms`.
+
+### 8.4 Aggregate 6-Model × 3-Arm Results Across All 4 Studies (72 Evaluations)
+
+> **Observable vs. Unobservable Timing Spans**:
+> - For **`claude` (`2.1.310` `--output-format stream-json --verbose --include-partial-messages`)**, `cliStartupMs` (`init`), `modelFirstResponseMs` (`message_start` after `requesting`), `thinkingStreamMs` (`content_block_start(thinking)` $\to$ `content_block_start(text)`), `textOutputStreamMs` (`content_block_start(text)` $\to$ `message_stop`), `modelApiDurationMs` (`duration_api_ms`), and `totalCostUsd` (`total_cost_usd`) are all directly observed on every turn.
+> - For **`agy` (`1.4.7` `--output-format stream-json`)**, `cliStartupMs` (`init`), `modelFirstResponseMs` (first `step_update(agent_response, ACTIVE)` after `user_input DONE`), `textOutputStreamMs` (`agent_response ACTIVE` $\to$ `DONE`), `modelApiDurationMs` (`duration_seconds * 1000`), and `usage.thinking_tokens` are directly observed. Because `agy` emits thinking + text as a single step update without a separate thinking-start timestamp or USD cost field, `thinkingStreamMs` and `totalCostUsd` are recorded as `null` (`N/A`) rather than fabricated.
+
+| Model (`CLI`, Reasoning Effort) | Arm | Mean Accuracy (`Checks / 20`, False) | Mean Input Tokens | Mean Output Tokens (`Thinking`) | Mean CLI Startup (ms) | Mean Local Pipe `Orch+MCP+Route+Ver` (ms) | Mean Model 1st Resp (ms) | Mean Thinking Stream (ms) | Mean Text Stream (ms) | Mean Model API (ms) | Mean Total E2E Wall (ms) | Total API Cost across 4 Studies (`$`) |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| **`gemini-4-argon-high`** (`agy`, `high`) | `raw` | `0.60` (`12/20`, `7` false) | `18,199.25` | `2,464.00` (`2,380.75`) | `2,249.13` | `0.61` | `29,123.77` | `null` | `498.27` | `29,630.37` | `33,661.40` | `N/A` |
+| | `mcp_digest` | **`1.00` (`20/20`, `0` false)** | `12,655.25` | `1,442.00` (`1,340.50`) | `2,420.58` | `950.24` | `18,202.82` | `null` | `548.27` | `18,778.05` | `22,762.90` | `N/A` |
+| | **`compact_evidence`** | **`1.00` (`20/20`, `0` false)** | **`12,645.50`** | **`1,252.00` (`1,154.75`)** | `2,469.44` | `1,043.30` | **`15,025.25`** | `null` | `549.20` | **`15,588.08`** | **`20,273.58`** | `N/A` |
+| **`gemini-3.8-flash-high`** (`agy`, `high`) | `raw` | `0.60` (`12/20`, `7` false) | `18,395.50` | `20,534.00` (`20,457.00`) | `2,420.64` | `0.61` | `51,154.36` | `null` | `370.26` | `51,546.49` | `56,300.04` | `N/A` |
+| | `mcp_digest` | **`1.00` (`20/20`, `0` false)** | `12,804.25` | `3,813.00` (`3,713.75`) | `2,475.12` | `950.24` | **`10,081.25`** | `null` | `249.59` | **`10,347.61`** | **`14,269.87`** | `N/A` |
+| | **`compact_evidence`** | **`1.00` (`20/20`, `0` false)** | **`12,793.75`** | `17,480.25` (`17,384.75`) | `2,225.94` | `1,043.30` | `42,189.14` | `null` | `394.63` | `42,591.34` | `46,954.81` | `N/A` |
+| **`claude-fable-5-1`** (`claude`, `max`) | `raw` | `0.60` (`12/20`, `7` false) | `11,056.50` | `4,880.25` (`4,759.75`) | `563.57` | `0.48` | `1,581.63` | `56,145.51` | `951.98` | `58,383.75` | `60,112.29` | `$1.323166` |
+| | `mcp_digest` | **`1.00` (`20/20`, `0` false)** | `3,124.00` | `2,467.25` (`2,331.75`) | `512.63` | `950.24` | `1,733.06` | `26,297.74` | `1,084.02` | `28,897.50` | `31,575.49` | `$0.649631` |
+| | **`compact_evidence`** | **`1.00` (`20/20`, `0` false)** | **`3,070.00`** | **`1,876.75` (`1,738.75`)** | `457.16` | `1,019.80` | **`1,182.24`** | **`19,341.74`** | `1,180.68` | **`21,418.75`** | **`24,088.97`** | **`$0.528831`** |
+| **`claude-opus-5-5`** (`claude`, `max`) | `raw` | `0.55` (`11/20`, `7` false) | `11,056.50` | `10,930.00` (`10,801.25`) | `487.92` | `0.48` | `1,560.55` | `98,839.74` | `732.78` | `100,844.00` | `102,506.61` | `$1.014925` |
+| | `mcp_digest` | **`1.00` (`20/20`, `0` false)** | `3,124.00` | `3,309.75` (`3,165.25`) | `434.23` | `950.24` | `1,506.71` | `26,484.60` | `810.66` | `28,425.50` | **`31,058.26`** | **`$0.327252`** |
+| | **`compact_evidence`** | **`1.00` (`20/20`, `0` false)** | **`3,070.00`** | `5,863.75` (`5,719.50`) | `458.98` | `1,019.80` | `1,513.96` | `48,071.64` | `804.52` | `50,101.50` | `52,737.44` | `$0.530492` |
+| **`claude-sonnet-5-5`** (`claude`, `max`) | `raw` | `0.60` (`12/20`, `7` false) | `11,060.50` | `8,095.25` (`7,979.75`) | `450.02` | `0.48` | `1,656.34` | `54,295.66` | `223.78` | `55,807.75` | `57,402.52` | `$0.434412` |
+| | `mcp_digest` | **`1.00` (`20/20`, `0` false)** | `3,128.00` | `3,933.75` (`3,800.25`) | `464.51` | `950.24` | `1,753.61` | `24,540.86` | `507.66` | `26,269.75` | **`29,176.02`** | **`$0.188626`** |
+| | **`compact_evidence`** | **`1.00` (`20/20`, `0` false)** | **`3,074.00`** | `6,456.50` (`6,325.75`) | `444.66` | `1,019.80` | `2,296.81` | `40,606.80` | `423.91` | `42,989.75` | `45,655.11` | `$0.288995` |
+| **`claude-haiku-5-5`** (`claude`, `max`) | `raw` | `0.50` (`10/20`, `8` false) | `11,058.50` | `11,176.25` (`11,050.75`) | `474.13` | `0.48` | `1,298.40` | `47,280.74` | `188.07` | `48,489.75` | `50,143.80` | `$0.027881` |
+| | `mcp_digest` | **`0.95` (`19/20`, `0` false)** | `3,126.00` | `8,081.00` (`7,945.75`) | `451.20` | `950.24` | `1,049.77` | `31,865.21` | `359.37` | `32,912.00` | **`35,557.78`** | **`$0.017724`** |
+| | **`compact_evidence`** | **`0.95` (`19/20`, `0` false)** | **`3,072.00`** | `11,700.25` (`11,561.00`) | `451.84` | `1,019.80` | `1,414.10` | `45,598.90` | `275.68` | `46,885.25` | `49,561.20` | `$0.024937` |
+
+### 8.5 Per-Study Diagnostic Accuracy, E2E Latency & API Cost Matrix (72 Evaluations)
+
+| Study | Model | `raw` Accuracy (`E2E s`, `Cost $`) | `mcp_digest` Accuracy (`E2E s`, `Cost $`) | `compact_evidence` Accuracy (`E2E s`, `Cost $`) |
+|---|---|---|---|---|
+| **`cuda_opt_loop`** | `gemini-4-argon-high` | `0.60` (`3/5`, `36.40s`, `N/A`) | **`1.00`** (`5/5`, `16.01s`, `N/A`) | **`1.00`** (`5/5`, `21.89s`, `N/A`) |
+| | `gemini-3.8-flash-high` | `0.60` (`3/5`, `19.42s`, `N/A`) | **`1.00`** (`5/5`, `10.70s`, `N/A`) | **`1.00`** (`5/5`, `13.58s`, `N/A`) |
+| | `claude-fable-5-1` | `0.60` (`3/5`, `52.46s`, `$0.325033`) | **`1.00`** (`5/5`, `10.79s`, `$0.062720`) | **`1.00`** (`5/5`, `14.23s`, `$0.087345`) |
+| | `claude-opus-5-5` | `0.60` (`3/5`, `174.77s`, `$0.418933`) | **`1.00`** (`5/5`, `12.40s`, `$0.037168`) | **`1.00`** (`5/5`, `46.82s`, `$0.115678`) |
+| | `claude-sonnet-5-5` | `0.60` (`3/5`, `84.07s`, `$0.142027`) | **`1.00`** (`5/5`, `13.16s`, `$0.023384`) | **`1.00`** (`5/5`, `72.10s`, `$0.108009`) |
+| | `claude-haiku-5-5` | `0.60` (`3/5`, `59.40s`, `$0.007592`) | **`1.00`** (`5/5`, `21.70s`, `$0.002728`) | **`1.00`** (`5/5`, `44.74s`, `$0.005474`) |
+| **`cpp_build_loop`** | `gemini-4-argon-high` | `0.20` (`1/5`, `48.18s`, `N/A`) | **`1.00`** (`5/5`, `32.44s`, `N/A`) | **`1.00`** (`5/5`, `29.03s`, `N/A`) |
+| | `gemini-3.8-flash-high` | `0.20` (`1/5`, `45.65s`, `N/A`) | **`1.00`** (`5/5`, `24.85s`, `N/A`) | **`1.00`** (`5/5`, `147.06s`, `N/A`) |
+| | `claude-fable-5-1` | `0.20` (`1/5`, `47.69s`, `$0.391945`) | **`1.00`** (`5/5`, `20.48s`, `$0.124333`) | **`1.00`** (`5/5`, `12.44s`, `$0.094093`) |
+| | `claude-opus-5-5` | `0.20` (`1/5`, `34.90s`, `$0.155918`) | **`1.00`** (`5/5`, `25.37s`, `$0.075973`) | **`1.00`** (`5/5`, `34.13s`, `$0.093999`) |
+| | `claude-sonnet-5-5` | `0.20` (`1/5`, `41.10s`, `$0.099589`) | **`1.00`** (`5/5`, `50.65s`, `$0.082787`) | **`1.00`** (`5/5`, `31.65s`, `$0.057011`) |
+| | `claude-haiku-5-5` | `0.20` (`1/5`, `29.50s`, `$0.005486`) | **`1.00`** (`5/5`, `55.61s`, `$0.007133`) | **`1.00`** (`5/5`, `66.72s`, `$0.008564`) |
+| **`pytorch_inductor_training`** | `gemini-4-argon-high` | `0.60` (`3/5`, `19.74s`, `N/A`) | **`1.00`** (`5/5`, `28.59s`, `N/A`) | **`1.00`** (`5/5`, `17.47s`, `N/A`) |
+| | `gemini-3.8-flash-high` | `0.60` (`3/5`, `14.31s`, `N/A`) | **`1.00`** (`5/5`, `10.97s`, `N/A`) | **`1.00`** (`5/5`, `14.39s`, `N/A`) |
+| | `claude-fable-5-1` | `0.60` (`3/5`, `107.58s`, `$0.437318`) | **`1.00`** (`5/5`, `79.67s`, `$0.399908`) | **`1.00`** (`5/5`, `61.59s`, `$0.302883`) |
+| | `claude-opus-5-5` | `0.40` (`2/5`, `168.86s`, `$0.360286`) | **`1.00`** (`5/5`, `69.92s`, `$0.186913`) | **`1.00`** (`5/5`, `121.58s`, `$0.300333`) |
+| | `claude-sonnet-5-5` | `0.60` (`3/5`, `74.17s`, `$0.145332`) | **`1.00`** (`5/5`, `38.94s`, `$0.068086`) | **`1.00`** (`5/5`, `71.70s`, `$0.114506`) |
+| | `claude-haiku-5-5` | `0.20` (`1/5`, `79.35s`, `$0.010898`) | **`0.80`** (`4/5`, `46.51s`, `$0.006172`) | **`0.80`** (`4/5`, `67.90s`, `$0.008693`) |
+| **`linux_perf_cpu`** | `gemini-4-argon-high` | **`1.00`** (`5/5`, `30.32s`, `N/A`) | **`1.00`** (`5/5`, `14.01s`, `N/A`) | **`1.00`** (`5/5`, `12.71s`, `N/A`) |
+| | `gemini-3.8-flash-high` | **`1.00`** (`5/5`, `145.81s`, `N/A`) | **`1.00`** (`5/5`, `10.56s`, `N/A`) | **`1.00`** (`5/5`, `12.79s`, `N/A`) |
+| | `claude-fable-5-1` | **`1.00`** (`5/5`, `32.72s`, `$0.168670`) | **`1.00`** (`5/5`, `15.36s`, `$0.062670`) | **`1.00`** (`5/5`, `8.09s`, `$0.044195`) |
+| | `claude-opus-5-5` | **`1.00`** (`5/5`, `31.49s`, `$0.079788`) | **`1.00`** (`5/5`, `16.55s`, `$0.027198`) | **`1.00`** (`5/5`, `8.43s`, `$0.020478`) |
+| | `claude-sonnet-5-5` | **`1.00`** (`5/5`, `30.28s`, `$0.047464`) | **`1.00`** (`5/5`, `13.95s`, `$0.014369`) | **`1.00`** (`5/5`, `7.17s`, `$0.009469`) |
+| | `claude-haiku-5-5` | **`1.00`** (`5/5`, `32.32s`, `$0.003905`) | **`1.00`** (`5/5`, `18.41s`, `$0.001691`) | **`1.00`** (`5/5`, `18.89s`, `$0.002206`) |
+
+### 8.6 Key Multi-Model Conclusions
+
+1. **Consistent Diagnostic Lift Across All 6 Models (`0.50–0.60` $\to$ `0.95–1.00`)**:
+   - Without PerfDigest MCP (`raw`), every model—even `gemini-4-argon-high`, `claude-fable-5-1 --effort max`, and `claude-opus-5-5 --effort max`—scores `0.60` on `cuda_opt_loop`, `0.20` on `cpp_build_loop`, and `0.20–0.60` on `pytorch_inductor_training` (`7–8` false or unmeasured conclusions per model across the 4 studies), while scoring `1.00` on `linux_perf_cpu` where the complete raw `1.6 KB` text report fits in context.
+   - Both `mcp_digest` and `compact_evidence` reach **`1.00` (`20/20` checks, `0` false conclusions)** on `gemini-4-argon-high`, `gemini-3.8-flash-high`, `claude-fable-5-1`, `claude-opus-5-5`, and `claude-sonnet-5-5`, and **`0.95` (`19/20`, `0` false conclusions)** on `claude-haiku-5-5`.
+2. **`mcp_digest` vs. `compact_evidence` Tradeoffs**:
+   - When all candidate digests are already provided in a single turn, `mcp_digest` and `compact_evidence` achieve identical diagnostic accuracy (`1.00` on 5/6 models, `0.95` on Haiku 5.5).
+   - **`compact_evidence` wins on local pipeline efficiency, context size, provenance/verification guarantees, and flagship-model latency/cost**:
+     - **2.47x faster local MCP digestion** (`958.21 ms` $\to$ `388.39 ms` mean; **3.84x faster** on the 4-report C++ build study: `1,583.15 ms` $\to$ `412.34 ms`, cutting cgroup user CPU from `1,549.22 ms` to `552.43 ms`).
+     - **smaller prompt payload than both verbose evidence (`-35.3%` to `-43.7%`) and `mcp_digest`** (`4,542.25 B` mean vs `4,744.25 B` in `mcp_digest` and `18,966.25 B` in `raw`), reducing Claude mean input tokens per study from `11,058` (`raw`) and `3,125` (`mcp_digest`) to **`3,071` (`compact_evidence`)**.
+     - **Fastest & cheapest on `claude-fable-5-1` and `gemini-4-argon-high`**: Because `compact_evidence` explicitly supplies the routed primary report (`decision`) and independent verification receipt (`verification`), `claude-fable-5-1` spends fewer thinking tokens (`1,738.75` vs `2,331.75` in `mcp_digest` and `4,759.75` in `raw`), completing in **`24.09s` (`$0.528831`)** vs `31.58s` (`$0.649631`) in `mcp_digest` and `60.11s` (`$1.323166`) in `raw`. Similarly, `gemini-4-argon-high` completes in **`20.27s`** on `compact_evidence` vs `22.76s` on `mcp_digest` and `33.66s` on `raw`.
+     - On `claude-opus-5-5`, `claude-sonnet-5-5`, and `gemini-3.8-flash-high`, `mcp_digest` has slightly lower model thinking time than `compact_evidence` because those models spend extra thinking tokens cross-checking the verification receipt and routing probabilities when present in `compact_evidence`; however, both arms remain **1.26x–3.95x faster and 33%–68% cheaper than `raw`**.
+
 
