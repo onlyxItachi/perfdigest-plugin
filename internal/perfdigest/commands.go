@@ -7,7 +7,6 @@ import (
 	"math"
 	"os/exec"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -37,25 +36,6 @@ func (b *boundedBuffer) String() string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return b.buf.String()
-}
-
-func signalName(sig syscall.Signal) string {
-	switch sig {
-	case syscall.SIGTERM:
-		return "SIGTERM"
-	case syscall.SIGKILL:
-		return "SIGKILL"
-	case syscall.SIGINT:
-		return "SIGINT"
-	case syscall.SIGHUP:
-		return "SIGHUP"
-	case syscall.SIGQUIT:
-		return "SIGQUIT"
-	case syscall.SIGABRT:
-		return "SIGABRT"
-	default:
-		return fmt.Sprintf("SIG(%d)", int(sig))
-	}
 }
 
 // RunCommand executes a CommandSpec without a shell, using ChildEnvironment(), bounded timeout,
@@ -94,7 +74,7 @@ func RunCommand(ctx context.Context, spec CommandSpec, cwd string) (CommandRecei
 	cmd := exec.Command(spec.Command, args...)
 	cmd.Dir = cwd
 	cmd.Env = ChildEnvSlice(nil)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	configureProcessGroup(cmd)
 
 	stdoutBuf := &boundedBuffer{max: MaxCommandOutputBytes}
 	stderrBuf := &boundedBuffer{max: MaxCommandOutputBytes}
@@ -115,10 +95,9 @@ func RunCommand(ctx context.Context, spec CommandSpec, cwd string) (CommandRecei
 			return
 		}
 		stopped = true
-		pid := cmd.Process.Pid
-		_ = syscall.Kill(-pid, syscall.SIGTERM)
+		terminateProcessGroup(cmd, false)
 		killTimer = time.AfterFunc(500*time.Millisecond, func() {
-			_ = syscall.Kill(-pid, syscall.SIGKILL)
+			terminateProcessGroup(cmd, true)
 		})
 	}
 
@@ -167,9 +146,8 @@ func RunCommand(ctx context.Context, spec CommandSpec, cwd string) (CommandRecei
 		zero := 0
 		receipt.ExitCode = &zero
 	} else if exitErr, ok := waitErr.(*exec.ExitError); ok {
-		if status, ok := exitErr.Sys().(syscall.WaitStatus); ok && status.Signaled() {
-			s := signalName(status.Signal())
-			receipt.Signal = &s
+		if sigName := waitStatusSignalName(exitErr); sigName != nil {
+			receipt.Signal = sigName
 			receipt.ExitCode = nil
 		} else {
 			code := exitErr.ExitCode()

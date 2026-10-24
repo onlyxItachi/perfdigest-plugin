@@ -387,3 +387,84 @@ test('Go binary mcp stdio server contract parity via official MCP SDK client', a
     await rm(workspace, { recursive: true, force: true });
   }
 });
+
+test('Go cross-platform build matrix and postinstall binary provisioning (native preserve, Go rebuild, Node CLI fallback)', async () => {
+  // 1. Verify cross-compilation across all 6 OS/arch targets (linux/darwin/windows x amd64/arm64)
+  const buildGoScript = join(repoRoot, 'scripts/build-go.mjs');
+  const ensureBinaryScript = join(repoRoot, 'scripts/ensure-binary.mjs');
+  const { stdout: matrixOut } = await execFileAsync(process.execPath, [buildGoScript, '--verify-cross'], {
+    timeout: 120_000,
+  });
+  const matrix = JSON.parse(matrixOut) as {
+    status: string;
+    targets: Array<{ target: string; format: string; platform: string; arch: string; bytes: number }>;
+  };
+  assert.equal(matrix.status, 'ok');
+  assert.deepEqual(
+    matrix.targets.map((t) => `${t.target}:${t.format}:${t.platform}/${t.arch}`),
+    [
+      'linux/amd64:elf:linux/x64',
+      'linux/arm64:elf:linux/arm64',
+      'darwin/amd64:macho:darwin/x64',
+      'darwin/arm64:macho:darwin/arm64',
+      'windows/amd64:pe:win32/x64',
+      'windows/arm64:pe:win32/arm64',
+    ],
+  );
+  for (const t of matrix.targets) {
+    assert.ok(t.bytes > 1_000_000, `expected >1MB for ${t.target}, got ${t.bytes}`);
+  }
+
+  // 2. Verify ensure-binary.mjs preserves matching binary, rebuilds mismatched target via Go, and falls back to dist/cli.js when --no-go is set
+  const scratch = await mkdtemp(join(tmpdir(), 'pd-ensure-bin-'));
+  try {
+    const tempBin = join(scratch, 'perfdigest-plugin');
+    const cliJs = join(repoRoot, 'dist/cli.js');
+    // Copy current host binary to tempBin
+    await writeFile(tempBin, await readFile(goBinary));
+    await chmod(tempBin, 0o755);
+
+    // Matching host platform/arch -> preserved immediately
+    const { stdout: presOut } = await execFileAsync(process.execPath, [
+      ensureBinaryScript,
+      '--bin-path', tempBin,
+      '--cli-js-path', cliJs,
+      '--json',
+    ]);
+    const pres = JSON.parse(presOut);
+    assert.equal(pres.action, 'preserved');
+    assert.equal(pres.header.kind, 'native');
+
+    // Mismatched target (darwin/arm64 on linux/x64) with Go available -> rebuilt-go Mach-O arm64 binary
+    const { stdout: rebOut } = await execFileAsync(process.execPath, [
+      ensureBinaryScript,
+      '--bin-path', tempBin,
+      '--cli-js-path', cliJs,
+      '--target-platform', 'darwin',
+      '--target-arch', 'arm64',
+      '--json',
+    ]);
+    const reb = JSON.parse(rebOut);
+    assert.equal(reb.action, 'rebuilt-go');
+    assert.equal(reb.header.kind, 'native');
+    assert.equal(reb.header.format, 'macho');
+    assert.equal(reb.header.platform, 'darwin');
+    assert.equal(reb.header.arch, 'arm64');
+
+    // Mismatched target (linux/x64 while tempBin is darwin/arm64) with --no-go -> fallback-node-cli
+    const { stdout: fbOut } = await execFileAsync(process.execPath, [
+      ensureBinaryScript,
+      '--bin-path', tempBin,
+      '--cli-js-path', cliJs,
+      '--target-platform', 'linux',
+      '--target-arch', 'x64',
+      '--no-go',
+      '--json',
+    ]);
+    const fb = JSON.parse(fbOut);
+    assert.equal(fb.action, 'fallback-node-cli');
+    assert.equal(fb.header.kind, 'node-js-cli');
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
+});

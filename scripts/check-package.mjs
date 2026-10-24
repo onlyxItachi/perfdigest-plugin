@@ -13,9 +13,12 @@ const parent = resolve('work/package'); await mkdir(parent, { recursive: true })
 const root = await mkdtemp(join(parent, 'smoke-'));
 const packed = JSON.parse((await exec('npm', ['pack', '--json', '--ignore-scripts', '--pack-destination', root])).stdout)[0];
 const paths = packed.files.map(f => f.path);
-for (const path of ['dist/cli.js', 'dist/index.d.ts', 'dist/providers.js', 'dist/setup.js', 'docs/SETUP.md', 'examples/cpu-workload.mjs', '.mcp.json', '.codex-plugin/plugin.json', 'skills/perfdigest-evidence/SKILL.md', 'README.md', 'LICENSE']) assert.ok(paths.includes(path), path);
+for (const path of ['dist/cli.js', 'dist/perfdigest-plugin', 'dist/index.d.ts', 'dist/providers.js', 'dist/setup.js', 'docs/SETUP.md', 'examples/cpu-workload.mjs', '.mcp.json', '.codex-plugin/plugin.json', 'skills/perfdigest-evidence/SKILL.md', 'README.md', 'LICENSE', 'go.mod', 'cmd/perfdigest-plugin/main.go', 'internal/perfdigest/run.go', 'scripts/build-go.mjs', 'scripts/ensure-binary.mjs']) assert.ok(paths.includes(path), path);
 assert.ok(paths.every(p => !/(^|\/)(?:\.env(?:\.|$)|work\/|test\/|\.perfdigest\/|node_modules\/)/.test(p)), 'no credentials, test inputs, or run data in tarball');
 await exec('npm', ['install', '--prefix', root, '--ignore-scripts', '--no-audit', '--no-fund', join(root, packed.filename)], { timeout: 180_000 });
+const postinstallOut = JSON.parse((await exec(process.execPath, [join(root, 'node_modules/perfdigest-plugin/scripts/ensure-binary.mjs'), '--json'])).stdout);
+assert.equal(postinstallOut.action, 'preserved');
+assert.equal(postinstallOut.header.kind, 'native');
 const cli = join(root, 'node_modules/perfdigest-plugin/dist/cli.js');
 const binary = join(root, 'node_modules/.bin/perfdigest-plugin');
 assert.match((await exec(binary, ['--help'])).stdout, /Codex-first MVP/);

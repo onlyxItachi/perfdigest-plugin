@@ -127,7 +127,7 @@ func Redact(text string, sources ...map[string]string) string {
 
 func isExecutableFile(path string) bool {
 	info, err := os.Stat(path)
-	if err != nil || !info.Mode().IsRegular() {
+	if err != nil || info.IsDir() || !info.Mode().IsRegular() {
 		return false
 	}
 	if runtime.GOOS == "windows" {
@@ -141,13 +141,24 @@ func Executable(name string, env map[string]string) (string, error) {
 	if env == nil {
 		env = OsEnvMap()
 	}
-	if strings.Contains(name, "/") || strings.Contains(name, "\\") {
-		if !isExecutableFile(name) {
-			return "", fmt.Errorf("%s is not executable", name)
+	if filepath.IsAbs(name) || strings.ContainsRune(name, filepath.Separator) || strings.Contains(name, "/") || strings.Contains(name, "\\") {
+		if isExecutableFile(name) {
+			return name, nil
 		}
-		return name, nil
+		if runtime.GOOS == "windows" && filepath.Ext(name) == "" {
+			for _, ext := range windowsPathExtensions(env) {
+				if isExecutableFile(name + ext) {
+					return name + ext, nil
+				}
+			}
+		}
+		return "", fmt.Errorf("%s is not executable", name)
 	}
 	pathVal := env["PATH"]
+	if pathVal == "" && runtime.GOOS == "windows" {
+		pathVal = env["Path"]
+	}
+	exts := windowsPathExtensions(env)
 	for _, dir := range filepath.SplitList(pathVal) {
 		if dir == "" {
 			continue
@@ -156,6 +167,36 @@ func Executable(name string, env map[string]string) (string, error) {
 		if isExecutableFile(candidate) {
 			return candidate, nil
 		}
+		if runtime.GOOS == "windows" && filepath.Ext(name) == "" {
+			for _, ext := range exts {
+				withExt := candidate + ext
+				if isExecutableFile(withExt) {
+					return withExt, nil
+				}
+			}
+		}
 	}
 	return "", fmt.Errorf("%s is not on PATH", name)
+}
+
+func windowsPathExtensions(env map[string]string) []string {
+	if runtime.GOOS != "windows" {
+		return nil
+	}
+	raw := env["PATHEXT"]
+	if raw == "" {
+		raw = ".COM;.EXE;.BAT;.CMD"
+	}
+	var out []string
+	for _, part := range strings.Split(raw, ";") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if !strings.HasPrefix(part, ".") {
+			part = "." + part
+		}
+		out = append(out, part, strings.ToLower(part))
+	}
+	return out
 }

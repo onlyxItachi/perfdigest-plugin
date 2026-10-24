@@ -5,17 +5,28 @@ import (
 	"path/filepath"
 )
 
-func locateDemoScript(workspace string) string {
+func locateDemoScript(workspace string) (string, error) {
+	var candidates []string
 	if exe, err := os.Executable(); err == nil {
 		if realExe, err := filepath.EvalSymlinks(exe); err == nil {
 			exe = realExe
 		}
-		candidate := filepath.Join(filepath.Dir(filepath.Dir(exe)), "examples", "cpu-workload.mjs")
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate
+		exeDir := filepath.Dir(exe)
+		candidates = append(candidates,
+			filepath.Join(filepath.Dir(exeDir), "examples", "cpu-workload.mjs"),
+			filepath.Join(exeDir, "..", "perfdigest-plugin", "examples", "cpu-workload.mjs"),
+		)
+	}
+	candidates = append(candidates,
+		filepath.Join(workspace, "examples", "cpu-workload.mjs"),
+		filepath.Join(workspace, "node_modules", "perfdigest-plugin", "examples", "cpu-workload.mjs"),
+	)
+	for _, candidate := range candidates {
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate, nil
 		}
 	}
-	return filepath.Join(workspace, "examples", "cpu-workload.mjs")
+	return filepath.Join(workspace, "examples", "cpu-workload.mjs"), nil
 }
 
 func DemoManifest(workspace string, usePerf bool) (Manifest, error) {
@@ -35,7 +46,10 @@ func DemoManifest(workspace string, usePerf bool) (Manifest, error) {
 	if err != nil {
 		return Manifest{}, err
 	}
-	script := locateDemoScript(workspace)
+	script, err := locateDemoScript(workspace)
+	if err != nil {
+		return Manifest{}, err
+	}
 	args := []string{script, tracePath}
 	var capture CommandSpec
 	if usePerf {

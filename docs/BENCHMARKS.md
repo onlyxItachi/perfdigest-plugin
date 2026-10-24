@@ -272,11 +272,22 @@ Table D benchmarks the plugin's own **MCP stdio server mode (`perfdigest-plugin 
 > **Workload 3 & Default Binary Migration Takeaway**:
 > 1. **Instantaneous MCP Server & CLI Cold Start (`3.91 ms` vs `79–155 ms`)**: In `perfdigest-plugin mcp`, Go `one_shot` (**289.49 ms**) matches Go `persistent` (**291.29 ms**) and is **1.85× faster than Node 22 `one_shot` (`535.81 ms`)** and **1.30× faster than Node 22 `persistent` (`379.04 ms`)**.
 > 2. **4.8×–8.6× Lower Long-Lived MCP Server Memory (`11.5–14.7 MB` vs `66.4–116.9 MB`)**: Because IDE and agent hosts (Claude Code, Cursor, Codex, Antigravity) keep MCP stdio servers running in the background for the duration of a developer session, migrating `"bin": { "perfdigest-plugin": "dist/perfdigest-plugin" }` reduces idle/active MCP server resident memory from **99–117 MB (Node 22)** down to **11.5–14.7 MB (Go)** while cutting cgroup tree peak memory (server + Python `uvx` child) from **111.6 MB** to **65.8 MB**.
-> 3. **Dual-Surface Packaging**: `npm run build` compiles both `dist/*.js` (`tsc -p tsconfig.json`) for programmatic ESM library imports and `dist/perfdigest-plugin` (`go build -trimpath -ldflags="-s -w"`) as the default CLI/MCP binary.
+> 3. **Dual-Surface Cross-Platform Packaging**: `npm run build` compiles both `dist/*.js` (`tsc -p tsconfig.json`) for programmatic ESM library imports and `dist/perfdigest-plugin` (`node scripts/build-go.mjs`, `CGO_ENABLED=0 -trimpath -ldflags="-s -w"`) as the default CLI/MCP binary. `node scripts/build-go.mjs --verify-cross` verifies native compilation across `linux/amd64`, `linux/arm64`, `darwin/amd64`, `darwin/arm64`, `windows/amd64`, and `windows/arm64`, and `scripts/ensure-binary.mjs` (`postinstall`) checks the binary header (`ELF`, `Mach-O 64-bit`, `PE/COFF`) to preserve native execution (< 5 ms check), rebuild for mismatched OS/arch targets when `go` is installed, or fall back cleanly to `dist/cli.js`.
 
 ---
 
-## 7. Explicit scope & limitations
+## 7. Cross-Repo `PerfDigest-MCP-Bench` Regression Workflow (`npm run test:bench-regression`)
+
+[`scripts/check-bench-regression.mjs`](../scripts/check-bench-regression.mjs) integrates [`onlyxItachi/PerfDigest-MCP-Bench`](https://github.com/onlyxItachi/PerfDigest-MCP-Bench) (merged PR #1, `aaa1f41`) directly into `npm run check` and `.github/workflows/ci.yml`:
+
+1. **Cross-Repo Schema Lockstep**: Verifies that `benchmark-result.v1.schema.json`, `benchmark-manifest.v1.schema.json`, and `regression-corpus.v1.schema.json` remain synchronized across both repositories, and validates `PerfDigest-MCP-Bench`'s 72-cell `interpreter-matrix-2026-07-18.benchmark-result.v1.json` and `real-workloads-corpus.v1.json` through [`bench/validate.mjs`](../bench/validate.mjs) and `PerfDigest-MCP-Bench/ci/export_*.py --check`.
+2. **Real-Workload End-to-End Parity (`dist/perfdigest-plugin` Go vs `investigate()` Node/TS)**: Executes full `investigate()` workflows with live `uvx perfdigest-mcp` session reuse and loopback SystemOne HTTP routing against the committed real profiler artifacts in `PerfDigest-MCP-Bench`, asserting 100% parity on SHA-256 provenance (including millisecond-rounded `modifiedAt`), routing outcome, top unit identity, and `null` vs `0.0` metric honesty:
+   - **`cpp_build_loop`** (5 reports in `results/cpp_build_loop_raw/`, `2,588,962 B`): routes to `template-heavy` (`InstantiateClass`, index `159`, `189` units); Go default binary completes in **373.49 ms** vs Node/TS **526.64 ms** (**1.41× faster**).
+   - **`cuda_opt_bench`** (`results/cuda_opt_bench_raw/ptxas_verbose.txt`, `2,351 B`): routes to `ptxas-verbose` (`_Z15checksum_kernelPKflPd [sm_89]`, index `0`, `7` units); Go default binary completes in **318.29 ms** vs Node/TS **450.15 ms** (**1.41× faster**).
+
+---
+
+## 8. Explicit scope & limitations
 
 - **Single host, single session**: All medians, IQRs, and resource figures apply strictly to `amd-ryzen-ai-9-hx-370-x64` (`Linux 7.0.0-27-generic`) and do not generalize to other CPUs, OS kernels, filesystems, or shared CI runners.
 - **1-report floor**: Single-report investigations (`K = 1`) still pay one initial `uvx perfdigest-mcp` startup (~268–404 ms); bounded session reuse eliminates $K - 1$ redundant Python/MCP startups when $K \ge 2$ candidate reports are summarized in a single investigation (such as multi-artifact CMake/Ninja/Clang or `ptxas` + `ncu` manifests).

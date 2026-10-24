@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -148,13 +147,12 @@ func (s *Session) Close() error {
 		_ = stdin.Close()
 	}
 	if cmd != nil && cmd.Process != nil {
-		pid := cmd.Process.Pid
-		_ = syscall.Kill(-pid, syscall.SIGTERM)
+		terminateProcessGroup(cmd, false)
 		if waitDone != nil {
 			select {
 			case <-waitDone:
 			case <-time.After(150 * time.Millisecond):
-				_ = syscall.Kill(-pid, syscall.SIGKILL)
+				terminateProcessGroup(cmd, true)
 				select {
 				case <-waitDone:
 				case <-time.After(200 * time.Millisecond):
@@ -181,7 +179,7 @@ func (s *Session) spawnAndHandshake(ctx context.Context) error {
 	cmd := exec.Command(command, args...)
 	cmd.Dir = s.workspace
 	cmd.Env = ChildEnvSlice(nil)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	configureProcessGroup(cmd)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {

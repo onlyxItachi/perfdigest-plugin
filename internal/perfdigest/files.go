@@ -113,7 +113,7 @@ func ReportFile(workspace, relPath, knownWorkspaceRealpath string) (ReportFileIn
 		Path:       resolved,
 		Sha256:     sum,
 		Bytes:      nbytes,
-		ModifiedAt: meta.ModTime().UTC().Format("2006-01-02T15:04:05.000Z"),
+		ModifiedAt: meta.ModTime().UTC().Round(time.Millisecond).Format("2006-01-02T15:04:05.000Z"),
 	}, nil
 }
 
