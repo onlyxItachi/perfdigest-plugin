@@ -185,24 +185,58 @@ type ProbabilityEntry struct {
 	Probability float64 `json:"probability"`
 }
 
+type McpExtractionRecord struct {
+	Step              int            `json:"step"`
+	Tool              string         `json:"tool"`
+	ReportID          string         `json:"reportId"`
+	SecondaryReportID string         `json:"secondaryReportId,omitempty"`
+	Unit              string         `json:"unit,omitempty"`
+	SecondaryUnit     string         `json:"secondaryUnit,omitempty"`
+	Section           string         `json:"section,omitempty"`
+	Sha256            string         `json:"sha256"`
+	SecondarySha256   string         `json:"secondarySha256,omitempty"`
+	Provenance        string         `json:"provenance"`
+	Data              map[string]any `json:"data"`
+}
+
+type EvidenceAcquisitionStep struct {
+	Step              int                `json:"step"`
+	Layer             string             `json:"layer"`
+	Action            string             `json:"action"`
+	McpTool           *string            `json:"mcpTool"`
+	TargetReportID    *string            `json:"targetReportId"`
+	SecondaryReportID string             `json:"secondaryReportId,omitempty"`
+	TargetUnit        string             `json:"targetUnit,omitempty"`
+	SecondaryUnit     string             `json:"secondaryUnit,omitempty"`
+	Confidence        *float64           `json:"confidence"`
+	Probabilities     []ProbabilityEntry `json:"probabilities,omitempty"`
+	Reason            string             `json:"reason"`
+	InputSha256       string             `json:"inputSha256,omitempty"`
+	LatencyMs         float64            `json:"latencyMs"`
+	InputTokens       *int               `json:"inputTokens"`
+	OutputTokens      *int               `json:"outputTokens"`
+}
+
 type RouteDecision struct {
-	Source              string             `json:"source"`
-	Provider            string             `json:"provider,omitempty"`
-	Model               string             `json:"model,omitempty"`
-	RequestedModel      string             `json:"requestedModel,omitempty"`
-	ConfidenceSemantics string             `json:"confidenceSemantics,omitempty"`
-	Transport           string             `json:"transport,omitempty"`
-	InputSha256         string             `json:"inputSha256,omitempty"`
-	EvidenceCount       *int               `json:"evidenceCount,omitempty"`
-	SelectedID          *string            `json:"selectedId"`
-	Confidence          *float64           `json:"confidence"`
-	Probabilities       []ProbabilityEntry `json:"probabilities,omitempty"`
-	Reason              string             `json:"reason"`
-	LatencyMs           float64            `json:"latencyMs"`
-	Requests            int                `json:"requests"`
-	InputTokens         *int               `json:"inputTokens"`
-	OutputTokens        *int               `json:"outputTokens"`
-	CostUsd             any                `json:"costUsd"`
+	Source              string                    `json:"source"`
+	Provider            string                    `json:"provider,omitempty"`
+	Model               string                    `json:"model,omitempty"`
+	RequestedModel      string                    `json:"requestedModel,omitempty"`
+	ConfidenceSemantics string                    `json:"confidenceSemantics,omitempty"`
+	Transport           string                    `json:"transport,omitempty"`
+	InputSha256         string                    `json:"inputSha256,omitempty"`
+	EvidenceCount       *int                      `json:"evidenceCount,omitempty"`
+	SelectedID          *string                   `json:"selectedId"`
+	ComplementaryIDs    []string                  `json:"complementaryIds,omitempty"`
+	Confidence          *float64                  `json:"confidence"`
+	Probabilities       []ProbabilityEntry        `json:"probabilities,omitempty"`
+	Reason              string                    `json:"reason"`
+	LatencyMs           float64                   `json:"latencyMs"`
+	Requests            int                       `json:"requests"`
+	InputTokens         *int                      `json:"inputTokens"`
+	OutputTokens        *int                      `json:"outputTokens"`
+	CostUsd             any                       `json:"costUsd"`
+	Steps               []EvidenceAcquisitionStep `json:"steps,omitempty"`
 }
 
 type EvidenceProvenance struct {
@@ -217,19 +251,22 @@ type EvidenceProvenance struct {
 }
 
 type CollectedEvidence struct {
-	Report     ReportSpec     `json:"report"`
-	Sha256     string         `json:"sha256"`
-	Bytes      int64          `json:"bytes"`
-	ModifiedAt string         `json:"modifiedAt"`
-	Provenance string         `json:"provenance"`
-	Digest     map[string]any `json:"digest"`
+	Report      ReportSpec            `json:"report"`
+	Sha256      string                `json:"sha256"`
+	Bytes       int64                 `json:"bytes"`
+	ModifiedAt  string                `json:"modifiedAt"`
+	Provenance  string                `json:"provenance"`
+	Digest      map[string]any        `json:"digest"`
+	Extractions []McpExtractionRecord `json:"extractions,omitempty"`
 }
 
 type EvidencePacket struct {
-	Status        string               `json:"status"`
-	Routing       string               `json:"routing"`
-	Decision      RouteDecision        `json:"decision"`
-	Considered    []EvidenceProvenance `json:"considered"`
-	Evidence      []CollectedEvidence  `json:"evidence"`
-	Corroborating []CollectedEvidence  `json:"corroborating,omitempty"`
+	Status        string                    `json:"status"`
+	Routing       string                    `json:"routing"`
+	Decision      RouteDecision             `json:"decision"`
+	Considered    []EvidenceProvenance      `json:"considered"`
+	Evidence      []CollectedEvidence       `json:"evidence"`
+	Corroborating []CollectedEvidence       `json:"corroborating,omitempty"`
+	Extractions   []McpExtractionRecord     `json:"extractions,omitempty"`
+	Steps         []EvidenceAcquisitionStep `json:"steps,omitempty"`
 }

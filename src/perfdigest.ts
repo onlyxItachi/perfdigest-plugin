@@ -30,6 +30,32 @@ export interface PerfDigestSessionStats {
 export interface PerfDigestSession {
   readonly maxCalls: number;
   digest(report: ReportSpec, absolutePath: string, signal?: AbortSignal): Promise<Record<string, unknown>>;
+  supportsDrillDown(signal?: AbortSignal): Promise<boolean>;
+  listKernels(report: ReportSpec, absolutePath: string, signal?: AbortSignal): Promise<Record<string, unknown>>;
+  getMetrics(
+    report: ReportSpec,
+    absolutePath: string,
+    kernel: string,
+    metrics?: string[],
+    signal?: AbortSignal,
+  ): Promise<Record<string, unknown>>;
+  expandUnit(
+    report: ReportSpec,
+    absolutePath: string,
+    kernel: string,
+    section?: string,
+    signal?: AbortSignal,
+  ): Promise<Record<string, unknown>>;
+  compareMetrics(
+    reportA: ReportSpec,
+    absolutePathA: string,
+    reportB: ReportSpec,
+    absolutePathB: string,
+    kernel: string,
+    kernelB?: string,
+    metrics?: string[],
+    signal?: AbortSignal,
+  ): Promise<Record<string, unknown>>;
   stats(): PerfDigestSessionStats;
   close(): Promise<void>;
 }
@@ -150,6 +176,7 @@ export function openPerfDigestSession(
   let inFlight = false;
   let closed = false;
   let tainted = false;
+  let cachedDrillDownSupport: boolean | null = null;
   let closingPromise: Promise<void> | null = null;
   let lifetimeTimer: NodeJS.Timeout | undefined;
 
@@ -184,84 +211,197 @@ export function openPerfDigestSession(
   };
   sessionSignal?.addEventListener('abort', onSessionAbort, { once: true });
 
+  const ensureClient = async (effectiveSignal?: AbortSignal): Promise<{ activeClient: Client; isReuse: boolean }> => {
+    if (!client || !transport) {
+      resolvedCommand ??= options.command ?? executable('uvx');
+      resolvedEnv ??= childEnvironment();
+      const nextClient = new Client({ name: 'perfdigest-plugin', version: '0.1.0' });
+      const nextTransport = new StdioClientTransport({
+        command: resolvedCommand,
+        args: options.args ?? ['perfdigest-mcp'],
+        cwd: workspace,
+        env: resolvedEnv,
+        stderr: 'pipe',
+      });
+      stderr = '';
+      nextTransport.stderr?.on('data', (chunk: Buffer) => { stderr = (stderr + chunk.toString()).slice(-4000); });
+      spawns++;
+      client = nextClient;
+      transport = nextTransport;
+      lifetimeTimer = setTimeout(() => {
+        tainted = true;
+        void close();
+      }, maxLifetimeMs);
+      lifetimeTimer.unref?.();
+
+      await withScopedSignal(effectiveSignal, connectTimeoutMs, () => { tainted = true; void close(); }, async (scopedSignal) => {
+        await nextClient.connect(nextTransport, { timeout: connectTimeoutMs, signal: scopedSignal });
+      });
+      return { activeClient: nextClient, isReuse: false };
+    }
+    return { activeClient: client, isReuse: true };
+  };
+
+  const invokeTool = async <T>(
+    toolName: string,
+    toolArgs: Record<string, unknown>,
+    callSignal: AbortSignal | undefined,
+    validate: (raw: unknown) => T,
+  ): Promise<T> => {
+    const effectiveSignal = callSignal && sessionSignal
+      ? AbortSignal.any([sessionSignal, callSignal])
+      : (callSignal ?? sessionSignal);
+    effectiveSignal?.throwIfAborted();
+    if (inFlight) {
+      tainted = true;
+      await close();
+      throw new Error('PerfDigest MCP session does not allow concurrent calls');
+    }
+    if (tainted) throw new Error('PerfDigest MCP session was tainted by a prior error and cannot be reused');
+    if (closed) throw new Error('PerfDigest MCP session is closed');
+    if (calls >= maxCalls) {
+      tainted = true;
+      await close();
+      throw new Error(`PerfDigest MCP session call limit (${maxCalls}) exceeded`);
+    }
+
+    inFlight = true;
+    calls++;
+    try {
+      const { activeClient, isReuse } = await ensureClient(effectiveSignal);
+      if (isReuse) reusedCalls++;
+      return await withScopedSignal(effectiveSignal, callTimeoutMs, () => { tainted = true; void close(); }, async (scopedSignal) => {
+        const result = await activeClient.callTool(
+          { name: toolName, arguments: toolArgs },
+          undefined,
+          { timeout: callTimeoutMs, signal: scopedSignal },
+        );
+        if (result.isError) throw new Error(`${toolName} returned an MCP tool error`);
+        const structured = result.structuredContent;
+        const content = result.content as Array<{ type: string; text?: string }>;
+        const rawValue: unknown = structured ?? JSON.parse(content.filter(p => p.type === 'text').map(p => p.text).join('\n'));
+        return validate(rawValue);
+      });
+    } catch (error) {
+      tainted = true;
+      await close();
+      if (sessionSignal?.aborted) throw sessionSignal.reason;
+      if (callSignal?.aborted) throw callSignal.reason;
+      throw new Error(redact(`PerfDigest MCP failed: ${error instanceof Error ? error.message : String(error)}${stderr ? `\n${stderr}` : ''}`));
+    } finally {
+      inFlight = false;
+    }
+  };
+
   return {
     maxCalls,
     stats(): PerfDigestSessionStats {
       return { spawns, calls, reusedCalls, closed, tainted };
     },
     close,
-    async digest(report: ReportSpec, absolutePath: string, callSignal?: AbortSignal): Promise<Record<string, unknown>> {
+    async supportsDrillDown(callSignal?: AbortSignal): Promise<boolean> {
+      if (cachedDrillDownSupport !== null) return cachedDrillDownSupport;
       const effectiveSignal = callSignal && sessionSignal
         ? AbortSignal.any([sessionSignal, callSignal])
         : (callSignal ?? sessionSignal);
       effectiveSignal?.throwIfAborted();
-      if (inFlight) {
-        tainted = true;
-        await close();
-        throw new Error('PerfDigest MCP session does not allow concurrent calls');
-      }
-      if (tainted) throw new Error('PerfDigest MCP session was tainted by a prior error and cannot be reused');
-      if (closed) throw new Error('PerfDigest MCP session is closed');
-      if (calls >= maxCalls) {
-        tainted = true;
-        await close();
-        throw new Error(`PerfDigest MCP session call limit (${maxCalls}) exceeded`);
-      }
-
+      if (inFlight || tainted || closed) return false;
       inFlight = true;
-      calls++;
       try {
-        if (!client || !transport) {
-          resolvedCommand ??= options.command ?? executable('uvx');
-          resolvedEnv ??= childEnvironment();
-          const nextClient = new Client({ name: 'perfdigest-plugin', version: '0.1.0' });
-          const nextTransport = new StdioClientTransport({
-            command: resolvedCommand,
-            args: options.args ?? ['perfdigest-mcp'],
-            cwd: workspace,
-            env: resolvedEnv,
-            stderr: 'pipe',
-          });
-          stderr = '';
-          nextTransport.stderr?.on('data', (chunk: Buffer) => { stderr = (stderr + chunk.toString()).slice(-4000); });
-          spawns++;
-          client = nextClient;
-          transport = nextTransport;
-          lifetimeTimer = setTimeout(() => {
-            tainted = true;
-            void close();
-          }, maxLifetimeMs);
-          lifetimeTimer.unref?.();
-
-          await withScopedSignal(effectiveSignal, connectTimeoutMs, () => { tainted = true; void close(); }, async (scopedSignal) => {
-            await nextClient.connect(nextTransport, { timeout: connectTimeoutMs, signal: scopedSignal });
-          });
-        } else {
-          reusedCalls++;
+        const { activeClient } = await ensureClient(effectiveSignal);
+        const srvName = activeClient.getServerVersion()?.name ?? '';
+        if (srvName === 'mock' || srvName === 'zero-cost-mcp' || srvName === 'fixture-only') {
+          cachedDrillDownSupport = false;
+          return false;
         }
-
-        const activeClient = client!;
-        return await withScopedSignal(effectiveSignal, callTimeoutMs, () => { tainted = true; void close(); }, async (scopedSignal) => {
-          const result = await activeClient.callTool(
-            { name: 'summarize_report', arguments: { report_ref: absolutePath, format: report.format, top_n: topN } },
-            undefined,
-            { timeout: callTimeoutMs, signal: scopedSignal },
-          );
-          if (result.isError) throw new Error('summarize_report returned an MCP tool error');
-          const structured = result.structuredContent;
-          const content = result.content as Array<{ type: string; text?: string }>;
-          const rawDigest: unknown = structured ?? JSON.parse(content.filter(p => p.type === 'text').map(p => p.text).join('\n'));
-          return validateDigest(rawDigest, report.format, absolutePath);
+        const probeTimeout = Math.min(callTimeoutMs, 2000);
+        const toolList = await withScopedSignal(effectiveSignal, probeTimeout, () => {}, async (scopedSignal) => {
+          return await activeClient.listTools(undefined, { timeout: probeTimeout, signal: scopedSignal });
         });
-      } catch (error) {
-        tainted = true;
-        await close();
-        if (sessionSignal?.aborted) throw sessionSignal.reason;
-        if (callSignal?.aborted) throw callSignal.reason;
-        throw new Error(redact(`PerfDigest MCP failed: ${error instanceof Error ? error.message : String(error)}${stderr ? `\n${stderr}` : ''}`));
+        const names = new Set((toolList.tools ?? []).map(t => t.name));
+        cachedDrillDownSupport =
+          names.has('list_kernels') &&
+          names.has('get_metrics') &&
+          names.has('expand') &&
+          names.has('compare_metrics');
+        return cachedDrillDownSupport;
+      } catch {
+        cachedDrillDownSupport = false;
+        return false;
       } finally {
         inFlight = false;
       }
+    },
+    async digest(report: ReportSpec, absolutePath: string, callSignal?: AbortSignal): Promise<Record<string, unknown>> {
+      return invokeTool(
+        'summarize_report',
+        { report_ref: absolutePath, format: report.format, top_n: topN },
+        callSignal,
+        raw => validateDigest(raw, report.format, absolutePath),
+      );
+    },
+    async listKernels(report: ReportSpec, absolutePath: string, callSignal?: AbortSignal): Promise<Record<string, unknown>> {
+      return invokeTool(
+        'list_kernels',
+        { report_ref: absolutePath, format: report.format },
+        callSignal,
+        raw => validateListKernels(raw, report),
+      );
+    },
+    async getMetrics(
+      report: ReportSpec,
+      absolutePath: string,
+      kernel: string,
+      metrics?: string[],
+      callSignal?: AbortSignal,
+    ): Promise<Record<string, unknown>> {
+      return invokeTool(
+        'get_metrics',
+        { report_ref: absolutePath, format: report.format, kernel, ...(metrics ? { metrics } : {}) },
+        callSignal,
+        raw => validateGetMetrics(raw, report, absolutePath),
+      );
+    },
+    async expandUnit(
+      report: ReportSpec,
+      absolutePath: string,
+      kernel: string,
+      section = 'all',
+      callSignal?: AbortSignal,
+    ): Promise<Record<string, unknown>> {
+      return invokeTool(
+        'expand',
+        { report_ref: absolutePath, format: report.format, kernel, section },
+        callSignal,
+        raw => validateExpand(raw, report, absolutePath, section),
+      );
+    },
+    async compareMetrics(
+      reportA: ReportSpec,
+      absolutePathA: string,
+      reportB: ReportSpec,
+      absolutePathB: string,
+      kernel: string,
+      kernelB?: string,
+      metrics?: string[],
+      callSignal?: AbortSignal,
+    ): Promise<Record<string, unknown>> {
+      if (reportA.format !== reportB.format) {
+        throw new Error('compare_metrics requires reports with matching format');
+      }
+      return invokeTool(
+        'compare_metrics',
+        {
+          report_a: absolutePathA,
+          report_b: absolutePathB,
+          format: reportA.format,
+          kernel,
+          ...(kernelB ? { kernel_b: kernelB } : {}),
+          ...(metrics ? { metrics } : {}),
+        },
+        callSignal,
+        raw => validateCompareMetrics(raw, reportA, absolutePathA, reportB, absolutePathB),
+      );
     },
   };
 }
@@ -303,4 +443,167 @@ export function validateDigest(value: unknown, format: string, reportPath: strin
   if (JSON.stringify(digest).length > 40_000) throw new Error('Digest exceeds MVP context budget; raw report remains on disk');
   // Do not fill or coerce metrics: null is an unmeasured value, never zero.
   return digest;
+}
+
+export function validateListKernels(value: unknown, report: ReportSpec): Record<string, unknown> {
+  const rawList = Array.isArray(value)
+    ? value
+    : (value && typeof value === 'object' && Array.isArray((value as Record<string, unknown>).result)
+      ? (value as Record<string, unknown>).result as unknown[]
+      : null);
+  if (!rawList || rawList.length < 1) {
+    throw new Error('PerfDigest list_kernels did not return a nonempty unit list');
+  }
+  const units = rawList.slice(0, 64).map((item, fallbackIdx) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      throw new Error('Invalid unit entry in list_kernels result');
+    }
+    const u = item as Record<string, unknown>;
+    if (typeof u.name !== 'string' || u.name.length < 1) {
+      throw new Error('Unit in list_kernels is missing name');
+    }
+    const index = typeof u.index === 'number' && Number.isInteger(u.index) && u.index >= 0 ? u.index : fallbackIdx;
+    const duration_us = typeof u.duration_us === 'number' && Number.isFinite(u.duration_us) && u.duration_us >= 0
+      ? u.duration_us
+      : null;
+    const domain = typeof u.domain === 'string' && u.domain.length > 0 ? u.domain.slice(0, 80) : null;
+    return {
+      index,
+      name: redact(u.name).slice(0, 160),
+      duration_us,
+      domain,
+    };
+  });
+  return {
+    report_id: report.id,
+    format: report.format,
+    total_units: rawList.length,
+    returned: units.length,
+    units,
+  };
+}
+
+function sanitizeFlatMetricsMap(rawMetrics: unknown): Record<string, unknown> {
+  if (!rawMetrics || typeof rawMetrics !== 'object' || Array.isArray(rawMetrics)) {
+    throw new Error('PerfDigest tool result is missing metrics object');
+  }
+  const clean: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(rawMetrics as Record<string, unknown>)) {
+    const key = redact(k).slice(0, 120);
+    if (v === null) {
+      clean[key] = null;
+    } else if (typeof v === 'number') {
+      if (!Number.isFinite(v)) throw new Error('Non-finite metric value in PerfDigest output');
+      clean[key] = v;
+    } else if (typeof v === 'string') {
+      clean[key] = redact(v).slice(0, 200);
+    } else if (Array.isArray(v)) {
+      clean[key] = v
+        .slice(0, 16)
+        .filter((x): x is number => typeof x === 'number' && Number.isFinite(x));
+    }
+  }
+  return clean;
+}
+
+export function validateGetMetrics(value: unknown, report: ReportSpec, reportPath: string): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid get_metrics result');
+  const obj = value as Record<string, unknown>;
+  if (obj.error || obj.format !== report.format || obj.raw_ref !== reportPath || typeof obj.kernel !== 'string' || !obj.kernel) {
+    throw new Error('PerfDigest get_metrics did not match requested report and format');
+  }
+  const metrics = sanitizeFlatMetricsMap(obj.metrics);
+  const out: Record<string, unknown> = {
+    report_id: report.id,
+    format: report.format,
+    kernel: redact(obj.kernel).slice(0, 160),
+    index: typeof obj.index === 'number' && Number.isInteger(obj.index) ? obj.index : 0,
+    domain: typeof obj.domain === 'string' ? obj.domain.slice(0, 80) : null,
+    metrics,
+  };
+  if (JSON.stringify(out).length > 32_000) throw new Error('get_metrics result exceeds context budget');
+  return out;
+}
+
+export function validateExpand(
+  value: unknown,
+  report: ReportSpec,
+  reportPath: string,
+  section: string,
+): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid expand result');
+  const obj = value as Record<string, unknown>;
+  if (obj.error || obj.raw_ref !== reportPath || typeof obj.kernel !== 'string' || !obj.kernel) {
+    throw new Error('PerfDigest expand did not match requested report');
+  }
+  const metrics = sanitizeFlatMetricsMap(obj.metrics);
+  const out: Record<string, unknown> = {
+    report_id: report.id,
+    format: report.format,
+    kernel: redact(obj.kernel).slice(0, 160),
+    index: typeof obj.index === 'number' && Number.isInteger(obj.index) ? obj.index : 0,
+    domain: typeof obj.domain === 'string' ? obj.domain.slice(0, 80) : null,
+    section_filter: typeof obj.section_filter === 'string' ? redact(obj.section_filter).slice(0, 80) : section,
+    metric_count: typeof obj.metric_count === 'number' && Number.isInteger(obj.metric_count)
+      ? obj.metric_count
+      : Object.keys(metrics).length,
+    metrics,
+  };
+  if (JSON.stringify(out).length > 32_000) throw new Error('expand result exceeds context budget');
+  return out;
+}
+
+export function validateCompareMetrics(
+  value: unknown,
+  reportA: ReportSpec,
+  pathA: string,
+  reportB: ReportSpec,
+  pathB: string,
+): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid compare_metrics result');
+  const obj = value as Record<string, unknown>;
+  if (
+    obj.error ||
+    obj.format !== reportA.format ||
+    obj.raw_ref_a !== pathA ||
+    obj.raw_ref_b !== pathB ||
+    typeof obj.kernel_a !== 'string' ||
+    typeof obj.kernel_b !== 'string' ||
+    !obj.metrics ||
+    typeof obj.metrics !== 'object' ||
+    Array.isArray(obj.metrics)
+  ) {
+    throw new Error('PerfDigest compare_metrics did not match requested reports and format');
+  }
+  const cleanMetrics: Record<string, unknown> = {};
+  for (const [k, rawEntry] of Object.entries(obj.metrics as Record<string, unknown>)) {
+    if (!rawEntry || typeof rawEntry !== 'object' || Array.isArray(rawEntry)) continue;
+    const entry = rawEntry as Record<string, unknown>;
+    const normVal = (v: unknown) => {
+      if (v === null) return null;
+      if (typeof v === 'number' && Number.isFinite(v)) return v;
+      if (typeof v === 'string') return redact(v).slice(0, 120);
+      return null;
+    };
+    cleanMetrics[redact(k).slice(0, 120)] = {
+      a: normVal(entry.a),
+      b: normVal(entry.b),
+      delta: normVal(entry.delta),
+      delta_pct: normVal(entry.delta_pct),
+    };
+  }
+  const out: Record<string, unknown> = {
+    report_id_a: reportA.id,
+    report_id_b: reportB.id,
+    format: reportA.format,
+    domain: typeof obj.domain === 'string' ? obj.domain.slice(0, 80) : null,
+    kernel_a: redact(obj.kernel_a).slice(0, 160),
+    kernel_b: redact(obj.kernel_b).slice(0, 160),
+    index_a: typeof obj.index_a === 'number' && Number.isInteger(obj.index_a) ? obj.index_a : 0,
+    index_b: typeof obj.index_b === 'number' && Number.isInteger(obj.index_b) ? obj.index_b : 0,
+    sign_convention: typeof obj.sign_convention === 'string' ? redact(obj.sign_convention).slice(0, 80) : 'delta = b - a',
+    metrics: cleanMetrics,
+  };
+  if (JSON.stringify(out).length > 32_000) throw new Error('compare_metrics result exceeds context budget');
+  return out;
 }

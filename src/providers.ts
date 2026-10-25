@@ -3,7 +3,8 @@ import { performance } from 'node:perf_hooks';
 import { z } from 'zod';
 import type { EvidencePacket, ProviderName, ReportSpec, RouteDecision, RoutingMode } from './config.js';
 import { DecisionsError, decisionsClient, localDecisionsClient, decisionsFailure, decisionsInput,
-  offlineSelection, routeDecision, routingQuestion, selectReport, type DecisionsErrorKind } from './decisions.js';
+  iterativeActionQuestion, offlineSelection, routeActionDecision, routeDecision, routingQuestion,
+  selectNextAction, selectReport, type CandidateMcpAction, type DecisionsErrorKind } from './decisions.js';
 import { validateLocalEndpoint } from './setup.js';
 import { cloudflareModels, defaultCloudflareModel, isCloudflareModelName, type CloudflareModelName, type CloudflareModelSpec } from './cloudflare-models.js';
 
@@ -35,6 +36,12 @@ export interface DecisionProvider {
   readonly name: ProviderName;
   select(issue: string, reports: ReportSpec[], signal?: AbortSignal,
     evidence?: EvidencePacket['evidence']): Promise<RouteDecision>;
+  decideAction?(
+    stateJson: string,
+    actions: CandidateMcpAction[],
+    evidenceCount: number,
+    signal?: AbortSignal,
+  ): Promise<RouteDecision>;
 }
 export class ProviderError extends DecisionsError {
   constructor(readonly provider: ProviderName, kind: DecisionsErrorKind, status: number | null = null) {
@@ -143,7 +150,12 @@ export function createDecisionProvider(mode: RoutingMode, options: DecisionProvi
   if (name === 'offline') return { name, select: async (_issue, reports) => offlineSelection(reports) };
   if (name === 'openai') {
     const client = options.decisionsMockURL ? localDecisionsClient(options.decisionsMockURL) : decisionsClient();
-    return { name, select: (issue, reports, signal, evidence) => selectReport(client, issue, reports, signal, evidence) };
+    return {
+      name,
+      select: (issue, reports, signal, evidence) => selectReport(client, issue, reports, signal, evidence),
+      decideAction: (stateJson, actions, evidenceCount, signal) =>
+        selectNextAction(client, stateJson, actions, evidenceCount, signal),
+    };
   }
   let endpoint: string;
   const headers: Record<string, string> = { 'content-type': 'application/json' };
@@ -156,50 +168,80 @@ export function createDecisionProvider(mode: RoutingMode, options: DecisionProvi
     endpoint = `https://api.cloudflare.com/client/v4/accounts/${account}/ai/run/${model!.id}`;
     headers.authorization = `Bearer ${token}`;
   }
-  return { name, async select(issue, reports, signal, evidence = []) {
-    const start = performance.now();
+  const querySystemOne = async (input: string, questions: DecisionQuestion[], signal?: AbortSignal) => {
+    signal?.throwIfAborted();
+    let response: Response;
     try {
-      signal?.throwIfAborted();
-      const input = decisionsInput(issue, reports, evidence);
-      const questions = [routingQuestion(reports)];
-      let response: Response;
-      try {
-        response = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(toSystemOne(input, questions, model?.requestModel ?? 'clef-flash')),
-          redirect: 'error', signal: AbortSignal.any([AbortSignal.timeout(name === 'local' ? 120_000 : 30_000), ...(signal ? [signal] : [])]) });
-      } catch { throw new ProviderError(name, signal?.aborted ? 'cancelled' : 'network'); }
-      // One request, no retries, no redirect, no upstream body/headers in diagnostics.
-      let text: string;
-      try { text = await response.text(); } catch { throw new ProviderError(name, signal?.aborted ? 'cancelled' : 'network'); }
-      if (Buffer.byteLength(text) > 128_000) throw new ProviderError(name, 'schema');
-      if (!response.ok) {
-        let code: number | undefined;
-        if (name === 'cloudflare') {
-          try {
-            const body = JSON.parse(text) as { errors?: Array<{ code?: number }> };
-            // Keep only a recognized numeric classification; never retain server text.
-            code = body.errors?.find(e => e.code === 3036 || e.code === 5035)?.code;
-          } catch { /* HTTP category remains authoritative even for a malformed error body. */ }
-        }
-        throw httpFailure(name, response.status, code);
-      }
-      let raw: unknown = JSON.parse(text);
+      response = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(toSystemOne(input, questions, model?.requestModel ?? 'clef-flash')),
+        redirect: 'error', signal: AbortSignal.any([AbortSignal.timeout(name === 'local' ? 120_000 : 30_000), ...(signal ? [signal] : [])]) });
+    } catch { throw new ProviderError(name, signal?.aborted ? 'cancelled' : 'network'); }
+    // One request, no retries, no redirect, no upstream body/headers in diagnostics.
+    let text: string;
+    try { text = await response.text(); } catch { throw new ProviderError(name, signal?.aborted ? 'cancelled' : 'network'); }
+    if (Buffer.byteLength(text) > 128_000) throw new ProviderError(name, 'schema');
+    if (!response.ok) {
+      let code: number | undefined;
       if (name === 'cloudflare') {
-        const envelope = z.object({ success: z.boolean(), result: z.unknown(), errors: z.array(z.unknown()).optional() }).parse(raw);
-        if (!envelope.success) throw new ProviderError(name, 'service', response.status);
-        raw = envelope.result;
+        try {
+          const body = JSON.parse(text) as { errors?: Array<{ code?: number }> };
+          // Keep only a recognized numeric classification; never retain server text.
+          code = body.errors?.find(e => e.code === 3036 || e.code === 5035)?.code;
+        } catch { /* HTTP category remains authoritative even for a malformed error body. */ }
       }
-      const normalized = normalizeSystemOne(raw, questions);
-      // Check the advertised model identity; this alone cannot verify the server's weights.
-      // Local llama.cpp serves Clef-flash under its alias; Cloudflare must return the requested model.
-      if (!(model?.identities ?? ['clef-flash', '@cf/cloudflare/clef-flash']).includes(normalized.model)) throw new ProviderError(name, 'schema');
-      return routeDecision(normalized, reports, { source: name === 'local' ? 'clef_local' : 'clef_cloudflare',
-        provider: name, transport: name === 'local' ? 'loopback_http' : 'cloudflare_https', confidenceSemantics: 'systemone_uniform_zero',
-        inputSha256: createHash('sha256').update(input).digest('hex'), evidenceCount: evidence.length,
-        latencyMs: Math.round(performance.now() - start), ...(model ? { requestedModel: model.id } : {}) });
-    } catch (error) {
-      if (error instanceof ProviderError) throw error;
-      const failure = decisionsFailure(error);
-      throw new ProviderError(name, signal?.aborted ? 'cancelled' : failure.kind, failure.httpStatus);
+      throw httpFailure(name, response.status, code);
     }
-  } };
+    let raw: unknown = JSON.parse(text);
+    if (name === 'cloudflare') {
+      const envelope = z.object({ success: z.boolean(), result: z.unknown(), errors: z.array(z.unknown()).optional() }).parse(raw);
+      if (!envelope.success) throw new ProviderError(name, 'service', response.status);
+      raw = envelope.result;
+    }
+    const normalized = normalizeSystemOne(raw, questions);
+    // Check the advertised model identity; this alone cannot verify the server's weights.
+    // Local llama.cpp serves Clef-flash under its alias; Cloudflare must return the requested model.
+    if (!(model?.identities ?? ['clef-flash', '@cf/cloudflare/clef-flash']).includes(normalized.model)) throw new ProviderError(name, 'schema');
+    return normalized;
+  };
+  return {
+    name,
+    async select(issue, reports, signal, evidence = []) {
+      const start = performance.now();
+      try {
+        signal?.throwIfAborted();
+        const input = decisionsInput(issue, reports, evidence);
+        const questions = [routingQuestion(reports)];
+        const normalized = await querySystemOne(input, questions, signal);
+        return routeDecision(normalized, reports, { source: name === 'local' ? 'clef_local' : 'clef_cloudflare',
+          provider: name, transport: name === 'local' ? 'loopback_http' : 'cloudflare_https', confidenceSemantics: 'systemone_uniform_zero',
+          inputSha256: createHash('sha256').update(input).digest('hex'), evidenceCount: evidence.length,
+          latencyMs: Math.round(performance.now() - start), ...(model ? { requestedModel: model.id } : {}) });
+      } catch (error) {
+        if (error instanceof ProviderError) throw error;
+        const failure = decisionsFailure(error);
+        throw new ProviderError(name, signal?.aborted ? 'cancelled' : failure.kind, failure.httpStatus);
+      }
+    },
+    async decideAction(stateJson, actions, evidenceCount, signal) {
+      const start = performance.now();
+      try {
+        signal?.throwIfAborted();
+        const questions = [iterativeActionQuestion(actions)];
+        const normalized = await querySystemOne(stateJson, questions, signal);
+        return routeActionDecision(normalized, actions, {
+          source: name === 'local' ? 'clef_local' : 'clef_cloudflare',
+          provider: name,
+          transport: name === 'local' ? 'loopback_http' : 'cloudflare_https',
+          confidenceSemantics: 'systemone_uniform_zero',
+          inputSha256: createHash('sha256').update(stateJson).digest('hex'),
+          evidenceCount,
+          latencyMs: Math.round(performance.now() - start),
+          ...(model ? { requestedModel: model.id } : {}),
+        });
+      } catch (error) {
+        if (error instanceof ProviderError) throw error;
+        const failure = decisionsFailure(error);
+        throw new ProviderError(name, signal?.aborted ? 'cancelled' : failure.kind, failure.httpStatus);
+      }
+    },
+  };
 }

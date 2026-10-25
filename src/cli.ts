@@ -33,6 +33,7 @@ async function main() {
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
     help: { type: 'boolean', short: 'h' }, workspace: { type: 'string' },
     agent: { type: 'string' }, 'agent-command': { type: 'string' }, 'agent-sessions': { type: 'boolean' },
+    'agent-in-execution-async': { type: 'boolean' },
     'agent-delivery': { type: 'string' }, 'compact-evidence': { type: 'boolean' },
     routing: { type: 'string' }, provider: { type: 'string' }, model: { type: 'string' }, perf: { type: 'boolean' },
     endpoint: { type: 'string' }, 'env-file': { type: 'string' }, 'decision-model': { type: 'string' }, yes: { type: 'boolean' }, 'check-connection': { type: 'boolean' },
@@ -71,19 +72,29 @@ async function main() {
   }
   const agent = values.agent ?? (command === 'demo' ? 'none' : 'codex');
   if (agent !== 'none' && agent !== 'codex' && agent !== 'generic') throw new Error('--agent must be none, codex or generic');
-  if (agent !== 'generic' && (values['agent-command'] !== undefined || values['agent-sessions'] !== undefined)) {
-    throw new Error('--agent-command and --agent-sessions require --agent generic');
+  if (agent !== 'generic' && (values['agent-command'] !== undefined || values['agent-sessions'] !== undefined || values['agent-in-execution-async'] !== undefined)) {
+    throw new Error('--agent-command, --agent-sessions and --agent-in-execution-async require --agent generic');
   }
   if (agent === 'generic' && !values['agent-command']) {
     throw new Error('--agent generic requires --agent-command PATH');
   }
   const agentDeliveryRaw = values['agent-delivery'];
-  if (agentDeliveryRaw !== undefined && agentDeliveryRaw !== 'two_turn' && agentDeliveryRaw !== 'single_turn') {
-    throw new Error('--agent-delivery must be two_turn or single_turn');
+  if (
+    agentDeliveryRaw !== undefined &&
+    agentDeliveryRaw !== 'two_turn' &&
+    agentDeliveryRaw !== 'single_turn' &&
+    agentDeliveryRaw !== 'in_execution' &&
+    agentDeliveryRaw !== 'auto'
+  ) {
+    throw new Error('--agent-delivery must be auto, in_execution, two_turn or single_turn');
   }
   const agentDelivery = agentDeliveryRaw as AgentDeliveryMode | undefined;
   const agentAdapter = agent === 'generic'
-    ? genericCliAdapter({ command: values['agent-command']!, sessions: values['agent-sessions'] ?? false })
+    ? genericCliAdapter({
+        command: values['agent-command']!,
+        sessions: values['agent-sessions'] ?? false,
+        inExecutionAsync: values['agent-in-execution-async'] ?? false,
+      })
     : undefined;
   createDecisionProvider(routing, modelOption); // Preflight credentials and model before creating/capturing a demo.
   if (command === 'run' && !positionals[1]) throw new Error('run requires a manifest path');

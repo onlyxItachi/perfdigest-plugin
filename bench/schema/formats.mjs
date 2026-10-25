@@ -835,4 +835,34 @@ export const multiModelEvalResultSchema = z.object({
   limits: z.array(nonEmpty).min(1),
 }).strict();
 
+export const measurementReceiptSchema = z.object({
+  schema: z.literal('perfdigest.benchmark.measurement-receipt.v1'),
+  experimentId: nonEmpty,
+  generatedAtUtc: z.iso.datetime(),
+  gitSha: z.string().regex(/^[a-f0-9]{40}$/),
+  runnerVersion: nonEmpty,
+  reconciledFromSourceArtifact: z.string().nullable(),
+  cellsCsvRef: nonEmpty,
+  summaryCsvRef: nonEmpty,
+  sourceTraceRef: nonEmpty,
+  sampleSize: z.object({
+    totalCells: z.int().min(1),
+    completeCells: z.int().min(0),
+    failedCells: z.int().min(0),
+    timedOutCells: z.int().min(0),
+    abstainedCells: z.int().min(0),
+    invalidIncompleteCells: z.int().min(0),
+  }).strict(),
+  models: z.array(z.object({
+    modelId: nonEmpty,
+    effort: nonEmpty,
+  }).strict()).min(1),
+  arms: z.array(z.enum(['raw', 'mcp_digest', 'evidence'])).min(1),
+  baselineParityVerified: z.literal(true),
+  nativeToolsEnabledInRawBaseline: z.literal(true),
+  oracleLeakageCheckPassed: z.literal(true),
+  limitations: z.array(nonEmpty).min(1),
+}).strict();
+
+
 

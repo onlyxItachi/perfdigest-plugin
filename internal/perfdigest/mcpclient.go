@@ -48,8 +48,9 @@ type Session struct {
 	linesCh       chan string
 	readErrCh     chan error
 	waitDoneCh    chan struct{}
-	stderrBuf     *tailBuffer
-	lifetimeTimer *time.Timer
+	stderrBuf          *tailBuffer
+	lifetimeTimer      *time.Timer
+	cachedDrillSupport *bool
 }
 
 type tailBuffer struct {
@@ -243,8 +244,19 @@ func (s *Session) spawnAndHandshake(ctx context.Context) error {
 			"version": "0.1.0",
 		},
 	}
-	if _, err := s.rpcCall(initCtx, "initialize", initParams, s.opts.ConnectTimeoutMs); err != nil {
+	initRes, err := s.rpcCall(initCtx, "initialize", initParams, s.opts.ConnectTimeoutMs)
+	if err != nil {
 		return err
+	}
+	if srvInfo, ok := initRes["serverInfo"].(map[string]any); ok {
+		if srvName, ok := srvInfo["name"].(string); ok {
+			if srvName == "mock" || srvName == "zero-cost-mcp" || srvName == "fixture-only" {
+				f := false
+				s.mu.Lock()
+				s.cachedDrillSupport = &f
+				s.mu.Unlock()
+			}
+		}
 	}
 	notif := map[string]any{
 		"jsonrpc": "2.0",
@@ -324,7 +336,84 @@ func (s *Session) rpcCall(ctx context.Context, method string, params any, timeou
 	}
 }
 
-func (s *Session) Digest(ctx context.Context, report ReportSpec, absolutePath string) (map[string]any, error) {
+func (s *Session) SupportsDrillDown(ctx context.Context) bool {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if ctx.Err() != nil {
+		return false
+	}
+	s.mu.Lock()
+	if s.cachedDrillSupport != nil {
+		val := *s.cachedDrillSupport
+		s.mu.Unlock()
+		return val
+	}
+	if s.inFlight || s.tainted || s.closed {
+		s.mu.Unlock()
+		return false
+	}
+	s.inFlight = true
+	needSpawn := s.cmd == nil
+	s.mu.Unlock()
+
+	defer func() {
+		s.mu.Lock()
+		s.inFlight = false
+		s.mu.Unlock()
+	}()
+
+	if needSpawn {
+		if err := s.spawnAndHandshake(ctx); err != nil {
+			f := false
+			s.mu.Lock()
+			s.cachedDrillSupport = &f
+			s.mu.Unlock()
+			return false
+		}
+		s.mu.Lock()
+		if s.cachedDrillSupport != nil {
+			val := *s.cachedDrillSupport
+			s.mu.Unlock()
+			return val
+		}
+		s.mu.Unlock()
+	}
+
+	probeTimeoutMs := s.opts.CallTimeoutMs
+	if probeTimeoutMs > 2000 {
+		probeTimeoutMs = 2000
+	}
+	res, err := s.rpcCall(ctx, "tools/list", map[string]any{}, probeTimeoutMs)
+	if err != nil {
+		f := false
+		s.mu.Lock()
+		s.cachedDrillSupport = &f
+		s.mu.Unlock()
+		return false
+	}
+	toolsSlice, _ := res["tools"].([]any)
+	names := make(map[string]bool, len(toolsSlice))
+	for _, item := range toolsSlice {
+		if m, ok := item.(map[string]any); ok {
+			if n, ok := m["name"].(string); ok {
+				names[n] = true
+			}
+		}
+	}
+	supported := names["list_kernels"] && names["get_metrics"] && names["expand"] && names["compare_metrics"]
+	s.mu.Lock()
+	s.cachedDrillSupport = &supported
+	s.mu.Unlock()
+	return supported
+}
+
+func (s *Session) invokeTool(
+	ctx context.Context,
+	toolName string,
+	toolArgs map[string]any,
+	validate func(any) (map[string]any, error),
+) (map[string]any, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -366,30 +455,26 @@ func (s *Session) Digest(ctx context.Context, report ReportSpec, absolutePath st
 		s.mu.Unlock()
 	}()
 
-	runDigest := func() (map[string]any, error) {
+	runCall := func() (map[string]any, error) {
 		if needSpawn {
 			if err := s.spawnAndHandshake(ctx); err != nil {
 				return nil, err
 			}
 		}
 		callParams := map[string]any{
-			"name": "summarize_report",
-			"arguments": map[string]any{
-				"report_ref": absolutePath,
-				"format":     report.Format,
-				"top_n":      s.opts.TopN,
-			},
+			"name":      toolName,
+			"arguments": toolArgs,
 		}
 		res, err := s.rpcCall(ctx, "tools/call", callParams, s.opts.CallTimeoutMs)
 		if err != nil {
 			return nil, err
 		}
 		if isErr, _ := res["isError"].(bool); isErr {
-			return nil, fmt.Errorf("summarize_report returned an MCP tool error")
+			return nil, fmt.Errorf("%s returned an MCP tool error", toolName)
 		}
-		var rawDigest any
+		var rawValue any
 		if sc, ok := res["structuredContent"]; ok && sc != nil {
-			rawDigest = sc
+			rawValue = sc
 		} else if contentList, ok := res["content"].([]any); ok {
 			var parts []string
 			for _, item := range contentList {
@@ -399,16 +484,16 @@ func (s *Session) Digest(ctx context.Context, report ReportSpec, absolutePath st
 					}
 				}
 			}
-			if err := json.Unmarshal([]byte(strings.Join(parts, "\n")), &rawDigest); err != nil {
+			if err := json.Unmarshal([]byte(strings.Join(parts, "\n")), &rawValue); err != nil {
 				return nil, err
 			}
 		} else {
-			return nil, fmt.Errorf("missing content in summarize_report response")
+			return nil, fmt.Errorf("missing content in %s response", toolName)
 		}
-		return ValidateDigest(rawDigest, report.Format, absolutePath)
+		return validate(rawValue)
 	}
 
-	digest, err := runDigest()
+	out, err := runCall()
 	if err != nil {
 		stderrStr := ""
 		if s.stderrBuf != nil {
@@ -424,7 +509,109 @@ func (s *Session) Digest(ctx context.Context, report ReportSpec, absolutePath st
 		}
 		return nil, fmt.Errorf("%s", Redact(fmt.Sprintf("PerfDigest MCP failed: %v%s", err, suffix)))
 	}
-	return digest, nil
+	return out, nil
+}
+
+func (s *Session) Digest(ctx context.Context, report ReportSpec, absolutePath string) (map[string]any, error) {
+	return s.invokeTool(
+		ctx,
+		"summarize_report",
+		map[string]any{
+			"report_ref": absolutePath,
+			"format":     report.Format,
+			"top_n":      s.opts.TopN,
+		},
+		func(raw any) (map[string]any, error) {
+			return ValidateDigest(raw, report.Format, absolutePath)
+		},
+	)
+}
+
+func (s *Session) ListKernels(ctx context.Context, report ReportSpec, absolutePath string) (map[string]any, error) {
+	return s.invokeTool(
+		ctx,
+		"list_kernels",
+		map[string]any{
+			"report_ref": absolutePath,
+			"format":     report.Format,
+		},
+		func(raw any) (map[string]any, error) {
+			return ValidateListKernels(raw, report)
+		},
+	)
+}
+
+func (s *Session) GetMetrics(ctx context.Context, report ReportSpec, absolutePath string, kernel string, metrics []string) (map[string]any, error) {
+	args := map[string]any{
+		"report_ref": absolutePath,
+		"format":     report.Format,
+		"kernel":     kernel,
+	}
+	if len(metrics) > 0 {
+		args["metrics"] = metrics
+	}
+	return s.invokeTool(
+		ctx,
+		"get_metrics",
+		args,
+		func(raw any) (map[string]any, error) {
+			return ValidateGetMetrics(raw, report, absolutePath)
+		},
+	)
+}
+
+func (s *Session) ExpandUnit(ctx context.Context, report ReportSpec, absolutePath string, kernel string, section string) (map[string]any, error) {
+	if section == "" {
+		section = "all"
+	}
+	return s.invokeTool(
+		ctx,
+		"expand",
+		map[string]any{
+			"report_ref": absolutePath,
+			"format":     report.Format,
+			"kernel":     kernel,
+			"section":    section,
+		},
+		func(raw any) (map[string]any, error) {
+			return ValidateExpand(raw, report, absolutePath, section)
+		},
+	)
+}
+
+func (s *Session) CompareMetrics(
+	ctx context.Context,
+	reportA ReportSpec,
+	absolutePathA string,
+	reportB ReportSpec,
+	absolutePathB string,
+	kernel string,
+	kernelB string,
+	metrics []string,
+) (map[string]any, error) {
+	if reportA.Format != reportB.Format {
+		return nil, fmt.Errorf("compare_metrics requires reports with matching format")
+	}
+	args := map[string]any{
+		"report_a": absolutePathA,
+		"report_b": absolutePathB,
+		"format":   reportA.Format,
+		"kernel":   kernel,
+	}
+	if kernelB != "" {
+		args["kernel_b"] = kernelB
+	}
+	if len(metrics) > 0 {
+		args["metrics"] = metrics
+	}
+	return s.invokeTool(
+		ctx,
+		"compare_metrics",
+		args,
+		func(raw any) (map[string]any, error) {
+			return ValidateCompareMetrics(raw, reportA, absolutePathA, reportB, absolutePathB)
+		},
+	)
 }
 
 func toInt(v any) (int, bool) {
@@ -472,4 +659,264 @@ func ValidateDigest(value any, format string, reportPath string) (map[string]any
 		return nil, fmt.Errorf("Digest exceeds MVP context budget; raw report remains on disk")
 	}
 	return digest, nil
+}
+
+func truncStr(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen]
+}
+
+func ValidateListKernels(value any, report ReportSpec) (map[string]any, error) {
+	var rawList []any
+	if arr, ok := value.([]any); ok {
+		rawList = arr
+	} else if m, ok := value.(map[string]any); ok && m != nil {
+		if arr, ok := m["result"].([]any); ok {
+			rawList = arr
+		}
+	}
+	if len(rawList) < 1 {
+		return nil, fmt.Errorf("PerfDigest list_kernels did not return a nonempty unit list")
+	}
+	limit := len(rawList)
+	if limit > 64 {
+		limit = 64
+	}
+	units := make([]map[string]any, 0, limit)
+	for fallbackIdx, item := range rawList[:limit] {
+		u, ok := item.(map[string]any)
+		if !ok || u == nil {
+			return nil, fmt.Errorf("Invalid unit entry in list_kernels result")
+		}
+		nameStr, _ := u["name"].(string)
+		if nameStr == "" {
+			return nil, fmt.Errorf("Unit in list_kernels is missing name")
+		}
+		idx, okIdx := toInt(u["index"])
+		if !okIdx || idx < 0 {
+			idx = fallbackIdx
+		}
+		var durVal any = nil
+		if f, ok := toFiniteFloat(u["duration_us"]); ok && f >= 0 {
+			durVal = f
+		}
+		var domVal any = nil
+		if d, ok := u["domain"].(string); ok && d != "" {
+			domVal = truncStr(d, 80)
+		}
+		units = append(units, map[string]any{
+			"index":       idx,
+			"name":        truncStr(Redact(nameStr), 160),
+			"duration_us": durVal,
+			"domain":      domVal,
+		})
+	}
+	return map[string]any{
+		"report_id":   report.ID,
+		"format":      report.Format,
+		"total_units": len(rawList),
+		"returned":    len(units),
+		"units":       units,
+	}, nil
+}
+
+func sanitizeFlatMetricsMap(rawMetrics any) (map[string]any, error) {
+	m, ok := rawMetrics.(map[string]any)
+	if !ok || m == nil {
+		return nil, fmt.Errorf("PerfDigest tool result is missing metrics object")
+	}
+	clean := make(map[string]any, len(m))
+	for k, v := range m {
+		key := truncStr(Redact(k), 120)
+		if v == nil {
+			clean[key] = nil
+		} else if f, ok := toFiniteFloat(v); ok {
+			clean[key] = f
+		} else if s, ok := v.(string); ok {
+			clean[key] = truncStr(Redact(s), 200)
+		} else if arr, ok := v.([]any); ok {
+			lim := len(arr)
+			if lim > 16 {
+				lim = 16
+			}
+			nums := make([]float64, 0, lim)
+			for _, elem := range arr[:lim] {
+				if nf, ok := toFiniteFloat(elem); ok {
+					nums = append(nums, nf)
+				}
+			}
+			clean[key] = nums
+		}
+	}
+	return clean, nil
+}
+
+func ValidateGetMetrics(value any, report ReportSpec, reportPath string) (map[string]any, error) {
+	obj, ok := value.(map[string]any)
+	if !ok || obj == nil {
+		return nil, fmt.Errorf("Invalid get_metrics result")
+	}
+	if errVal, hasErr := obj["error"]; hasErr && errVal != nil && errVal != false && errVal != "" {
+		return nil, fmt.Errorf("PerfDigest get_metrics did not match requested report and format")
+	}
+	fmtStr, _ := obj["format"].(string)
+	rawRef, _ := obj["raw_ref"].(string)
+	kernelStr, _ := obj["kernel"].(string)
+	if fmtStr != report.Format || rawRef != reportPath || kernelStr == "" {
+		return nil, fmt.Errorf("PerfDigest get_metrics did not match requested report and format")
+	}
+	metrics, err := sanitizeFlatMetricsMap(obj["metrics"])
+	if err != nil {
+		return nil, err
+	}
+	idx, okIdx := toInt(obj["index"])
+	if !okIdx {
+		idx = 0
+	}
+	var domVal any = nil
+	if d, ok := obj["domain"].(string); ok {
+		domVal = truncStr(d, 80)
+	}
+	out := map[string]any{
+		"report_id": report.ID,
+		"format":    report.Format,
+		"kernel":    truncStr(Redact(kernelStr), 160),
+		"index":     idx,
+		"domain":    domVal,
+		"metrics":   metrics,
+	}
+	encoded, err := json.Marshal(out)
+	if err != nil || len(encoded) > 32_000 {
+		return nil, fmt.Errorf("get_metrics result exceeds context budget")
+	}
+	return out, nil
+}
+
+func ValidateExpand(value any, report ReportSpec, reportPath string, section string) (map[string]any, error) {
+	obj, ok := value.(map[string]any)
+	if !ok || obj == nil {
+		return nil, fmt.Errorf("Invalid expand result")
+	}
+	if errVal, hasErr := obj["error"]; hasErr && errVal != nil && errVal != false && errVal != "" {
+		return nil, fmt.Errorf("PerfDigest expand did not match requested report")
+	}
+	rawRef, _ := obj["raw_ref"].(string)
+	kernelStr, _ := obj["kernel"].(string)
+	if rawRef != reportPath || kernelStr == "" {
+		return nil, fmt.Errorf("PerfDigest expand did not match requested report")
+	}
+	metrics, err := sanitizeFlatMetricsMap(obj["metrics"])
+	if err != nil {
+		return nil, err
+	}
+	idx, okIdx := toInt(obj["index"])
+	if !okIdx {
+		idx = 0
+	}
+	var domVal any = nil
+	if d, ok := obj["domain"].(string); ok {
+		domVal = truncStr(d, 80)
+	}
+	secFilter := section
+	if sf, ok := obj["section_filter"].(string); ok && sf != "" {
+		secFilter = truncStr(Redact(sf), 80)
+	}
+	mCount, okMc := toInt(obj["metric_count"])
+	if !okMc {
+		mCount = len(metrics)
+	}
+	out := map[string]any{
+		"report_id":      report.ID,
+		"format":         report.Format,
+		"kernel":         truncStr(Redact(kernelStr), 160),
+		"index":          idx,
+		"domain":         domVal,
+		"section_filter": secFilter,
+		"metric_count":   mCount,
+		"metrics":        metrics,
+	}
+	encoded, err := json.Marshal(out)
+	if err != nil || len(encoded) > 32_000 {
+		return nil, fmt.Errorf("expand result exceeds context budget")
+	}
+	return out, nil
+}
+
+func ValidateCompareMetrics(value any, reportA ReportSpec, pathA string, reportB ReportSpec, pathB string) (map[string]any, error) {
+	obj, ok := value.(map[string]any)
+	if !ok || obj == nil {
+		return nil, fmt.Errorf("Invalid compare_metrics result")
+	}
+	if errVal, hasErr := obj["error"]; hasErr && errVal != nil && errVal != false && errVal != "" {
+		return nil, fmt.Errorf("PerfDigest compare_metrics did not match requested reports and format")
+	}
+	fmtStr, _ := obj["format"].(string)
+	rawRefA, _ := obj["raw_ref_a"].(string)
+	rawRefB, _ := obj["raw_ref_b"].(string)
+	kernelA, _ := obj["kernel_a"].(string)
+	kernelB, _ := obj["kernel_b"].(string)
+	rawMetrics, okMetrics := obj["metrics"].(map[string]any)
+	if fmtStr != reportA.Format || rawRefA != pathA || rawRefB != pathB || kernelA == "" || kernelB == "" || !okMetrics || rawMetrics == nil {
+		return nil, fmt.Errorf("PerfDigest compare_metrics did not match requested reports and format")
+	}
+	normVal := func(v any) any {
+		if v == nil {
+			return nil
+		}
+		if f, ok := toFiniteFloat(v); ok {
+			return f
+		}
+		if s, ok := v.(string); ok {
+			return truncStr(Redact(s), 120)
+		}
+		return nil
+	}
+	cleanMetrics := make(map[string]any, len(rawMetrics))
+	for k, rawEntry := range rawMetrics {
+		entry, ok := rawEntry.(map[string]any)
+		if !ok || entry == nil {
+			continue
+		}
+		cleanMetrics[truncStr(Redact(k), 120)] = map[string]any{
+			"a":         normVal(entry["a"]),
+			"b":         normVal(entry["b"]),
+			"delta":     normVal(entry["delta"]),
+			"delta_pct": normVal(entry["delta_pct"]),
+		}
+	}
+	idxA, okA := toInt(obj["index_a"])
+	if !okA {
+		idxA = 0
+	}
+	idxB, okB := toInt(obj["index_b"])
+	if !okB {
+		idxB = 0
+	}
+	var domVal any = nil
+	if d, ok := obj["domain"].(string); ok {
+		domVal = truncStr(d, 80)
+	}
+	signConv := "delta = b - a"
+	if sc, ok := obj["sign_convention"].(string); ok && sc != "" {
+		signConv = truncStr(Redact(sc), 80)
+	}
+	out := map[string]any{
+		"report_id_a":     reportA.ID,
+		"report_id_b":     reportB.ID,
+		"format":          reportA.Format,
+		"domain":          domVal,
+		"kernel_a":        truncStr(Redact(kernelA), 160),
+		"kernel_b":        truncStr(Redact(kernelB), 160),
+		"index_a":         idxA,
+		"index_b":         idxB,
+		"sign_convention": signConv,
+		"metrics":         cleanMetrics,
+	}
+	encoded, err := json.Marshal(out)
+	if err != nil || len(encoded) > 32_000 {
+		return nil, fmt.Errorf("compare_metrics result exceeds context budget")
+	}
+	return out, nil
 }

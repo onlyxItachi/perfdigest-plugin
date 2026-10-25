@@ -22,6 +22,11 @@ type AgentCapabilities struct {
 	Cancellation            bool   `json:"cancellation"`
 	UsageReporting          bool   `json:"usageReporting"`
 	Sandbox                 string `json:"sandbox"`
+	InExecutionAsyncInput   string `json:"inExecutionAsyncInput,omitempty"`
+	InExecutionToolDelivery string `json:"inExecutionToolDelivery,omitempty"`
+	QueuedStdinNextTurn     string `json:"queuedStdinNextTurn,omitempty"`
+	InterruptionAndSteering string `json:"interruptionAndSteering,omitempty"`
+	UsageReportingSemantics string `json:"usageReportingSemantics,omitempty"`
 }
 
 type AgentCapabilitiesWithAdapter struct {
@@ -31,6 +36,174 @@ type AgentCapabilitiesWithAdapter struct {
 	Cancellation            bool   `json:"cancellation"`
 	UsageReporting          bool   `json:"usageReporting"`
 	Sandbox                 string `json:"sandbox"`
+	InExecutionAsyncInput   string `json:"inExecutionAsyncInput,omitempty"`
+	InExecutionToolDelivery string `json:"inExecutionToolDelivery,omitempty"`
+	QueuedStdinNextTurn     string `json:"queuedStdinNextTurn,omitempty"`
+	InterruptionAndSteering string `json:"interruptionAndSteering,omitempty"`
+	UsageReportingSemantics string `json:"usageReportingSemantics,omitempty"`
+}
+
+func GetRuntimeCapabilityProfile(runtimeID string, sessions bool) AgentCapabilities {
+	switch runtimeID {
+	case "codex":
+		return AgentCapabilities{
+			SameSessionContinuation: true,
+			NativeAsyncInput:        false,
+			Cancellation:            true,
+			UsageReporting:          true,
+			Sandbox:                 "read-only",
+			InExecutionAsyncInput:   "unsupported",
+			InExecutionToolDelivery: "supported",
+			QueuedStdinNextTurn:     "unsupported",
+			InterruptionAndSteering: "unsupported",
+			UsageReportingSemantics: "incremental_per_turn",
+		}
+	case "agy":
+		return AgentCapabilities{
+			SameSessionContinuation: true,
+			NativeAsyncInput:        false,
+			Cancellation:            true,
+			UsageReporting:          true,
+			Sandbox:                 "agent-defined",
+			InExecutionAsyncInput:   "unsupported",
+			InExecutionToolDelivery: "supported",
+			QueuedStdinNextTurn:     "supported",
+			InterruptionAndSteering: "unsupported",
+			UsageReportingSemantics: "cumulative_session_trajectory",
+		}
+	case "claude":
+		return AgentCapabilities{
+			SameSessionContinuation: true,
+			NativeAsyncInput:        false,
+			Cancellation:            true,
+			UsageReporting:          true,
+			Sandbox:                 "agent-defined",
+			InExecutionAsyncInput:   "unsupported",
+			InExecutionToolDelivery: "supported",
+			QueuedStdinNextTurn:     "supported",
+			InterruptionAndSteering: "unsupported",
+			UsageReportingSemantics: "incremental_per_turn",
+		}
+	case "generic-cli-in-execution":
+		return AgentCapabilities{
+			SameSessionContinuation: true,
+			NativeAsyncInput:        true,
+			Cancellation:            true,
+			UsageReporting:          true,
+			Sandbox:                 "agent-defined",
+			InExecutionAsyncInput:   "supported",
+			InExecutionToolDelivery: "supported",
+			QueuedStdinNextTurn:     "supported",
+			InterruptionAndSteering: "supported",
+			UsageReportingSemantics: "single_turn_only",
+		}
+	default:
+		return AgentCapabilities{
+			SameSessionContinuation: sessions,
+			NativeAsyncInput:        false,
+			Cancellation:            true,
+			UsageReporting:          true,
+			Sandbox:                 "agent-defined",
+			InExecutionAsyncInput:   "unsupported",
+			InExecutionToolDelivery: "unsupported",
+			QueuedStdinNextTurn:     "unsupported",
+			InterruptionAndSteering: "unsupported",
+			UsageReportingSemantics: "incremental_per_turn",
+		}
+	}
+}
+
+type NegotiatedDeliveryPlan struct {
+	RequestedMode           string
+	EffectiveMode           string
+	PlannedEvidenceDelivery string
+	Reason                  string
+	FellBack                bool
+}
+
+func NegotiateEvidenceDeliveryMode(requestedMode string, caps *AgentCapabilities, strictDeliveryMode bool) (NegotiatedDeliveryPlan, error) {
+	if requestedMode == "" {
+		requestedMode = "two_turn"
+	}
+	supportsInExec := caps != nil && (caps.InExecutionAsyncInput == "supported" || caps.NativeAsyncInput)
+	supportsSameSession := caps != nil && caps.SameSessionContinuation
+
+	switch requestedMode {
+	case "auto":
+		if supportsInExec {
+			return NegotiatedDeliveryPlan{
+				RequestedMode:           requestedMode,
+				EffectiveMode:           "in_execution",
+				PlannedEvidenceDelivery: "in_execution_async_input",
+				Reason:                  "runtime_supports_in_execution_async_input",
+				FellBack:                false,
+			}, nil
+		}
+		return NegotiatedDeliveryPlan{
+			RequestedMode:           requestedMode,
+			EffectiveMode:           "single_turn",
+			PlannedEvidenceDelivery: "single_turn_with_evidence",
+			Reason:                  "runtime_lacks_in_execution_async_input_selected_single_turn_fallback",
+			FellBack:                true,
+		}, nil
+	case "in_execution":
+		if supportsInExec {
+			return NegotiatedDeliveryPlan{
+				RequestedMode:           requestedMode,
+				EffectiveMode:           "in_execution",
+				PlannedEvidenceDelivery: "in_execution_async_input",
+				Reason:                  "explicit_in_execution_supported_by_runtime",
+				FellBack:                false,
+			}, nil
+		}
+		if strictDeliveryMode {
+			return NegotiatedDeliveryPlan{}, NewAgentError(AgentErrUnsupported, "start", "in_execution delivery requires an adapter with inExecutionAsyncInput=supported")
+		}
+		return NegotiatedDeliveryPlan{
+			RequestedMode:           requestedMode,
+			EffectiveMode:           "single_turn",
+			PlannedEvidenceDelivery: "single_turn_with_evidence",
+			Reason:                  "requested_in_execution_unsupported_by_runtime_fell_back_to_single_turn",
+			FellBack:                true,
+		}, nil
+	case "single_turn":
+		return NegotiatedDeliveryPlan{
+			RequestedMode:           requestedMode,
+			EffectiveMode:           "single_turn",
+			PlannedEvidenceDelivery: "single_turn_with_evidence",
+			Reason:                  "explicit_single_turn_with_evidence",
+			FellBack:                false,
+		}, nil
+	case "two_turn":
+		planned := "fresh_session_with_context"
+		reason := "explicit_two_turn_fresh_session_with_context"
+		if supportsSameSession {
+			planned = "same_session_next_turn"
+			reason = "explicit_two_turn_same_session_next_turn"
+		}
+		return NegotiatedDeliveryPlan{
+			RequestedMode:           requestedMode,
+			EffectiveMode:           "two_turn",
+			PlannedEvidenceDelivery: planned,
+			Reason:                  reason,
+			FellBack:                !supportsSameSession,
+		}, nil
+	default:
+		return NegotiatedDeliveryPlan{}, NewAgentError(AgentErrUnsupported, "start", "agentDelivery must be auto, in_execution, two_turn or single_turn")
+	}
+}
+
+type InExecutionTurnResult struct {
+	Turn                         AgentTurn
+	EvidenceDeliveredInExecution bool
+	EvidenceConsumedInExecution  bool
+	EarlyAgentCompletion         bool
+	DeliveryCount                int
+}
+
+type InExecutionAgentSession interface {
+	AgentSession
+	TurnInExecution(ctx context.Context, prompt string, supplyEvidence func() (string, error), emit EmitFunc) (InExecutionTurnResult, error)
 }
 
 type AgentTurn struct {
@@ -103,6 +276,7 @@ type GenericCliAgentOptions struct {
 	TimeoutMs        int
 	MaxOutputBytes   int
 	NativeAsyncInput bool
+	InExecutionAsync bool
 }
 
 var sessionIDPattern = regexp.MustCompile(`^[\w.-]{1,128}$`)
@@ -114,7 +288,7 @@ func GenericCliAdapter(opts GenericCliAgentOptions) (AgentAdapter, error) {
 	if strings.TrimSpace(opts.Command) == "" {
 		return nil, NewAgentError(AgentErrUnsupported, "start", "generic CLI adapter requires a non-empty command")
 	}
-	if opts.NativeAsyncInput {
+	if opts.NativeAsyncInput && !opts.InExecutionAsync {
 		return nil, NewAgentError(AgentErrUnsupported, "start", "generic CLI adapter does not support nativeAsyncInput")
 	}
 	timeoutMs := opts.TimeoutMs
@@ -145,6 +319,9 @@ type genericAdapterImpl struct {
 func (a *genericAdapterImpl) Name() string        { return "generic-cli" }
 func (a *genericAdapterImpl) EventPrefix() string { return "agent" }
 func (a *genericAdapterImpl) Capabilities() AgentCapabilities {
+	if a.opts.InExecutionAsync {
+		return GetRuntimeCapabilityProfile("generic-cli-in-execution", true)
+	}
 	return AgentCapabilities{
 		SameSessionContinuation: a.opts.Sessions,
 		NativeAsyncInput:        false,
@@ -229,6 +406,350 @@ func (s *genericSessionImpl) Turn(ctx context.Context, prompt string, phase stri
 		Text:     Redact(res.text),
 		Usage:    res.usage,
 		ThreadID: tid,
+	}, nil
+}
+
+func (s *genericSessionImpl) TurnInExecution(
+	ctx context.Context,
+	prompt string,
+	supplyEvidence func() (string, error),
+	emit EmitFunc,
+) (InExecutionTurnResult, error) {
+	if !s.adapter.opts.InExecutionAsync {
+		return InExecutionTurnResult{}, NewAgentError(AgentErrUnsupported, "in_execution", "adapter does not have InExecutionAsync enabled")
+	}
+	if emit == nil {
+		emit = func(string, string) {}
+	}
+	emit("agent.in_execution.started", "")
+	emit("agent.analysis.started", "")
+
+	reqMap := map[string]any{
+		"protocol":  agentProtocol,
+		"phase":     "in_execution",
+		"prompt":    prompt,
+		"sessionId": nil,
+	}
+	if s.adapter.opts.Sessions && s.sessionID != nil {
+		reqMap["sessionId"] = *s.sessionID
+	}
+	inputBytes, _ := json.Marshal(reqMap)
+
+	res, err := runGenericInExecutionTurn(
+		ctx,
+		s.adapter.opts.Command,
+		s.adapter.opts.Args,
+		s.workspace,
+		string(inputBytes),
+		supplyEvidence,
+		s.adapter.timeoutMs,
+		s.adapter.maxOutputBytes,
+		emit,
+	)
+	if err != nil {
+		if ae, ok := err.(*AgentError); ok {
+			return InExecutionTurnResult{}, NewAgentError(ae.Kind, "in_execution", ae.RawMessage)
+		}
+		return InExecutionTurnResult{}, NewAgentError(AgentErrFailed, "in_execution", err.Error())
+	}
+	if s.adapter.opts.Sessions && res.turn.sessionID != nil && *res.turn.sessionID != "" {
+		sid := *res.turn.sessionID
+		s.sessionID = &sid
+	}
+	emit("agent.analysis.completed", "")
+	emit("agent.review.completed", "")
+	emit("agent.in_execution.completed", "")
+	var tid *string
+	if res.turn.sessionID != nil {
+		val := *res.turn.sessionID
+		tid = &val
+	} else if s.adapter.opts.Sessions && s.sessionID != nil {
+		val := *s.sessionID
+		tid = &val
+	}
+	return InExecutionTurnResult{
+		Turn: AgentTurn{
+			Text:     Redact(res.turn.text),
+			Usage:    res.turn.usage,
+			ThreadID: tid,
+		},
+		EvidenceDeliveredInExecution: res.evidenceDelivered,
+		EvidenceConsumedInExecution:  res.evidenceConsumed,
+		EarlyAgentCompletion:         res.earlyCompletion,
+		DeliveryCount:                res.deliveryCount,
+	}, nil
+}
+
+type genericInExecutionResult struct {
+	turn              genericTurnResult
+	evidenceDelivered bool
+	evidenceConsumed  bool
+	earlyCompletion   bool
+	deliveryCount     int
+}
+
+func runGenericInExecutionTurn(
+	ctx context.Context,
+	command string,
+	args []string,
+	cwd string,
+	initialInput string,
+	supplyEvidence func() (string, error),
+	timeoutMs int,
+	maxOutputBytes int,
+	emit EmitFunc,
+) (genericInExecutionResult, error) {
+	if ctx != nil && ctx.Err() != nil {
+		return genericInExecutionResult{}, NewAgentError(AgentErrCancelled, "in_execution", "run cancelled")
+	}
+
+	cmd := exec.Command(command, args...)
+	cmd.Dir = cwd
+	cmd.Env = ChildEnvSlice(nil)
+
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return genericInExecutionResult{}, NewAgentError(AgentErrFailed, "in_execution", err.Error())
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return genericInExecutionResult{}, NewAgentError(AgentErrFailed, "in_execution", err.Error())
+	}
+	cmd.Stderr = io.Discard
+
+	if err := cmd.Start(); err != nil {
+		return genericInExecutionResult{}, NewAgentError(AgentErrFailed, "in_execution", err.Error())
+	}
+
+	var stdinMu sync.Mutex
+	stdinClosed := false
+	evidenceDelivered := false
+	deliveryCount := 0
+	processDone := make(chan struct{})
+
+	_, _ = stdin.Write([]byte(initialInput + "\n"))
+
+	supplyErrCh := make(chan error, 1)
+	go func() {
+		evPayload, serr := supplyEvidence()
+		if serr != nil {
+			supplyErrCh <- serr
+			return
+		}
+		stdinMu.Lock()
+		defer stdinMu.Unlock()
+		select {
+		case <-processDone:
+			return
+		default:
+		}
+		if stdinClosed || evidenceDelivered {
+			return
+		}
+		evidenceDelivered = true
+		deliveryCount++
+		emit("evidence.delivered", "In-execution asynchronous evidence frame sent to active generic-cli stream")
+		frame, _ := json.Marshal(map[string]any{
+			"protocol": agentProtocol,
+			"type":     "evidence",
+			"evidence": evPayload,
+		})
+		_, _ = stdin.Write(append(frame, '\n'))
+		_ = stdin.Close()
+		stdinClosed = true
+	}()
+
+	var mu sync.Mutex
+	var outBuf bytes.Buffer
+	startedEmitted := false
+	ackEmitted := false
+	exceededLimit := false
+
+	readDone := make(chan struct{})
+	go func() {
+		defer close(readDone)
+		buf := make([]byte, 4096)
+		for {
+			n, rerr := stdout.Read(buf)
+			if n > 0 {
+				mu.Lock()
+				if outBuf.Len()+n > maxOutputBytes {
+					exceededLimit = true
+					mu.Unlock()
+					if cmd.Process != nil {
+						_ = cmd.Process.Kill()
+					}
+					return
+				}
+				outBuf.Write(buf[:n])
+				s := outBuf.String()
+				shouldStart := !startedEmitted && (strings.Contains(s, `"type":"started"`) || strings.Contains(s, `"type": "started"`))
+				if shouldStart {
+					startedEmitted = true
+				}
+				shouldAck := !ackEmitted && (strings.Contains(s, `"type":"evidence_ack"`) || strings.Contains(s, `"type": "evidence_ack"`))
+				if shouldAck {
+					ackEmitted = true
+				}
+				mu.Unlock()
+				if shouldStart {
+					emit("agent.analysis.turn_started", "")
+				}
+				if shouldAck {
+					emit("evidence.accepted_by_runtime", "generic-cli in-execution evidence_ack")
+					emit("evidence.model_visible", "generic-cli in-execution stream")
+				}
+			}
+			if rerr != nil {
+				return
+			}
+		}
+	}()
+
+	waitCh := make(chan error, 1)
+	go func() {
+		<-readDone
+		werr := cmd.Wait()
+		close(processDone)
+		waitCh <- werr
+	}()
+
+	timer := time.NewTimer(time.Duration(timeoutMs) * time.Millisecond)
+	defer timer.Stop()
+
+	var ctxDone <-chan struct{}
+	if ctx != nil {
+		ctxDone = ctx.Done()
+	}
+
+	terminate := func() {
+		stdinMu.Lock()
+		if !stdinClosed {
+			_ = stdin.Close()
+			stdinClosed = true
+		}
+		stdinMu.Unlock()
+		if cmd.Process == nil {
+			return
+		}
+		_ = cmd.Process.Signal(syscall.SIGTERM)
+		killTimer := time.AfterFunc(2*time.Second, func() {
+			if cmd.Process != nil {
+				_ = cmd.Process.Kill()
+			}
+		})
+		<-waitCh
+		killTimer.Stop()
+	}
+
+	var waitErr error
+	select {
+	case waitErr = <-waitCh:
+	case serr := <-supplyErrCh:
+		terminate()
+		return genericInExecutionResult{}, serr
+	case <-timer.C:
+		terminate()
+		return genericInExecutionResult{}, NewAgentError(AgentErrTimedOut, "in_execution", fmt.Sprintf("no result within %d ms", timeoutMs))
+	case <-ctxDone:
+		terminate()
+		return genericInExecutionResult{}, NewAgentError(AgentErrCancelled, "in_execution", "run cancelled")
+	}
+
+	mu.Lock()
+	overLimit := exceededLimit
+	rawOut := outBuf.String()
+	didAck := ackEmitted
+	mu.Unlock()
+
+	if overLimit {
+		return genericInExecutionResult{}, NewAgentError(AgentErrProtocol, "in_execution", "agent output exceeded the limit")
+	}
+	if waitErr != nil {
+		code := -1
+		if exitErr, ok := waitErr.(*exec.ExitError); ok {
+			code = exitErr.ExitCode()
+		}
+		return genericInExecutionResult{}, NewAgentError(AgentErrFailed, "in_execution", fmt.Sprintf("agent exited with code %d", code))
+	}
+
+	rawLines := strings.Split(rawOut, "\n")
+	var results []map[string]any
+	sawAckLine := false
+	for _, l := range rawLines {
+		trimmed := strings.TrimSpace(l)
+		if trimmed == "" {
+			continue
+		}
+		var obj map[string]any
+		if err := json.Unmarshal([]byte(trimmed), &obj); err != nil {
+			return genericInExecutionResult{}, NewAgentError(AgentErrProtocol, "in_execution", "agent output did not follow perfdigest-agent/v1")
+		}
+		t, _ := obj["type"].(string)
+		if t != "started" && t != "progress" && t != "awaiting_evidence" && t != "evidence_ack" && t != "result" {
+			return genericInExecutionResult{}, NewAgentError(AgentErrProtocol, "in_execution", "agent output did not follow perfdigest-agent/v1")
+		}
+		if t == "evidence_ack" {
+			sawAckLine = true
+		}
+		if t == "result" {
+			results = append(results, obj)
+		}
+	}
+	if len(results) != 1 {
+		return genericInExecutionResult{}, NewAgentError(AgentErrProtocol, "in_execution", "agent output did not follow perfdigest-agent/v1")
+	}
+
+	r := results[0]
+	txt, ok := r["text"].(string)
+	if !ok || txt == "" {
+		return genericInExecutionResult{}, NewAgentError(AgentErrProtocol, "in_execution", "agent output did not follow perfdigest-agent/v1")
+	}
+
+	var sidPtr *string
+	if sidRaw, hasSid := r["sessionId"]; hasSid && sidRaw != nil {
+		sidStr, ok := sidRaw.(string)
+		if !ok || !sessionIDPattern.MatchString(sidStr) {
+			return genericInExecutionResult{}, NewAgentError(AgentErrProtocol, "in_execution", "agent output did not follow perfdigest-agent/v1")
+		}
+		sidPtr = &sidStr
+	}
+
+	var usageMap map[string]any
+	if uRaw, hasU := r["usage"]; hasU && uRaw != nil {
+		if um, ok := uRaw.(map[string]any); ok {
+			usageMap = um
+		}
+	}
+
+	stdinMu.Lock()
+	delivered := evidenceDelivered
+	delCount := deliveryCount
+	stdinMu.Unlock()
+
+	earlyCompletion := !delivered
+	evConsumedFlag, _ := r["evidenceConsumed"].(bool)
+	consumed := delivered && (evConsumedFlag || sawAckLine)
+	if earlyCompletion {
+		emit("agent.in_execution.completed_before_evidence", "Agent solved and exited before background evidence arrived")
+	} else if consumed {
+		if !didAck {
+			emit("evidence.accepted_by_runtime", "generic-cli in-execution result")
+			emit("evidence.model_visible", "generic-cli in-execution stream")
+		}
+		emit("evidence.consumed", "Agent consumed in-execution evidence in single execution")
+	}
+
+	return genericInExecutionResult{
+		turn: genericTurnResult{
+			text:      txt,
+			sessionID: sidPtr,
+			usage:     usageMap,
+		},
+		evidenceDelivered: delivered,
+		evidenceConsumed:  consumed,
+		earlyCompletion:   earlyCompletion,
+		deliveryCount:     delCount,
 	}, nil
 }
 

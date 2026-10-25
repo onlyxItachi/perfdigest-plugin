@@ -27,7 +27,7 @@ export type ProviderName = typeof providerNames[number];
 export type RoutingMode = ProviderName | 'decisions' | 'openai-luna' | 'clef-local' | 'clef-cloudflare';
 /** 'generic' requires an explicit adapter (CLI: --agent-command); nothing is selected implicitly. */
 export type AgentMode = 'none' | 'codex' | 'generic';
-export type AgentDeliveryMode = 'two_turn' | 'single_turn';
+export type AgentDeliveryMode = 'two_turn' | 'single_turn' | 'in_execution' | 'auto';
 
 export interface TimelineEvent {
   event: string;
@@ -50,6 +50,45 @@ export interface CommandReceipt {
   stderr: string;
 }
 
+export type PerfDigestMcpToolName =
+  | 'summarize_report'
+  | 'list_kernels'
+  | 'get_metrics'
+  | 'expand'
+  | 'compare_metrics';
+
+export interface McpExtractionRecord {
+  step: number;
+  tool: Exclude<PerfDigestMcpToolName, 'summarize_report'>;
+  reportId: string;
+  secondaryReportId?: string;
+  unit?: string;
+  secondaryUnit?: string;
+  section?: string;
+  sha256: string;
+  secondarySha256?: string;
+  provenance: 'perfdigest_mcp';
+  data: Record<string, unknown>;
+}
+
+export interface EvidenceAcquisitionStep {
+  step: number;
+  layer: 'report_orientation' | 'unit_discovery' | 'deep_extraction' | 'stopping';
+  action: string;
+  mcpTool: PerfDigestMcpToolName | null;
+  targetReportId: string | null;
+  secondaryReportId?: string | null;
+  targetUnit?: string | null;
+  secondaryUnit?: string | null;
+  confidence: number | null;
+  probabilities?: Array<{ value: string; probability: number }>;
+  reason: 'selected' | 'sufficient' | 'low_confidence' | 'human_review' | 'refused' | 'budget_reached';
+  inputSha256?: string;
+  latencyMs: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
+}
+
 export interface RouteDecision {
   source: 'offline_order' | 'openai_decisions' | 'clef_local' | 'clef_cloudflare';
   provider?: ProviderName;
@@ -61,6 +100,7 @@ export interface RouteDecision {
   inputSha256?: string;
   evidenceCount?: number;
   selectedId: string | null;
+  complementaryIds?: string[];
   confidence: number | null;
   probabilities?: Array<{ value: string; probability: number }>;
   reason: 'selected' | 'refused' | 'low_confidence' | 'human_review';
@@ -69,6 +109,7 @@ export interface RouteDecision {
   inputTokens: number | null;
   outputTokens: number | null;
   costUsd: null;
+  steps?: EvidenceAcquisitionStep[];
 }
 
 /**
@@ -109,10 +150,19 @@ export interface EvidencePacket {
     modifiedAt: string;
     provenance: 'perfdigest_mcp';
     digest: Record<string, unknown>;
+    extractions?: McpExtractionRecord[];
   }>;
   /**
-   * Optional non-selected candidate digests already computed during measured routing,
-   * included only when `includeCorroborating: true` and a route was accepted.
+   * Complementary or corroborating candidate digests already computed during measured routing.
    */
   corroborating?: EvidencePacket['evidence'];
+  /**
+   * Targeted PerfDigest MCP drill-down extractions (`list_kernels`, `get_metrics`, `expand`,
+   * `compare_metrics`) acquired across iterative decision steps.
+   */
+  extractions?: McpExtractionRecord[];
+  /**
+   * Ordered Decision -> MCP acquisition steps taken during iterative investigation.
+   */
+  steps?: EvidenceAcquisitionStep[];
 }

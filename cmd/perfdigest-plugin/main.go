@@ -36,13 +36,14 @@ init --check-connection opts in to one read-only Cloudflare check; inference and
 `
 
 type cliFlags struct {
-	help                 bool
-	workspace            *string
-	agent                *string
-	agentCommand         *string
-	agentSessions        *bool
-	agentDelivery        *string
-	routing              *string
+	help                  bool
+	workspace             *string
+	agent                 *string
+	agentCommand          *string
+	agentSessions         *bool
+	agentInExecutionAsync *bool
+	agentDelivery         *string
+	routing               *string
 	provider             *string
 	model                *string
 	perf                 bool
@@ -78,18 +79,19 @@ func parseCLIArgs(args []string) (cliFlags, error) {
 		warmup:    0,
 	}
 	boolFlags := map[string]bool{
-		"--help":                  true,
-		"-h":                      true,
-		"--agent-sessions":        true,
-		"--perf":                  true,
-		"--yes":                   true,
-		"--check-connection":      true,
-		"--include-corroborating": true,
-		"--compact-evidence":      true,
-		"--serve-jsonl":           true,
-		"--bench-investigate":     true,
-		"--zero-cost-mcp":         true,
-		"--live-mcp":              true,
+		"--help":                     true,
+		"-h":                         true,
+		"--agent-sessions":           true,
+		"--agent-in-execution-async": true,
+		"--perf":                     true,
+		"--yes":                      true,
+		"--check-connection":         true,
+		"--include-corroborating":    true,
+		"--compact-evidence":         true,
+		"--serve-jsonl":              true,
+		"--bench-investigate":        true,
+		"--zero-cost-mcp":            true,
+		"--live-mcp":                 true,
 	}
 	stringFlags := map[string]bool{
 		"--workspace":          true,
@@ -142,6 +144,8 @@ func parseCLIArgs(args []string) (cliFlags, error) {
 				f.help = val
 			case "--agent-sessions":
 				f.agentSessions = &val
+			case "--agent-in-execution-async":
+				f.agentInExecutionAsync = &val
 			case "--perf":
 				f.perf = val
 			case "--yes":
@@ -761,8 +765,8 @@ func runCLI() error {
 	if agent != "none" && agent != "codex" && agent != "generic" {
 		return errors.New("--agent must be none, codex or generic")
 	}
-	if agent != "generic" && (f.agentCommand != nil || f.agentSessions != nil) {
-		return errors.New("--agent-command and --agent-sessions require --agent generic")
+	if agent != "generic" && (f.agentCommand != nil || f.agentSessions != nil || f.agentInExecutionAsync != nil) {
+		return errors.New("--agent-command, --agent-sessions and --agent-in-execution-async require --agent generic")
 	}
 	if agent == "generic" && (f.agentCommand == nil || *f.agentCommand == "") {
 		return errors.New("--agent generic requires --agent-command PATH")
@@ -771,9 +775,11 @@ func runCLI() error {
 	var agentAdapter perfdigest.AgentAdapter
 	if agent == "generic" {
 		sessions := f.agentSessions != nil && *f.agentSessions
+		inExecAsync := f.agentInExecutionAsync != nil && *f.agentInExecutionAsync
 		agentAdapter, err = perfdigest.GenericCliAdapter(perfdigest.GenericCliAgentOptions{
-			Command:  *f.agentCommand,
-			Sessions: sessions,
+			Command:          *f.agentCommand,
+			Sessions:         sessions,
+			InExecutionAsync: inExecAsync,
 		})
 		if err != nil {
 			return err
@@ -822,8 +828,8 @@ func runCLI() error {
 	if f.agentDelivery != nil && *f.agentDelivery != "" {
 		agentDelivery = *f.agentDelivery
 	}
-	if agentDelivery != "two_turn" && agentDelivery != "single_turn" {
-		return errors.New("--agent-delivery must be two_turn or single_turn")
+	if agentDelivery != "two_turn" && agentDelivery != "single_turn" && agentDelivery != "in_execution" && agentDelivery != "auto" {
+		return errors.New("--agent-delivery must be auto, in_execution, two_turn or single_turn")
 	}
 
 	result, err := perfdigest.Investigate(ctx, perfdigest.RunOptions{
