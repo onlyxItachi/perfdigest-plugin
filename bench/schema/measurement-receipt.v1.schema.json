@@ -35,21 +35,21 @@
     },
     "cellsCsvRef": {
       "type": "string",
-      "minLength": 1
+      "pattern": "^[^/\\\\]+(?:\\/[^/\\\\]+)*\\.csv$"
     },
     "summaryCsvRef": {
       "type": "string",
-      "minLength": 1
+      "pattern": "^[^/\\\\]+(?:\\/[^/\\\\]+)*\\.csv$"
     },
     "sourceTraceRef": {
       "type": "string",
-      "minLength": 1
+      "pattern": "^[^/\\\\]+(?:\\/[^/\\\\]+)*\\.jsonl?$"
     },
     "auxiliaryArtifactRefs": {
       "type": "array",
       "items": {
         "type": "string",
-        "minLength": 1
+        "pattern": "^[^/\\\\]+(?:\\/[^/\\\\]+)*\\.md$"
       }
     },
     "sampleSize": {
@@ -108,7 +108,13 @@
           },
           "effort": {
             "type": "string",
-            "minLength": 1
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ]
           }
         },
         "required": [

@@ -85,16 +85,20 @@ func GetRuntimeCapabilityProfile(runtimeID string, sessions bool) AgentCapabilit
 			UsageReportingSemantics: "incremental_per_turn",
 		}
 	case "generic-cli-in-execution":
+		queued := "unsupported"
+		if sessions {
+			queued = "supported"
+		}
 		return AgentCapabilities{
-			SameSessionContinuation: true,
+			SameSessionContinuation: sessions,
 			NativeAsyncInput:        true,
 			Cancellation:            true,
 			UsageReporting:          true,
 			Sandbox:                 "agent-defined",
 			InExecutionAsyncInput:   "supported",
 			InExecutionToolDelivery: "supported",
-			QueuedStdinNextTurn:     "supported",
-			InterruptionAndSteering: "supported",
+			QueuedStdinNextTurn:     queued,
+			InterruptionAndSteering: "unsupported",
 			UsageReportingSemantics: "single_turn_only",
 		}
 	default:
@@ -320,7 +324,7 @@ func (a *genericAdapterImpl) Name() string        { return "generic-cli" }
 func (a *genericAdapterImpl) EventPrefix() string { return "agent" }
 func (a *genericAdapterImpl) Capabilities() AgentCapabilities {
 	if a.opts.InExecutionAsync {
-		return GetRuntimeCapabilityProfile("generic-cli-in-execution", true)
+		return GetRuntimeCapabilityProfile("generic-cli-in-execution", a.opts.Sessions)
 	}
 	return AgentCapabilities{
 		SameSessionContinuation: a.opts.Sessions,
@@ -506,6 +510,7 @@ func runGenericInExecutionTurn(
 	cmd := exec.Command(command, args...)
 	cmd.Dir = cwd
 	cmd.Env = ChildEnvSlice(nil)
+	configureProcessGroup(cmd)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -527,6 +532,14 @@ func runGenericInExecutionTurn(
 	deliveryCount := 0
 	processDone := make(chan struct{})
 
+	var mu sync.Mutex
+	var outBuf bytes.Buffer
+	startedEmitted := false
+	deliveredEmitted := false
+	ackEmitted := false
+	exceededLimit := false
+	deliveryStdoutOffset := -1
+
 	_, _ = stdin.Write([]byte(initialInput + "\n"))
 
 	supplyErrCh := make(chan error, 1)
@@ -537,33 +550,60 @@ func runGenericInExecutionTurn(
 			return
 		}
 		stdinMu.Lock()
-		defer stdinMu.Unlock()
 		select {
 		case <-processDone:
+			stdinMu.Unlock()
 			return
 		default:
 		}
 		if stdinClosed || evidenceDelivered {
+			stdinMu.Unlock()
 			return
 		}
-		evidenceDelivered = true
-		deliveryCount++
-		emit("evidence.delivered", "In-execution asynchronous evidence frame sent to active generic-cli stream")
-		frame, _ := json.Marshal(map[string]any{
-			"protocol": agentProtocol,
-			"type":     "evidence",
-			"evidence": evPayload,
-		})
-		_, _ = stdin.Write(append(frame, '\n'))
-		_ = stdin.Close()
-		stdinClosed = true
-	}()
+		mu.Lock()
+		deliveryStdoutOffset = outBuf.Len()
+		mu.Unlock()
+		stdinMu.Unlock()
 
-	var mu sync.Mutex
-	var outBuf bytes.Buffer
-	startedEmitted := false
-	ackEmitted := false
-	exceededLimit := false
+		frame, _ := json.Marshal(map[string]any{
+			"protocol":   agentProtocol,
+			"type":       "evidence",
+			"deliveryId": "ev-1",
+			"evidence":   evPayload,
+		})
+		_, werr := stdin.Write(append(frame, '\n'))
+
+		stdinMu.Lock()
+		if werr == nil && !stdinClosed {
+			evidenceDelivered = true
+			deliveryCount = 1
+			emit("evidence.delivered", "In-execution asynchronous evidence frame sent to active generic-cli stream")
+			mu.Lock()
+			deliveredEmitted = true
+			s := outBuf.String()
+			shouldDeferredAck := false
+			if !ackEmitted && deliveryStdoutOffset >= 0 && len(s) > deliveryStdoutOffset {
+				postDelivery := s[deliveryStdoutOffset:]
+				if strings.Contains(postDelivery, `"type":"evidence_ack"`) || strings.Contains(postDelivery, `"type": "evidence_ack"`) {
+					ackEmitted = true
+					shouldDeferredAck = true
+				}
+			}
+			mu.Unlock()
+			if shouldDeferredAck {
+				emit("evidence.accepted_by_runtime", "generic-cli in-execution evidence_ack")
+			}
+		} else {
+			mu.Lock()
+			deliveryStdoutOffset = -1
+			mu.Unlock()
+		}
+		if !stdinClosed {
+			_ = stdin.Close()
+			stdinClosed = true
+		}
+		stdinMu.Unlock()
+	}()
 
 	readDone := make(chan struct{})
 	go func() {
@@ -587,9 +627,13 @@ func runGenericInExecutionTurn(
 				if shouldStart {
 					startedEmitted = true
 				}
-				shouldAck := !ackEmitted && (strings.Contains(s, `"type":"evidence_ack"`) || strings.Contains(s, `"type": "evidence_ack"`))
-				if shouldAck {
-					ackEmitted = true
+				shouldAck := false
+				if deliveredEmitted && !ackEmitted && deliveryStdoutOffset >= 0 && len(s) > deliveryStdoutOffset {
+					postDelivery := s[deliveryStdoutOffset:]
+					if strings.Contains(postDelivery, `"type":"evidence_ack"`) || strings.Contains(postDelivery, `"type": "evidence_ack"`) {
+						ackEmitted = true
+						shouldAck = true
+					}
 				}
 				mu.Unlock()
 				if shouldStart {
@@ -623,18 +667,18 @@ func runGenericInExecutionTurn(
 
 	terminate := func() {
 		stdinMu.Lock()
-		if !stdinClosed {
-			_ = stdin.Close()
-			stdinClosed = true
-		}
+		stdinClosed = true
 		stdinMu.Unlock()
+		go func() {
+			_ = stdin.Close()
+		}()
 		if cmd.Process == nil {
 			return
 		}
-		_ = cmd.Process.Signal(syscall.SIGTERM)
+		terminateProcessGroup(cmd, false)
 		killTimer := time.AfterFunc(2*time.Second, func() {
 			if cmd.Process != nil {
-				_ = cmd.Process.Kill()
+				terminateProcessGroup(cmd, true)
 			}
 		})
 		<-waitCh
@@ -644,6 +688,11 @@ func runGenericInExecutionTurn(
 	var waitErr error
 	select {
 	case waitErr = <-waitCh:
+		select {
+		case serr := <-supplyErrCh:
+			return genericInExecutionResult{}, serr
+		default:
+		}
 	case serr := <-supplyErrCh:
 		terminate()
 		return genericInExecutionResult{}, serr
@@ -674,7 +723,6 @@ func runGenericInExecutionTurn(
 
 	rawLines := strings.Split(rawOut, "\n")
 	var results []map[string]any
-	sawAckLine := false
 	for _, l := range rawLines {
 		trimmed := strings.TrimSpace(l)
 		if trimmed == "" {
@@ -687,9 +735,6 @@ func runGenericInExecutionTurn(
 		t, _ := obj["type"].(string)
 		if t != "started" && t != "progress" && t != "awaiting_evidence" && t != "evidence_ack" && t != "result" {
 			return genericInExecutionResult{}, NewAgentError(AgentErrProtocol, "in_execution", "agent output did not follow perfdigest-agent/v1")
-		}
-		if t == "evidence_ack" {
-			sawAckLine = true
 		}
 		if t == "result" {
 			results = append(results, obj)
@@ -729,15 +774,7 @@ func runGenericInExecutionTurn(
 	earlyCompletion := !delivered
 	evConsumedRaw, hasEvConsumed := r["evidenceConsumed"]
 	evConsumedFlag, isBool := evConsumedRaw.(bool)
-	hasAckFrame := didAck || sawAckLine
-	var consumed bool
-	if delivered {
-		if hasEvConsumed && isBool {
-			consumed = evConsumedFlag
-		} else {
-			consumed = hasAckFrame
-		}
-	}
+	consumed := delivered && hasEvConsumed && isBool && evConsumedFlag
 	if earlyCompletion {
 		emit("agent.in_execution.completed_before_evidence", "Agent solved and exited before background evidence arrived")
 	} else if consumed {
@@ -785,6 +822,7 @@ func runGenericTurn(
 	cmd := exec.Command(command, args...)
 	cmd.Dir = cwd
 	cmd.Env = ChildEnvSlice(nil)
+	configureProcessGroup(cmd)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {

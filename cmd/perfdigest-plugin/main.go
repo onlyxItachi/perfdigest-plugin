@@ -21,13 +21,16 @@ import (
 const helpText = `PerfDigest Evidence — Codex-first MVP
 
   perfdigest-plugin init [--provider cloudflare|local|openai|offline --yes] [--env-file PATH] [--endpoint URL] [--decision-model clef-flash|clef|clef-omni] [--check-connection]
-  perfdigest-plugin demo [--agent none|codex|generic] [--agent-command PATH] [--agent-sessions] [--routing offline|decisions] [--decision-model NAME] [--perf]
-  perfdigest-plugin run manifest.json [--workspace PATH] [--routing decisions|offline] [--agent codex|none|generic] [--agent-command PATH] [--agent-sessions] [--decision-model NAME]
+  perfdigest-plugin demo [--agent none|codex|generic] [--agent-command PATH] [--agent-sessions] [--agent-in-execution-async] [--agent-delivery auto|in_execution|single_turn|two_turn] [--strict-delivery-mode] [--routing offline|decisions] [--decision-model NAME] [--perf]
+  perfdigest-plugin run manifest.json [--workspace PATH] [--routing decisions|offline] [--agent codex|none|generic] [--agent-command PATH] [--agent-sessions] [--agent-in-execution-async] [--agent-delivery auto|in_execution|single_turn|two_turn] [--strict-delivery-mode] [--decision-model NAME]
   perfdigest-plugin mcp [--workspace PATH]
 
 Unconfigured demo defaults: real local CPU measurements + verification, offline routing, no model calls.
 Unconfigured run defaults: existing Codex ChatGPT login + live Decisions (PERFDIGEST_DECISIONS_API_KEY).
 Use --agent codex to demonstrate overlap with a real Codex session, or --agent generic --agent-command PATH for a JSONL CLI agent.
+--agent-delivery selects auto, in_execution, single_turn (evidence-first single turn), or two_turn (default concurrent analysis + review).
+--agent-in-execution-async opts a generic CLI agent into the perfdigest-agent/v1 in-execution async evidence streaming protocol.
+--strict-delivery-mode fails closed if in_execution delivery is requested on an adapter without inExecutionAsyncInput support.
 --perf adds Linux hardware counters; otherwise the demo uses genuine elapsed-time traces.
 Raw reports, command receipts and timeline are saved under .perfdigest/runs/.
 --provider cloudflare|local|openai|offline explicitly selects inference; --routing keeps legacy aliases.
@@ -43,6 +46,7 @@ type cliFlags struct {
 	agentSessions         *bool
 	agentInExecutionAsync *bool
 	agentDelivery         *string
+	strictDeliveryMode    bool
 	routing               *string
 	provider             *string
 	model                *string
@@ -83,6 +87,7 @@ func parseCLIArgs(args []string) (cliFlags, error) {
 		"-h":                         true,
 		"--agent-sessions":           true,
 		"--agent-in-execution-async": true,
+		"--strict-delivery-mode":     true,
 		"--perf":                     true,
 		"--yes":                      true,
 		"--check-connection":         true,
@@ -146,6 +151,8 @@ func parseCLIArgs(args []string) (cliFlags, error) {
 				f.agentSessions = &val
 			case "--agent-in-execution-async":
 				f.agentInExecutionAsync = &val
+			case "--strict-delivery-mode":
+				f.strictDeliveryMode = val
 			case "--perf":
 				f.perf = val
 			case "--yes":
@@ -838,6 +845,7 @@ func runCLI() error {
 		Routing:              routing,
 		Agent:                agent,
 		AgentDelivery:        agentDelivery,
+		StrictDeliveryMode:   f.strictDeliveryMode,
 		Model:                modelStr,
 		CloudflareModel:      cloudflareModel,
 		DecisionsMockURL:     decisionsMockURL,

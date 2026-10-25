@@ -65,7 +65,7 @@ export async function serve(workspace: string, defaultRouting: RoutingMode = 'of
     return reply({
       jobId,
       status: job.state,
-      deliveryMode: 'in_execution_tool_delivery',
+      deliveryMode: job.state === 'complete' ? 'in_execution_tool_delivery' : null,
       waitedMs,
       ...(job.result ? { packet: job.result } : {}),
       ...(job.error ? { error: job.error } : {}),

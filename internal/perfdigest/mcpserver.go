@@ -459,10 +459,14 @@ func ServeMCP(ctx context.Context, workspace string, defaultRouting string, opti
 				delete(jobs, jobID)
 				jobsMu.Unlock()
 			}
+			var deliveryMode any = nil
+			if st == "complete" {
+				deliveryMode = "in_execution_tool_delivery"
+			}
 			payload := map[string]any{
 				"jobId":        jobID,
 				"status":       st,
-				"deliveryMode": "in_execution_tool_delivery",
+				"deliveryMode": deliveryMode,
 				"waitedMs":     waitedMs,
 			}
 			if resPkt != nil {

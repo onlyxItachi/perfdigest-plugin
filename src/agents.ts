@@ -20,7 +20,7 @@ export type RuntimeUsageReportingSemantics =
  * Delivery modes:
  * - in_execution_async_input: the agent runtime accepts an asynchronous `{type:"evidence"}`
  *   frame on an open stream during its single active investigation execution.
- * - in_execution_tool_delivery: the agent runtime invokes `await_evidence` / `get_evidence_job`
+ * - in_execution_tool_delivery: the agent runtime invokes `launch_evidence_prefetch` / `get_evidence_job`
  *   on the PerfDigest Evidence MCP server during its active turn.
  * - single_turn_with_evidence: single-execution fallback where the evidence worker completes
  *   first and delivers the verified packet in one self-contained turn (avoiding Turn-1 wait
@@ -108,15 +108,15 @@ export function getRuntimeCapabilityProfile(
       };
     case 'generic-cli-in-execution':
       return {
-        sameSessionContinuation: true,
+        sameSessionContinuation: Boolean(options.sessions),
         nativeAsyncInput: true,
         cancellation: true,
         usageReporting: true,
         sandbox: 'agent-defined',
         inExecutionAsyncInput: 'supported',
         inExecutionToolDelivery: 'supported',
-        queuedStdinNextTurn: 'supported',
-        interruptionAndSteering: 'supported',
+        queuedStdinNextTurn: options.sessions ? 'supported' : 'unsupported',
+        interruptionAndSteering: 'unsupported',
         usageReportingSemantics: 'single_turn_only',
       };
     case 'generic-cli':
@@ -448,7 +448,7 @@ export function genericCliAdapter(options: GenericCliAgentOptions): AgentAdapter
   const sessions = options.sessions ?? false;
   const inExecutionAsync = options.inExecutionAsync ?? false;
   const capabilities: AgentCapabilities = inExecutionAsync
-    ? getRuntimeCapabilityProfile('generic-cli-in-execution')
+    ? getRuntimeCapabilityProfile('generic-cli-in-execution', { sessions })
     : {
         sameSessionContinuation: sessions,
         nativeAsyncInput: false,
@@ -532,10 +532,10 @@ export function genericCliAdapter(options: GenericCliAgentOptions): AgentAdapter
               emit,
             )
               .catch((error: unknown) => {
-                if (hasSupplyError) throw supplyError;
-                if (error instanceof AgentError) throw new AgentError(error.kind, phase, error.message);
                 if (timedOut) throw new AgentError('timed_out', phase, `no result within ${timeoutMs} ms`);
                 if (signal.aborted) throw new AgentError('cancelled', phase, 'run cancelled');
+                if (hasSupplyError) throw supplyError;
+                if (error instanceof AgentError) throw new AgentError(error.kind, phase, error.message);
                 throw new AgentError('failed', phase, error instanceof Error ? error.message : String(error));
               })
               .finally(() => clearTimeout(timer));
@@ -639,6 +639,7 @@ function runInExecutionTurn(
     let ackEmitted = false;
     let processClosed = false;
     let evidenceDelivered = false;
+    let stdoutOffsetAtDelivery: number | null = null;
     let deliveryCount = 0;
     let killTimer: NodeJS.Timeout | undefined;
 
@@ -670,15 +671,23 @@ function runInExecutionTurn(
         started = true;
         emit('agent.analysis.turn_started');
       }
-      if (!ackEmitted && (stdout.includes('"type":"evidence_ack"') || stdout.includes('"type": "evidence_ack"'))) {
-        ackEmitted = true;
-        emit('evidence.accepted_by_runtime', 'generic-cli in-execution evidence_ack');
+      if (evidenceDelivered && !ackEmitted && stdoutOffsetAtDelivery !== null) {
+        const postDeliveryStdout = stdout.slice(stdoutOffsetAtDelivery);
+        if (postDeliveryStdout.includes('"type":"evidence_ack"') || postDeliveryStdout.includes('"type": "evidence_ack"')) {
+          ackEmitted = true;
+          emit('evidence.accepted_by_runtime', 'generic-cli in-execution evidence_ack');
+        }
       }
     });
 
+    let stdinWriteFailed = false;
     child.stderr.resume();
     child.on('error', error => finish(new AgentError('failed', 'in_execution', error.message)));
-    child.stdin.on('error', () => {});
+    child.stdin.on('error', () => {
+      stdinWriteFailed = true;
+      evidenceDelivered = false;
+      deliveryCount = 0;
+    });
 
     // Write the initial investigation prompt frame while keeping stdin open for async evidence injection
     child.stdin.write(`${initialInput}\n`);
@@ -686,18 +695,34 @@ function runInExecutionTurn(
     // Concurrently await evidence from the background worker + verification
     void supplyEvidence().then(
       (evidencePayload) => {
-        if (settled || processClosed || evidenceDelivered) {
+        if (
+          settled ||
+          processClosed ||
+          evidenceDelivered ||
+          stdinWriteFailed ||
+          child.exitCode !== null ||
+          child.stdin.destroyed ||
+          !child.stdin.writable
+        ) {
           return;
         }
-        evidenceDelivered = true;
-        deliveryCount += 1;
-        emit('evidence.delivered', 'In-execution asynchronous evidence frame sent to active generic-cli stream');
+        stdoutOffsetAtDelivery = stdout.length;
         const frame = JSON.stringify({
           protocol,
           type: 'evidence',
+          deliveryId: 'ev-1',
           evidence: evidencePayload,
         });
-        child.stdin.end(`${frame}\n`);
+        evidenceDelivered = true;
+        deliveryCount = 1;
+        emit('evidence.delivered', 'In-execution asynchronous evidence frame sent to active generic-cli stream');
+        child.stdin.end(`${frame}\n`, (writeErr?: Error | null) => {
+          if (writeErr) {
+            stdinWriteFailed = true;
+            evidenceDelivered = false;
+            deliveryCount = 0;
+          }
+        });
       },
       (err) => {
         if (settled || processClosed) return;
@@ -736,12 +761,7 @@ function runInExecutionTurn(
         }
         const usage = r.usage && typeof r.usage === 'object' ? (r.usage as Usage) : null;
         const earlyAgentCompletion = !evidenceDelivered;
-        const hasAckFrame = ackEmitted || lines.some(l => l.type === 'evidence_ack');
-        const evidenceConsumed =
-          evidenceDelivered &&
-          (typeof r.evidenceConsumed === 'boolean'
-            ? r.evidenceConsumed
-            : hasAckFrame);
+        const evidenceConsumed = evidenceDelivered && r.evidenceConsumed === true;
         if (earlyAgentCompletion) {
           emit('agent.in_execution.completed_before_evidence', 'Agent solved and exited before background evidence arrived');
         } else if (evidenceConsumed) {

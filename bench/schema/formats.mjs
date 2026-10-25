@@ -842,10 +842,10 @@ export const measurementReceiptSchema = z.object({
   gitSha: z.string().regex(/^[a-f0-9]{40}$/),
   runnerVersion: nonEmpty,
   reconciledFromSourceArtifact: z.string().nullable(),
-  cellsCsvRef: nonEmpty,
-  summaryCsvRef: nonEmpty,
-  sourceTraceRef: nonEmpty,
-  auxiliaryArtifactRefs: z.array(nonEmpty).optional(),
+  cellsCsvRef: z.string().regex(/^[^/\\]+(?:\/[^/\\]+)*\.csv$/),
+  summaryCsvRef: z.string().regex(/^[^/\\]+(?:\/[^/\\]+)*\.csv$/),
+  sourceTraceRef: z.string().regex(/^[^/\\]+(?:\/[^/\\]+)*\.jsonl?$/),
+  auxiliaryArtifactRefs: z.array(z.string().regex(/^[^/\\]+(?:\/[^/\\]+)*\.md$/)).optional(),
   sampleSize: z.object({
     totalCells: z.int().min(1),
     completeCells: z.int().min(0),
@@ -856,7 +856,7 @@ export const measurementReceiptSchema = z.object({
   }).strict(),
   models: z.array(z.object({
     modelId: nonEmpty,
-    effort: nonEmpty,
+    effort: z.enum(['low', 'medium', 'high', 'xhigh', 'max']),
   }).strict()).min(1),
   arms: z.array(z.enum(['raw', 'mcp_digest', 'evidence'])).min(1),
   baselineParityVerified: z.literal(true),
@@ -865,20 +865,53 @@ export const measurementReceiptSchema = z.object({
   limitations: z.array(nonEmpty).min(1),
 }).strict();
 
-export const benchmarkSourceTraceSchema = z.object({
+export const benchmarkSourceTraceEventSchema = z.object({
+  event: nonEmpty,
+  elapsedMs: z.number().min(0),
+  utcIso: z.iso.datetime(),
+}).passthrough();
+
+export const benchmarkSourceTraceCellSchema = z.object({
+  cell_id: nonEmpty,
+  model_id: nonEmpty,
+  study_id: nonEmpty,
+  arm: z.enum(['raw', 'mcp_digest', 'evidence']),
+  status: z.enum(['complete', 'failed', 'timed_out', 'abstained', 'invalid_incomplete']),
+  workload_sha256: sha256,
+  provenance_count: z.int().min(0),
+  decision_requests: z.int().min(0),
+  e2e_wall_ms: z.number().min(0).nullable(),
+  agent_input_tokens: z.number().min(0).nullable(),
+  agent_output_tokens: z.number().min(0).nullable(),
+  checks_passed: z.int().min(0).nullable(),
+  events: z.array(benchmarkSourceTraceEventSchema).min(1),
+}).passthrough();
+
+const benchmarkSourceTraceBaseFields = {
   schema: z.enum([
     'perfdigest.benchmark.v3-reconciled-v2-audit.v1',
     'perfdigest.benchmark.source-trace.v1',
   ]),
   generatedAt: z.string().optional(),
-  generatedAtUtc: z.string().optional(),
-  experimentId: z.string().optional(),
+  generatedAtUtc: z.iso.datetime().optional(),
+  experimentId: nonEmpty.optional(),
   sourceArtifact: z.string().nullable().optional(),
   rootCauseFindings: z.record(z.string(), z.unknown()).optional(),
   summaryByModelAndArm: z.array(z.record(z.string(), z.unknown())).optional(),
-  reconciledCells: z.array(z.record(z.string(), z.unknown())).min(1).optional(),
-  cells: z.array(z.record(z.string(), z.unknown())).min(1).optional(),
-}).strict();
+};
+
+export const benchmarkSourceTraceSchema = z.union([
+  z.object({
+    ...benchmarkSourceTraceBaseFields,
+    cells: z.array(benchmarkSourceTraceCellSchema).min(1),
+    reconciledCells: z.array(benchmarkSourceTraceCellSchema).min(1).optional(),
+  }).strict(),
+  z.object({
+    ...benchmarkSourceTraceBaseFields,
+    reconciledCells: z.array(benchmarkSourceTraceCellSchema).min(1),
+    cells: z.array(benchmarkSourceTraceCellSchema).min(1).optional(),
+  }).strict(),
+]);
 
 
 

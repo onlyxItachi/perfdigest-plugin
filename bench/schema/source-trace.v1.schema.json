@@ -1,0 +1,687 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "anyOf": [
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "type": "string",
+          "enum": [
+            "perfdigest.benchmark.v3-reconciled-v2-audit.v1",
+            "perfdigest.benchmark.source-trace.v1"
+          ]
+        },
+        "generatedAt": {
+          "type": "string"
+        },
+        "generatedAtUtc": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+        },
+        "experimentId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceArtifact": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rootCauseFindings": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "summaryByModelAndArm": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "cells": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "cell_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "study_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "arm": {
+                "type": "string",
+                "enum": [
+                  "raw",
+                  "mcp_digest",
+                  "evidence"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "complete",
+                  "failed",
+                  "timed_out",
+                  "abstained",
+                  "invalid_incomplete"
+                ]
+              },
+              "workload_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "provenance_count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "decision_requests": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "e2e_wall_ms": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "agent_input_tokens": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "agent_output_tokens": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "checks_passed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "events": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "event": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "elapsedMs": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "utcIso": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "elapsedMs",
+                    "utcIso"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            },
+            "required": [
+              "cell_id",
+              "model_id",
+              "study_id",
+              "arm",
+              "status",
+              "workload_sha256",
+              "provenance_count",
+              "decision_requests",
+              "e2e_wall_ms",
+              "agent_input_tokens",
+              "agent_output_tokens",
+              "checks_passed",
+              "events"
+            ],
+            "additionalProperties": {}
+          }
+        },
+        "reconciledCells": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "cell_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "study_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "arm": {
+                "type": "string",
+                "enum": [
+                  "raw",
+                  "mcp_digest",
+                  "evidence"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "complete",
+                  "failed",
+                  "timed_out",
+                  "abstained",
+                  "invalid_incomplete"
+                ]
+              },
+              "workload_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "provenance_count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "decision_requests": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "e2e_wall_ms": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "agent_input_tokens": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "agent_output_tokens": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "checks_passed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "events": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "event": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "elapsedMs": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "utcIso": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "elapsedMs",
+                    "utcIso"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            },
+            "required": [
+              "cell_id",
+              "model_id",
+              "study_id",
+              "arm",
+              "status",
+              "workload_sha256",
+              "provenance_count",
+              "decision_requests",
+              "e2e_wall_ms",
+              "agent_input_tokens",
+              "agent_output_tokens",
+              "checks_passed",
+              "events"
+            ],
+            "additionalProperties": {}
+          }
+        }
+      },
+      "required": [
+        "schema",
+        "cells"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "type": "string",
+          "enum": [
+            "perfdigest.benchmark.v3-reconciled-v2-audit.v1",
+            "perfdigest.benchmark.source-trace.v1"
+          ]
+        },
+        "generatedAt": {
+          "type": "string"
+        },
+        "generatedAtUtc": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+        },
+        "experimentId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceArtifact": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rootCauseFindings": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "summaryByModelAndArm": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "reconciledCells": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "cell_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "study_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "arm": {
+                "type": "string",
+                "enum": [
+                  "raw",
+                  "mcp_digest",
+                  "evidence"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "complete",
+                  "failed",
+                  "timed_out",
+                  "abstained",
+                  "invalid_incomplete"
+                ]
+              },
+              "workload_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "provenance_count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "decision_requests": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "e2e_wall_ms": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "agent_input_tokens": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "agent_output_tokens": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "checks_passed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "events": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "event": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "elapsedMs": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "utcIso": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "elapsedMs",
+                    "utcIso"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            },
+            "required": [
+              "cell_id",
+              "model_id",
+              "study_id",
+              "arm",
+              "status",
+              "workload_sha256",
+              "provenance_count",
+              "decision_requests",
+              "e2e_wall_ms",
+              "agent_input_tokens",
+              "agent_output_tokens",
+              "checks_passed",
+              "events"
+            ],
+            "additionalProperties": {}
+          }
+        },
+        "cells": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "cell_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "study_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "arm": {
+                "type": "string",
+                "enum": [
+                  "raw",
+                  "mcp_digest",
+                  "evidence"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "complete",
+                  "failed",
+                  "timed_out",
+                  "abstained",
+                  "invalid_incomplete"
+                ]
+              },
+              "workload_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "provenance_count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "decision_requests": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "e2e_wall_ms": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "agent_input_tokens": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "agent_output_tokens": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "checks_passed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "events": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "event": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "elapsedMs": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "utcIso": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "elapsedMs",
+                    "utcIso"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            },
+            "required": [
+              "cell_id",
+              "model_id",
+              "study_id",
+              "arm",
+              "status",
+              "workload_sha256",
+              "provenance_count",
+              "decision_requests",
+              "e2e_wall_ms",
+              "agent_input_tokens",
+              "agent_output_tokens",
+              "checks_passed",
+              "events"
+            ],
+            "additionalProperties": {}
+          }
+        }
+      },
+      "required": [
+        "schema",
+        "reconciledCells"
+      ],
+      "additionalProperties": false
+    }
+  ],
+  "$id": "https://github.com/onlyxItachi/perfdigest-plugin/bench/schema/source-trace.v1.schema.json",
+  "title": "PerfDigest Benchmark Machine-Readable Source Trace v1"
+}

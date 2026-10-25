@@ -687,7 +687,7 @@ test('investigate with agentDelivery=single_turn executes 1 review turn, skips b
 const req = JSON.parse(fs.readFileSync(0, 'utf8').trim());
 fs.appendFileSync(${JSON.stringify(callsFile)}, JSON.stringify(req) + '\\n');
 console.log(JSON.stringify({ type: 'started' }));
-const lines = req.prompt.split('\\n');
+const lines = req.prompt.split('\\n').filter(l => l.startsWith('{'));
 const payload = JSON.parse(lines[lines.length - 1]);
 console.log(JSON.stringify({
   type: 'result',
