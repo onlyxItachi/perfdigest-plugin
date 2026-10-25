@@ -1,0 +1,35 @@
+{
+  "schema": "perfdigest.benchmark.measurement-receipt.v1",
+  "experimentId": "sample-mixed-outcomes",
+  "generatedAtUtc": "2026-10-25T18:00:00.000Z",
+  "gitSha": "daf32c53ddf1e189d4fa2a5f0bfacc670bb85325",
+  "runnerVersion": "1.0.0",
+  "reconciledFromSourceArtifact": null,
+  "cellsCsvRef": "bench/fixtures/integrity-samples/failed-and-abstained-cells.csv",
+  "summaryCsvRef": "bench/fixtures/integrity-samples/failed-and-abstained-summary.csv",
+  "sourceTraceRef": "bench/fixtures/integrity-samples/failed-and-abstained-trace.json",
+  "sampleSize": {
+    "totalCells": 3,
+    "completeCells": 1,
+    "failedCells": 1,
+    "timedOutCells": 0,
+    "abstainedCells": 1,
+    "invalidIncompleteCells": 0
+  },
+  "models": [
+    {
+      "modelId": "gemini-4-argon-high",
+      "effort": "high"
+    }
+  ],
+  "arms": [
+    "raw",
+    "evidence"
+  ],
+  "baselineParityVerified": true,
+  "nativeToolsEnabledInRawBaseline": true,
+  "oracleLeakageCheckPassed": true,
+  "limitations": [
+    "Representative 3-cell fixture preserving complete, abstained, and failed outcomes for CI gate verification."
+  ]
+}
