@@ -1,0 +1,112 @@
+{
+  "schema": "perfdigest.benchmark.source-trace.v1",
+  "generatedAtUtc": "2026-10-25T18:00:00.000Z",
+  "experimentId": "sample-mixed-outcomes",
+  "sourceArtifact": null,
+  "cells": [
+    {
+      "cell_id": "c1_raw_ok",
+      "model_id": "gemini-4-argon-high",
+      "effort": "high",
+      "study_id": "cuda_opt_loop",
+      "arm": "raw",
+      "attempt": 1,
+      "status": "complete",
+      "workload_sha256": "f7d1a48af8b7c9c65c6b6f6eb41d089196fc780396c0c2e852f6ade1d51716d7",
+      "provenance_count": 0,
+      "decision_requests": 0,
+      "e2e_wall_ms": 106389.37,
+      "agent_input_tokens": 134665,
+      "agent_output_tokens": 3512,
+      "checks_passed": 5,
+      "events": [
+        {
+          "event": "run.started",
+          "elapsedMs": 0,
+          "utcIso": "2026-10-25T17:50:00.000Z"
+        },
+        {
+          "event": "turn1.started",
+          "elapsedMs": 12.4,
+          "utcIso": "2026-10-25T17:50:00.012Z"
+        },
+        {
+          "event": "turn1.completed",
+          "elapsedMs": 106380.1,
+          "utcIso": "2026-10-25T17:51:46.380Z"
+        },
+        {
+          "event": "run.completed",
+          "elapsedMs": 106389.37,
+          "utcIso": "2026-10-25T17:51:46.389Z"
+        }
+      ]
+    },
+    {
+      "cell_id": "c2_evidence_abstained",
+      "model_id": "gemini-4-argon-high",
+      "effort": "high",
+      "study_id": "cuda_opt_loop",
+      "arm": "evidence",
+      "attempt": 1,
+      "status": "abstained",
+      "workload_sha256": "f7d1a48af8b7c9c65c6b6f6eb41d089196fc780396c0c2e852f6ade1d51716d7",
+      "provenance_count": 3,
+      "decision_requests": 4,
+      "e2e_wall_ms": 82280.36,
+      "agent_input_tokens": 78465,
+      "agent_output_tokens": 5076,
+      "checks_passed": 3,
+      "events": [
+        {
+          "event": "run.started",
+          "elapsedMs": 0,
+          "utcIso": "2026-10-25T17:52:00.000Z"
+        },
+        {
+          "event": "worker.ready",
+          "elapsedMs": 5217.5,
+          "utcIso": "2026-10-25T17:52:05.217Z"
+        },
+        {
+          "event": "run.completed",
+          "elapsedMs": 82280.36,
+          "utcIso": "2026-10-25T17:53:22.280Z"
+        }
+      ]
+    },
+    {
+      "cell_id": "c3_evidence_failed",
+      "model_id": "gemini-4-argon-high",
+      "effort": "high",
+      "study_id": "cpp_build_loop",
+      "arm": "evidence",
+      "attempt": 1,
+      "status": "failed",
+      "workload_sha256": "f7d1a48af8b7c9c65c6b6f6eb41d089196fc780396c0c2e852f6ade1d51716d7",
+      "provenance_count": 3,
+      "decision_requests": 4,
+      "e2e_wall_ms": 82280.36,
+      "agent_input_tokens": 78465,
+      "agent_output_tokens": 5076,
+      "checks_passed": 0,
+      "events": [
+        {
+          "event": "run.started",
+          "elapsedMs": 0,
+          "utcIso": "2026-10-25T17:54:00.000Z"
+        },
+        {
+          "event": "worker.ready",
+          "elapsedMs": 5217.5,
+          "utcIso": "2026-10-25T17:54:05.217Z"
+        },
+        {
+          "event": "run.completed",
+          "elapsedMs": 82280.36,
+          "utcIso": "2026-10-25T17:55:22.280Z"
+        }
+      ]
+    }
+  ]
+}

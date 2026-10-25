@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "perfdigest.benchmark.measurement-receipt.v1"
+    },
+    "experimentId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generatedAtUtc": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+    },
+    "gitSha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "runnerVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reconciledFromSourceArtifact": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "cellsCsvRef": {
+      "type": "string",
+      "pattern": "^[^/\\\\]+(?:\\/[^/\\\\]+)*\\.csv$"
+    },
+    "summaryCsvRef": {
+      "type": "string",
+      "pattern": "^[^/\\\\]+(?:\\/[^/\\\\]+)*\\.csv$"
+    },
+    "sourceTraceRef": {
+      "type": "string",
+      "pattern": "^[^/\\\\]+(?:\\/[^/\\\\]+)*\\.jsonl?$"
+    },
+    "auxiliaryArtifactRefs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[^/\\\\]+(?:\\/[^/\\\\]+)*\\.md$"
+      }
+    },
+    "sampleSize": {
+      "type": "object",
+      "properties": {
+        "totalCells": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "completeCells": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "failedCells": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "timedOutCells": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "abstainedCells": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "invalidIncompleteCells": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "totalCells",
+        "completeCells",
+        "failedCells",
+        "timedOutCells",
+        "abstainedCells",
+        "invalidIncompleteCells"
+      ],
+      "additionalProperties": false
+    },
+    "models": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "modelId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "effort": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ]
+          }
+        },
+        "required": [
+          "modelId",
+          "effort"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "arms": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "raw",
+          "mcp_digest",
+          "evidence"
+        ]
+      }
+    },
+    "baselineParityVerified": {
+      "type": "boolean",
+      "const": true
+    },
+    "nativeToolsEnabledInRawBaseline": {
+      "type": "boolean",
+      "const": true
+    },
+    "oracleLeakageCheckPassed": {
+      "type": "boolean",
+      "const": true
+    },
+    "limitations": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "required": [
+    "schema",
+    "experimentId",
+    "generatedAtUtc",
+    "gitSha",
+    "runnerVersion",
+    "reconciledFromSourceArtifact",
+    "cellsCsvRef",
+    "summaryCsvRef",
+    "sourceTraceRef",
+    "sampleSize",
+    "models",
+    "arms",
+    "baselineParityVerified",
+    "nativeToolsEnabledInRawBaseline",
+    "oracleLeakageCheckPassed",
+    "limitations"
+  ],
+  "additionalProperties": false,
+  "$id": "https://github.com/onlyxItachi/perfdigest-plugin/bench/schema/measurement-receipt.v1.schema.json",
+  "title": "PerfDigest Benchmark Integrity Measurement Receipt v1"
+}

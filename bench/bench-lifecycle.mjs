@@ -1120,7 +1120,9 @@ async function main() {
       return;
     }
 
-    const outPath = join(benchDir, 'results/2026-10-18-lifecycle-and-orchestration.json');
+    const outDir = join(repo, 'work/bench-results');
+    await mkdir(outDir, { recursive: true });
+    const outPath = join(outDir, `${new Date().toISOString().slice(0, 10)}-lifecycle-and-orchestration.json`);
     await writeFile(outPath, JSON.stringify(resultDoc, null, 2) + '\n');
     process.stderr.write(`\n[bench-lifecycle] Saved benchmark results to ${outPath}\n`);
 

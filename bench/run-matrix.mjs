@@ -564,7 +564,7 @@ const result = {
 const parsed = resultSchema.safeParse(result);
 if (!parsed.success) { console.error(JSON.stringify(parsed.error.issues, null, 2)); process.exitCode = 1; }
 const out = resolve(opts.out ?? (opts.smoke ? join(scratch, 'smoke-result.json')
-  : join(benchDir, 'results', `${now.toISOString().slice(0, 10)}-${label}.json`)));
+  : join(repo, 'work', 'bench-results', `${now.toISOString().slice(0, 10)}-${label}.json`)));
 await mkdir(dirname(out), { recursive: true });
 await writeFile(out, `${JSON.stringify(result, null, 2)}\n`);
 for (const c of cells) {

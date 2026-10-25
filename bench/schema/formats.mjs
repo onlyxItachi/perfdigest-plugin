@@ -835,4 +835,83 @@ export const multiModelEvalResultSchema = z.object({
   limits: z.array(nonEmpty).min(1),
 }).strict();
 
+export const measurementReceiptSchema = z.object({
+  schema: z.literal('perfdigest.benchmark.measurement-receipt.v1'),
+  experimentId: nonEmpty,
+  generatedAtUtc: z.iso.datetime(),
+  gitSha: z.string().regex(/^[a-f0-9]{40}$/),
+  runnerVersion: nonEmpty,
+  reconciledFromSourceArtifact: z.string().nullable(),
+  cellsCsvRef: z.string().regex(/^[^/\\]+(?:\/[^/\\]+)*\.csv$/),
+  summaryCsvRef: z.string().regex(/^[^/\\]+(?:\/[^/\\]+)*\.csv$/),
+  sourceTraceRef: z.string().regex(/^[^/\\]+(?:\/[^/\\]+)*\.jsonl?$/),
+  auxiliaryArtifactRefs: z.array(z.string().regex(/^[^/\\]+(?:\/[^/\\]+)*\.md$/)).optional(),
+  sampleSize: z.object({
+    totalCells: z.int().min(1),
+    completeCells: z.int().min(0),
+    failedCells: z.int().min(0),
+    timedOutCells: z.int().min(0),
+    abstainedCells: z.int().min(0),
+    invalidIncompleteCells: z.int().min(0),
+  }).strict(),
+  models: z.array(z.object({
+    modelId: nonEmpty,
+    effort: z.enum(['low', 'medium', 'high', 'xhigh', 'max']),
+  }).strict()).min(1),
+  arms: z.array(z.enum(['raw', 'mcp_digest', 'evidence'])).min(1),
+  baselineParityVerified: z.literal(true),
+  nativeToolsEnabledInRawBaseline: z.literal(true),
+  oracleLeakageCheckPassed: z.literal(true),
+  limitations: z.array(nonEmpty).min(1),
+}).strict();
+
+export const benchmarkSourceTraceEventSchema = z.object({
+  event: nonEmpty,
+  elapsedMs: z.number().min(0),
+  utcIso: z.iso.datetime(),
+}).passthrough();
+
+export const benchmarkSourceTraceCellSchema = z.object({
+  cell_id: nonEmpty,
+  model_id: nonEmpty,
+  study_id: nonEmpty,
+  arm: z.enum(['raw', 'mcp_digest', 'evidence']),
+  status: z.enum(['complete', 'failed', 'timed_out', 'abstained', 'invalid_incomplete']),
+  workload_sha256: sha256,
+  provenance_count: z.int().min(0),
+  decision_requests: z.int().min(0),
+  e2e_wall_ms: z.number().min(0).nullable(),
+  agent_input_tokens: z.number().min(0).nullable(),
+  agent_output_tokens: z.number().min(0).nullable(),
+  checks_passed: z.int().min(0).nullable(),
+  events: z.array(benchmarkSourceTraceEventSchema).min(1),
+}).passthrough();
+
+const benchmarkSourceTraceBaseFields = {
+  schema: z.enum([
+    'perfdigest.benchmark.v3-reconciled-v2-audit.v1',
+    'perfdigest.benchmark.source-trace.v1',
+  ]),
+  generatedAt: z.string().optional(),
+  generatedAtUtc: z.iso.datetime().optional(),
+  experimentId: nonEmpty.optional(),
+  sourceArtifact: z.string().nullable().optional(),
+  rootCauseFindings: z.record(z.string(), z.unknown()).optional(),
+  summaryByModelAndArm: z.array(z.record(z.string(), z.unknown())).optional(),
+};
+
+export const benchmarkSourceTraceSchema = z.union([
+  z.object({
+    ...benchmarkSourceTraceBaseFields,
+    cells: z.array(benchmarkSourceTraceCellSchema).min(1),
+    reconciledCells: z.array(benchmarkSourceTraceCellSchema).min(1).optional(),
+  }).strict(),
+  z.object({
+    ...benchmarkSourceTraceBaseFields,
+    reconciledCells: z.array(benchmarkSourceTraceCellSchema).min(1),
+    cells: z.array(benchmarkSourceTraceCellSchema).min(1).optional(),
+  }).strict(),
+]);
+
+
 

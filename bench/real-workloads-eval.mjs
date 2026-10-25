@@ -1443,11 +1443,13 @@ await gatherEvidence({
 
 async function main() {
   const incrementalOpt = process.argv.includes('--incremental-opt');
-  const outPath = resolve(repo, 'bench/results/2026-10-18-real-workload-evaluation.json');
+  const frozenBaselinePath = resolve(repo, 'bench/results/2026-10-18-real-workload-evaluation.json');
+  const outDir = resolve(repo, 'work/bench-results');
+  const outPath = resolve(outDir, `${new Date().toISOString().slice(0, 10)}-real-workload-evaluation.json`);
   let existingDoc = null;
   if (incrementalOpt) {
     try {
-      existingDoc = JSON.parse(await readFile(outPath, 'utf8'));
+      existingDoc = JSON.parse(await readFile(frozenBaselinePath, 'utf8'));
     } catch {
       existingDoc = null;
     }
@@ -1712,6 +1714,7 @@ async function main() {
       process.exit(1);
     }
 
+    await mkdir(outDir, { recursive: true });
     await writeFile(outPath, `${JSON.stringify(output, null, 2)}\n`);
     console.log(JSON.stringify(output.summary, null, 2));
   } finally {
