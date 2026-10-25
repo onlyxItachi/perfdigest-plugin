@@ -20,18 +20,36 @@ This document specifies the repository-wide benchmark integrity schema, boundary
 
 ---
 
-## 2. Mandatory Artifact Bundle
+## 2. Mandatory Artifact Bundle & Machine-Readable Trace Verification
 
-Every benchmark evaluation must produce four coordinated artifacts:
+Every benchmark evaluation must produce four coordinated artifacts via `writeValidatedBenchmarkBundle`:
 
-1. **Per-Cell CSV (`*-cells.csv`)**: One row per `(model_id, study_id, arm, attempt)` trial containing all 63 mandatory columns defined in `MANDATORY_CELL_CSV_COLUMNS`.
+1. **Per-Cell CSV (`*-cells.csv`)**: One row per `(model_id, study_id, arm, attempt)` trial containing all 73 mandatory columns defined in `MANDATORY_CELL_CSV_COLUMNS`.
 2. **Aggregate Summary CSV (`*-summary.csv`)**: One row per `(model_id, effort, arm)` group containing all 30 mandatory columns defined in `MANDATORY_SUMMARY_CSV_COLUMNS`, mathematically reconciled with `*-cells.csv`.
-3. **Source Trace (`*.json` / `*.jsonl` / `*.md`)**: Sanitized event-level trace (`<WORKSPACE>`, `<HOME>`, `<TMP>`, `[REDACTED]`) linking every cell row (`source_trace_ref`) to its underlying timeline and tool audit.
-4. **Measurement Receipt (`*-measurement-receipt.json`)**: Validated by `perfdigest.benchmark.measurement-receipt.v1` (`bench/schema/measurement-receipt.v1.schema.json`), recording `experimentId`, `gitSha`, `runnerVersion`, `reconciledFromSourceArtifact`, `sampleSize`, `models`, `arms`, parity attestations, and explicit `limitations`.
+3. **Machine-Readable Source Trace (`*.json` / `*.jsonl`)**: Sanitized cell/event trace (`<WORKSPACE>`, `<HOME>`, `<TMP>`, `[REDACTED]`) referenced by `source_trace_ref` (prose `.md` files are rejected as `invalid_source_trace_format`). For every completed cell in `*-cells.csv`, `validateBenchmarkIntegrityBundle` verifies:
+   - The referenced `.json`/`.jsonl` trace exists and parses cleanly (`missing_or_unreadable_source_trace`).
+   - A matching cell record (`cell_id` or `${model_id}__${study_id}__${arm}`) exists in the trace (`source_trace_cell_missing`).
+   - Cell identity (`model_id`, `study_id`, `arm`, `status`) matches between the CSV and trace (`source_trace_identity_mismatch`).
+   - Telemetry (`e2e_wall_ms`, `agent_input_tokens`, `agent_output_tokens`, `checks_passed`, `decision_requests`) and monotonic event ordering match (`source_trace_telemetry_mismatch`).
+   - Provenance (`workload_sha256`, `provenance_count`) matches (`source_trace_provenance_mismatch`).
+4. **Measurement Receipt (`*-measurement-receipt.json`)**: Validated by `perfdigest.benchmark.measurement-receipt.v1` (`bench/schema/measurement-receipt.v1.schema.json`), recording `experimentId`, `gitSha`, `runnerVersion`, `reconciledFromSourceArtifact`, `cellsCsvRef`, `summaryCsvRef`, `sourceTraceRef`, optional `auxiliaryArtifactRefs`, `sampleSize`, `models`, `arms`, parity attestations, and explicit `limitations`.
 
 ---
 
-## 3. Running Validation Locally and in CI
+## 3. Producer Boundary & Unreceipted Artifact Enforcement
+
+- **Producer / Output Boundary (`writeValidatedBenchmarkBundle`)**: Benchmark producers must call `writeValidatedBenchmarkBundle` to emit results. It runs `validateBenchmarkIntegrityBundle` (including machine-readable source-trace reconciliation) **before** writing any file to disk and throws `BenchmarkIntegrityError` on any violation.
+- **Directory Audit (`auditBenchmarkResultsDirectory`)**: `scripts/check-benchmark-integrity.mjs` scans every file in `bench/results/`. Any artifact outside `FROZEN_HISTORICAL_BENCHMARK_ARTIFACTS` that is not bound to a valid `*-measurement-receipt.json` bundle fails CI with `untracked_or_receiptless_benchmark_artifact`, preventing unreceipted benchmarks from evading validation.
+
+---
+
+## 4. Cross-PR Coordination (`Refs #18` & `Refs #19`)
+
+PR #20 (`Refs #18`) is the canonical owner of `src/benchmark-integrity.ts`, `src/observability.ts`, and `bench/schema/measurement-receipt.v1.schema.json`. PR #21 (`Refs #19`) keeps byte-identical copies of those shared modules so PR #21's delivery-mode evaluation bundle is validated by the exact same #20 gates prior to merge.
+
+---
+
+## 5. Running Validation Locally and in CI
 
 ```bash
 npm run test:bench-integrity

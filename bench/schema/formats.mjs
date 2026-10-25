@@ -845,6 +845,7 @@ export const measurementReceiptSchema = z.object({
   cellsCsvRef: nonEmpty,
   summaryCsvRef: nonEmpty,
   sourceTraceRef: nonEmpty,
+  auxiliaryArtifactRefs: z.array(nonEmpty).optional(),
   sampleSize: z.object({
     totalCells: z.int().min(1),
     completeCells: z.int().min(0),
@@ -862,6 +863,21 @@ export const measurementReceiptSchema = z.object({
   nativeToolsEnabledInRawBaseline: z.literal(true),
   oracleLeakageCheckPassed: z.literal(true),
   limitations: z.array(nonEmpty).min(1),
+}).strict();
+
+export const benchmarkSourceTraceSchema = z.object({
+  schema: z.enum([
+    'perfdigest.benchmark.v3-reconciled-v2-audit.v1',
+    'perfdigest.benchmark.source-trace.v1',
+  ]),
+  generatedAt: z.string().optional(),
+  generatedAtUtc: z.string().optional(),
+  experimentId: z.string().optional(),
+  sourceArtifact: z.string().nullable().optional(),
+  rootCauseFindings: z.record(z.string(), z.unknown()).optional(),
+  summaryByModelAndArm: z.array(z.record(z.string(), z.unknown())).optional(),
+  reconciledCells: z.array(z.record(z.string(), z.unknown())).min(1).optional(),
+  cells: z.array(z.record(z.string(), z.unknown())).min(1).optional(),
 }).strict();
 
 

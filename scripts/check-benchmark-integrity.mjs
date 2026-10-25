@@ -3,14 +3,19 @@
  * CI gate for Issue #18: Benchmark integrity and repository engineering policies.
  * Verifies:
  *   1. Root AGENTS.md and CLAUDE.md exist and are synchronized on all 6 core policy pillars.
- *   2. All *-measurement-receipt.json bundles in bench/results/ pass full CSV/trace/receipt reconciliation.
- *   3. All representative fixture bundles in bench/fixtures/integrity-samples/ pass validation.
- *   4. Historical benchmark result files remain intact.
+ *   2. Every artifact in bench/results/ is either in FROZEN_HISTORICAL_BENCHMARK_ARTIFACTS or bound
+ *      to a valid *-measurement-receipt.json bundle (no unreceipted benchmark results can evade CI).
+ *   3. All *-measurement-receipt.json bundles pass full CSV, summary, and machine-readable
+ *      source_trace_ref existence, cell identity, provenance, and telemetry reconciliation.
+ *   4. All representative fixture bundles in bench/fixtures/integrity-samples/ pass validation.
  */
-import { readFile, readdir, access } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validateBenchmarkIntegrityBundle } from '../dist/benchmark-integrity.js';
+import {
+  auditBenchmarkResultsDirectory,
+  validateBenchmarkIntegrityBundle,
+} from '../dist/benchmark-integrity.js';
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -23,14 +28,6 @@ const REQUIRED_POLICY_SECTIONS = [
   '### 1.6 Secrets, Sanitization & Provenance',
   '## 2. Mandatory Machine-Readable Outputs for Every Benchmark Run',
   '## 3. Cost Control & CI Verification Gates',
-];
-
-const HISTORICAL_RESULT_ARTIFACTS = [
-  'bench/results/2026-10-18-amd-ryzen-ai-9-hx-370-x64.json',
-  'bench/results/2026-10-18-lifecycle-and-orchestration.json',
-  'bench/results/2026-10-18-mcp-session-reuse.json',
-  'bench/results/2026-10-18-real-workload-evaluation.json',
-  'bench/results/2026-10-24-multi-model-evaluation.json',
 ];
 
 let failures = 0;
@@ -67,57 +64,26 @@ if (failures === 0) {
   pass('AGENTS.md and CLAUDE.md present and synchronized across all 8 required policy sections');
 }
 
-// 2. Check historical result files exist and were not deleted
-for (const relPath of HISTORICAL_RESULT_ARTIFACTS) {
-  try {
-    await access(join(rootDir, relPath));
-  } catch {
-    fail(`Historical benchmark artifact missing: ${relPath}`);
+// 2. Audit bench/results/ directory (frozen historical files + receipted bundles + untracked file rejection)
+const dirAudit = await auditBenchmarkResultsDirectory(rootDir);
+if (!dirAudit.valid) {
+  for (const v of dirAudit.violations) {
+    fail(`bench/results audit (${v.code}): ${v.message}`);
   }
-}
-if (failures === 0) {
-  pass(`All ${HISTORICAL_RESULT_ARTIFACTS.length} historical benchmark result artifacts preserved`);
-}
-
-// 3. Validate all *-measurement-receipt.json bundles in bench/results/
-const resultsDir = join(rootDir, 'bench', 'results');
-const resultFiles = await readdir(resultsDir);
-const receiptFiles = resultFiles.filter((f) => f.endsWith('-measurement-receipt.json'));
-
-if (receiptFiles.length === 0) {
-  fail('No *-measurement-receipt.json files found in bench/results/');
+} else {
+  pass(
+    `bench/results directory audit passed: ${dirAudit.historicalFilesVerified.length} frozen historical artifacts preserved, ${dirAudit.receiptsValidated.length} receipt bundle(s) fully reconciled with machine-readable source traces, 0 unreceipted artifacts`,
+  );
 }
 
-for (const receiptFile of receiptFiles) {
-  const receiptPath = join(resultsDir, receiptFile);
-  const receipt = JSON.parse(await readFile(receiptPath, 'utf8'));
-  const cellsCsv = await readFile(join(rootDir, receipt.cellsCsvRef), 'utf8');
-  const summaryCsv = await readFile(join(rootDir, receipt.summaryCsvRef), 'utf8');
-  const sourceTraceText = await readFile(join(rootDir, receipt.sourceTraceRef), 'utf8');
-
-  const res = validateBenchmarkIntegrityBundle({
-    cellsCsv,
-    summaryCsv,
-    sourceTraceText,
-    receipt,
-  });
-
-  if (!res.valid) {
-    for (const v of res.violations) {
-      fail(`${receiptFile} (${v.code}): ${v.message}`);
-    }
-  } else {
-    pass(`${receiptFile}: ${res.checkedCellsCount} cells and ${res.checkedSummaryRowsCount} summary rows reconciled`);
-  }
-}
-
-// 4. Validate representative fixture bundles in bench/fixtures/integrity-samples/
+// 3. Validate representative fixture bundles in bench/fixtures/integrity-samples/
 const sampleDir = join(rootDir, 'bench', 'fixtures', 'integrity-samples');
 const mixedCellsCsv = await readFile(join(sampleDir, 'failed-and-abstained-cells.csv'), 'utf8');
 const mixedSummaryCsv = await readFile(join(sampleDir, 'failed-and-abstained-summary.csv'), 'utf8');
 const mixedRes = validateBenchmarkIntegrityBundle({
   cellsCsv: mixedCellsCsv,
   summaryCsv: mixedSummaryCsv,
+  requireSourceTraceVerification: false,
 });
 if (!mixedRes.valid) {
   for (const v of mixedRes.violations) {

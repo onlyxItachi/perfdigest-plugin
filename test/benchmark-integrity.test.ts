@@ -1,12 +1,16 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import {
+  auditBenchmarkResultsDirectory,
+  BenchmarkIntegrityError,
   MANDATORY_CELL_CSV_COLUMNS,
   MANDATORY_SUMMARY_CSV_COLUMNS,
   parseCsvRecords,
   validateBenchmarkIntegrityBundle,
+  writeValidatedBenchmarkBundle,
   type BenchmarkMeasurementReceipt,
 } from '../src/benchmark-integrity.js';
 
@@ -24,7 +28,7 @@ function serializeCsv(headers: readonly string[], rows: Array<Record<string, str
 }
 
 describe('Benchmark integrity schema & negative CI gates (Issue #18)', () => {
-  it('validates the canonical 24-cell v3 reconciled benchmark bundle and receipt', async () => {
+  it('validates the canonical 24-cell v3 reconciled benchmark bundle, receipt, and machine-readable trace', async () => {
     const cellsCsv = await readFile(
       join(rootDir, 'bench/results/2026-10-25-v3-reconciled-v2-cells.csv'),
       'utf8',
@@ -34,7 +38,7 @@ describe('Benchmark integrity schema & negative CI gates (Issue #18)', () => {
       'utf8',
     );
     const sourceTraceText = await readFile(
-      join(rootDir, 'bench/results/2026-10-25-v3-timing-and-usage-audit.md'),
+      join(rootDir, 'bench/results/2026-10-25-v3-reconciled-v2-audit.json'),
       'utf8',
     );
     const receipt = JSON.parse(
@@ -66,7 +70,11 @@ describe('Benchmark integrity schema & negative CI gates (Issue #18)', () => {
       'utf8',
     );
 
-    const result = validateBenchmarkIntegrityBundle({ cellsCsv, summaryCsv });
+    const result = validateBenchmarkIntegrityBundle({
+      cellsCsv,
+      summaryCsv,
+      requireSourceTraceVerification: false,
+    });
     assert.equal(result.valid, true, `Unexpected violations: ${JSON.stringify(result.violations)}`);
     assert.equal(result.checkedCellsCount, 3);
     assert.equal(result.checkedSummaryRowsCount, 2);
@@ -85,7 +93,11 @@ describe('Benchmark integrity schema & negative CI gates (Issue #18)', () => {
     const truncatedHeaders = parsedCells.headers.filter((h) => h !== 'parallel_overlap_ms');
     const badCellsCsv = serializeCsv(truncatedHeaders, parsedCells.rows);
 
-    const res = validateBenchmarkIntegrityBundle({ cellsCsv: badCellsCsv, summaryCsv });
+    const res = validateBenchmarkIntegrityBundle({
+      cellsCsv: badCellsCsv,
+      summaryCsv,
+      requireSourceTraceVerification: false,
+    });
     assert.equal(res.valid, false);
     assert.ok(res.violations.some((v) => v.code === 'missing_csv_column'));
   });
@@ -109,6 +121,7 @@ describe('Benchmark integrity schema & negative CI gates (Issue #18)', () => {
     const res = validateBenchmarkIntegrityBundle({
       cellsCsv: serializeCsv(MANDATORY_CELL_CSV_COLUMNS, parsedCells.rows),
       summaryCsv,
+      requireSourceTraceVerification: false,
     });
     assert.equal(res.valid, false);
     assert.ok(res.violations.some((v) => v.code === 'invalid_monotonic_interval'));
@@ -134,6 +147,7 @@ describe('Benchmark integrity schema & negative CI gates (Issue #18)', () => {
     const res = validateBenchmarkIntegrityBundle({
       cellsCsv: serializeCsv(MANDATORY_CELL_CSV_COLUMNS, parsedCells.rows),
       summaryCsv,
+      requireSourceTraceVerification: false,
     });
     assert.equal(res.valid, false);
     assert.ok(res.violations.some((v) => v.code === 'cumulative_session_token_double_count'));
@@ -156,6 +170,7 @@ describe('Benchmark integrity schema & negative CI gates (Issue #18)', () => {
     const res = validateBenchmarkIntegrityBundle({
       cellsCsv: serializeCsv(MANDATORY_CELL_CSV_COLUMNS, parsedCells.rows),
       summaryCsv,
+      requireSourceTraceVerification: false,
     });
     assert.equal(res.valid, false);
     assert.ok(res.violations.some((v) => v.code === 'zero_filled_unobserved_cost'));
@@ -178,6 +193,7 @@ describe('Benchmark integrity schema & negative CI gates (Issue #18)', () => {
     const res = validateBenchmarkIntegrityBundle({
       cellsCsv: serializeCsv(MANDATORY_CELL_CSV_COLUMNS, parsedCells.rows),
       summaryCsv,
+      requireSourceTraceVerification: false,
     });
     assert.equal(res.valid, false);
     assert.ok(res.violations.some((v) => v.code === 'mock_or_offline_mislabeled_as_live_hosted'));
@@ -199,6 +215,7 @@ describe('Benchmark integrity schema & negative CI gates (Issue #18)', () => {
     const res = validateBenchmarkIntegrityBundle({
       cellsCsv: serializeCsv(MANDATORY_CELL_CSV_COLUMNS, parsedCells.rows),
       summaryCsv,
+      requireSourceTraceVerification: false,
       promptsOrInputsToScanForLeakage: ['Hint: EXPECTED_ORACLE_ANSWER=transpose_v1_coalesced'],
     });
     assert.equal(res.valid, false);
@@ -223,6 +240,7 @@ describe('Benchmark integrity schema & negative CI gates (Issue #18)', () => {
     const res = validateBenchmarkIntegrityBundle({
       cellsCsv,
       summaryCsv: serializeCsv(MANDATORY_SUMMARY_CSV_COLUMNS, parsedSummary.rows),
+      requireSourceTraceVerification: false,
     });
     assert.equal(res.valid, false);
     assert.ok(res.violations.some((v) => v.code === 'summary_dropped_failed_or_abstained_trials'));
@@ -242,8 +260,161 @@ describe('Benchmark integrity schema & negative CI gates (Issue #18)', () => {
       cellsCsv,
       summaryCsv,
       sourceTraceText: 'Trace file loaded from /home/alice/secret-workspace with key sk-1234567890abcdefghij',
+      requireSourceTraceVerification: false,
     });
     assert.equal(res.valid, false);
     assert.ok(res.violations.some((v) => v.code === 'unsanitized_path_or_secret_in_artifact'));
+  });
+
+  it('rejects non-machine-readable, missing, cell-missing, identity-mismatched, or telemetry-mismatched source_trace_ref', async () => {
+    const cellsCsv = await readFile(
+      join(rootDir, 'bench/results/2026-10-25-v3-reconciled-v2-cells.csv'),
+      'utf8',
+    );
+    const summaryCsv = await readFile(
+      join(rootDir, 'bench/results/2026-10-25-v3-reconciled-v2-summary.csv'),
+      'utf8',
+    );
+    const rawAuditText = await readFile(
+      join(rootDir, 'bench/results/2026-10-25-v3-reconciled-v2-audit.json'),
+      'utf8',
+    );
+
+    // 1. Non-machine-readable markdown source_trace_ref
+    const parsedMd = parseCsvRecords(cellsCsv);
+    parsedMd.rows[0]!.source_trace_ref = 'docs/SOME_REPORT.md';
+    const resMd = validateBenchmarkIntegrityBundle({
+      cellsCsv: serializeCsv(MANDATORY_CELL_CSV_COLUMNS, parsedMd.rows),
+      summaryCsv,
+      sourceTracesByRef: {
+        'bench/results/2026-10-25-v3-reconciled-v2-audit.json': rawAuditText,
+        'docs/SOME_REPORT.md': '# Not a machine-readable trace',
+      },
+      requireSourceTraceVerification: true,
+    });
+    assert.equal(resMd.valid, false);
+    assert.ok(resMd.violations.some((v) => v.code === 'invalid_source_trace_format'));
+
+    // 2. Nonexistent JSON source_trace_ref
+    const parsedMissing = parseCsvRecords(cellsCsv);
+    parsedMissing.rows[0]!.source_trace_ref = 'bench/results/nonexistent-trace.json';
+    const resMissing = validateBenchmarkIntegrityBundle({
+      cellsCsv: serializeCsv(MANDATORY_CELL_CSV_COLUMNS, parsedMissing.rows),
+      summaryCsv,
+      sourceTracesByRef: {
+        'bench/results/2026-10-25-v3-reconciled-v2-audit.json': rawAuditText,
+        'bench/results/nonexistent-trace.json': null,
+      },
+      requireSourceTraceVerification: true,
+    });
+    assert.equal(resMissing.valid, false);
+    assert.ok(resMissing.violations.some((v) => v.code === 'missing_or_unreadable_source_trace'));
+
+    // 3. Cell missing from machine-readable trace
+    const auditMissingCell = JSON.parse(rawAuditText) as {
+      reconciledCells: Array<Record<string, unknown>>;
+    };
+    auditMissingCell.reconciledCells.shift();
+    const resCellMissing = validateBenchmarkIntegrityBundle({
+      cellsCsv,
+      summaryCsv,
+      sourceTracesByRef: {
+        'bench/results/2026-10-25-v3-reconciled-v2-audit.json': JSON.stringify(auditMissingCell),
+      },
+      requireSourceTraceVerification: true,
+    });
+    assert.equal(resCellMissing.valid, false);
+    assert.ok(resCellMissing.violations.some((v) => v.code === 'source_trace_cell_missing'));
+
+    // 4. Cell identity, telemetry, provenance, and event monotonicity mismatches in trace
+    const auditCorrupted = JSON.parse(rawAuditText) as {
+      reconciledCells: Array<Record<string, unknown>>;
+    };
+    auditCorrupted.reconciledCells[0]!.status = 'failed'; // identity mismatch vs 'complete'
+    auditCorrupted.reconciledCells[1]!.e2e_wall_ms = 999999; // telemetry mismatch
+    auditCorrupted.reconciledCells[2]!.provenance_count = 99; // provenance mismatch
+    auditCorrupted.reconciledCells[2]!.events = [
+      { event: 'run.started', elapsedMs: 50 },
+      { event: 'evidence.ready', elapsedMs: 10 }, // non-monotonic!
+    ];
+    const resCorrupted = validateBenchmarkIntegrityBundle({
+      cellsCsv,
+      summaryCsv,
+      sourceTracesByRef: {
+        'bench/results/2026-10-25-v3-reconciled-v2-audit.json': JSON.stringify(auditCorrupted),
+      },
+      requireSourceTraceVerification: true,
+    });
+    assert.equal(resCorrupted.valid, false);
+    assert.ok(resCorrupted.violations.some((v) => v.code === 'source_trace_identity_mismatch'));
+    assert.ok(resCorrupted.violations.some((v) => v.code === 'source_trace_telemetry_mismatch'));
+    assert.ok(resCorrupted.violations.some((v) => v.code === 'source_trace_provenance_mismatch'));
+  });
+
+  it('rejects unreceipted benchmark artifacts in bench/results and enforces validation at the producer boundary', async () => {
+    const tmpRoot = await mkdtemp(join(tmpdir(), 'pd-bench-audit-'));
+    try {
+      const resultsDir = join(tmpRoot, 'bench', 'results');
+      await mkdir(resultsDir, { recursive: true });
+
+      const cellsCsv = await readFile(
+        join(rootDir, 'bench/results/2026-10-25-v3-reconciled-v2-cells.csv'),
+        'utf8',
+      );
+      const summaryCsv = await readFile(
+        join(rootDir, 'bench/results/2026-10-25-v3-reconciled-v2-summary.csv'),
+        'utf8',
+      );
+      const sourceTraceContent = await readFile(
+        join(rootDir, 'bench/results/2026-10-25-v3-reconciled-v2-audit.json'),
+        'utf8',
+      );
+      const receipt = JSON.parse(
+        await readFile(
+          join(rootDir, 'bench/results/2026-10-25-v3-measurement-receipt.json'),
+          'utf8',
+        ),
+      ) as BenchmarkMeasurementReceipt;
+      delete receipt.auxiliaryArtifactRefs;
+
+      // 1. Producer boundary refuses to write if trace is missing/corrupted
+      const badTrace = JSON.stringify({ cells: [] });
+      await assert.rejects(
+        () =>
+          writeValidatedBenchmarkBundle({
+            rootDir: tmpRoot,
+            receiptRelPath: 'bench/results/2026-10-25-v3-measurement-receipt.json',
+            cellsCsv,
+            summaryCsv,
+            sourceTraceContent: badTrace,
+            receipt,
+          }),
+        (err: unknown) => err instanceof BenchmarkIntegrityError,
+      );
+
+      // 2. Producer boundary writes valid bundle cleanly
+      await writeValidatedBenchmarkBundle({
+        rootDir: tmpRoot,
+        receiptRelPath: 'bench/results/2026-10-25-v3-measurement-receipt.json',
+        cellsCsv,
+        summaryCsv,
+        sourceTraceContent,
+        receipt,
+      });
+
+      const cleanAudit = await auditBenchmarkResultsDirectory(tmpRoot, 'bench/results', []);
+      assert.equal(cleanAudit.valid, true, `Unexpected violations: ${JSON.stringify(cleanAudit.violations)}`);
+
+      // 3. Dropping an unreceipted CSV or JSON into bench/results fails auditBenchmarkResultsDirectory
+      await writeFile(join(resultsDir, '2026-10-26-unreceipted-cells.csv'), cellsCsv, 'utf8');
+      const rogueAudit = await auditBenchmarkResultsDirectory(tmpRoot, 'bench/results', []);
+      assert.equal(rogueAudit.valid, false);
+      assert.ok(
+        rogueAudit.violations.some((v) => v.code === 'untracked_or_receiptless_benchmark_artifact'),
+      );
+      assert.deepEqual(rogueAudit.untrackedFiles, ['bench/results/2026-10-26-unreceipted-cells.csv']);
+    } finally {
+      await rm(tmpRoot, { recursive: true, force: true });
+    }
   });
 });

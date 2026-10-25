@@ -45,6 +45,13 @@
       "type": "string",
       "minLength": 1
     },
+    "auxiliaryArtifactRefs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
     "sampleSize": {
       "type": "object",
       "properties": {
