@@ -1781,7 +1781,9 @@ async function main() {
       process.exit(1);
     }
 
-    const outPath = resolve(repo, 'bench/results/2026-10-24-multi-model-evaluation.json');
+    const outDir = resolve(repo, 'work/bench-results');
+    await mkdir(outDir, { recursive: true });
+    const outPath = resolve(outDir, `${new Date().toISOString().slice(0, 10)}-multi-model-evaluation.json`);
     await writeFile(outPath, `${JSON.stringify(doc, null, 2)}\n`);
     console.log(JSON.stringify(doc.summary, null, 2));
   } finally {

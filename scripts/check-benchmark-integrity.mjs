@@ -2,19 +2,22 @@
 /**
  * CI gate for Issue #18: Benchmark integrity and repository engineering policies.
  * Verifies:
- *   1. Root AGENTS.md and CLAUDE.md exist and are synchronized on all 6 core policy pillars.
- *   2. Every artifact in bench/results/ is either in FROZEN_HISTORICAL_BENCHMARK_ARTIFACTS or bound
- *      to a valid *-measurement-receipt.json bundle (no unreceipted benchmark results can evade CI).
- *   3. All *-measurement-receipt.json bundles pass full CSV, summary, and machine-readable
- *      source_trace_ref existence, cell identity, provenance, and telemetry reconciliation.
- *   4. All representative fixture bundles in bench/fixtures/integrity-samples/ pass validation.
+ *   1. Root AGENTS.md and CLAUDE.md exist, contain all required policy sections, and are
+ *      byte-for-byte identical after the title line.
+ *   2. Every artifact in bench/results/ is in FROZEN_HISTORICAL_BENCHMARK_ARTIFACTS with its
+ *      exact pinned SHA-256 digest (0 unreceipted or modified files).
+ *   3. The representative 3-cell bundle in bench/fixtures/integrity-samples/ passes full CSV,
+ *      summary, measurement-receipt, and machine-readable source_trace_ref verification.
+ *   4. Producer-boundary generation (writeValidatedBenchmarkBundle) and directory audit
+ *      (auditBenchmarkResultsDirectory) succeed in a scratch directory under work/bench-integrity-ci/.
  */
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, rm } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   auditBenchmarkResultsDirectory,
   validateBenchmarkIntegrityBundle,
+  writeValidatedBenchmarkBundle,
 } from '../dist/benchmark-integrity.js';
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -60,37 +63,92 @@ for (const section of REQUIRED_POLICY_SECTIONS) {
     fail(`CLAUDE.md is missing required section: "${section}"`);
   }
 }
-if (failures === 0) {
-  pass('AGENTS.md and CLAUDE.md present and synchronized across all 8 required policy sections');
+
+const agentsBody = agentsMd.split('\n').slice(1).join('\n');
+const claudeBody = claudeMd.split('\n').slice(1).join('\n');
+if (agentsBody !== claudeBody) {
+  fail('AGENTS.md and CLAUDE.md diverge after the title line');
 }
 
-// 2. Audit bench/results/ directory (frozen historical files + receipted bundles + untracked file rejection)
-const dirAudit = await auditBenchmarkResultsDirectory(rootDir);
+if (failures === 0) {
+  pass('AGENTS.md and CLAUDE.md present and byte-for-byte synchronized across all 8 required policy sections');
+}
+
+// 2. Audit bench/results/ directory (frozen historical files + SHA-256 pinning + zero new committed results)
+const dirAudit = await auditBenchmarkResultsDirectory(
+  rootDir,
+  'bench/results',
+  undefined,
+  undefined,
+  { allowReceiptedBundles: false },
+);
 if (!dirAudit.valid) {
   for (const v of dirAudit.violations) {
     fail(`bench/results audit (${v.code}): ${v.message}`);
   }
 } else {
   pass(
-    `bench/results directory audit passed: ${dirAudit.historicalFilesVerified.length} frozen historical artifacts preserved, ${dirAudit.receiptsValidated.length} receipt bundle(s) fully reconciled with machine-readable source traces, 0 unreceipted artifacts`,
+    `bench/results directory audit passed: ${dirAudit.historicalFilesVerified.length} frozen historical artifacts SHA-256 verified, 0 unreceipted artifacts`,
   );
 }
 
-// 3. Validate representative fixture bundles in bench/fixtures/integrity-samples/
+// 3. Validate representative fixture bundle in bench/fixtures/integrity-samples/ with full trace + receipt verification
 const sampleDir = join(rootDir, 'bench', 'fixtures', 'integrity-samples');
 const mixedCellsCsv = await readFile(join(sampleDir, 'failed-and-abstained-cells.csv'), 'utf8');
 const mixedSummaryCsv = await readFile(join(sampleDir, 'failed-and-abstained-summary.csv'), 'utf8');
+const mixedTraceText = await readFile(join(sampleDir, 'failed-and-abstained-trace.json'), 'utf8');
+const mixedReceipt = JSON.parse(
+  await readFile(join(sampleDir, 'failed-and-abstained-measurement-receipt.json'), 'utf8'),
+);
+
 const mixedRes = validateBenchmarkIntegrityBundle({
   cellsCsv: mixedCellsCsv,
   summaryCsv: mixedSummaryCsv,
-  requireSourceTraceVerification: false,
+  sourceTraceText: mixedTraceText,
+  receipt: mixedReceipt,
+  requireSourceTraceVerification: true,
 });
 if (!mixedRes.valid) {
   for (const v of mixedRes.violations) {
     fail(`failed-and-abstained fixture (${v.code}): ${v.message}`);
   }
 } else {
-  pass(`failed-and-abstained fixture: ${mixedRes.checkedCellsCount} cells (complete + abstained + failed) reconciled`);
+  pass(
+    `failed-and-abstained fixture: ${mixedRes.checkedCellsCount} cells (complete + abstained + failed) reconciled with source trace and measurement receipt`,
+  );
+}
+
+// 4. Verify producer-boundary generation and directory audit in a scratch directory under work/bench-integrity-ci/
+const ciScratchRoot = join(rootDir, 'work', 'bench-integrity-ci');
+await rm(ciScratchRoot, { recursive: true, force: true });
+try {
+  await mkdir(ciScratchRoot, { recursive: true });
+  await writeValidatedBenchmarkBundle({
+    rootDir: ciScratchRoot,
+    receiptRelPath: 'bench/fixtures/integrity-samples/failed-and-abstained-measurement-receipt.json',
+    cellsCsv: mixedCellsCsv,
+    summaryCsv: mixedSummaryCsv,
+    sourceTraceContent: mixedTraceText,
+    receipt: mixedReceipt,
+  });
+  const scratchAudit = await auditBenchmarkResultsDirectory(
+    ciScratchRoot,
+    'bench/fixtures/integrity-samples',
+    [],
+    {},
+  );
+  if (!scratchAudit.valid || scratchAudit.receiptsValidated.length !== 1) {
+    for (const v of scratchAudit.violations) {
+      fail(`producer-boundary scratch audit (${v.code}): ${v.message}`);
+    }
+    if (scratchAudit.receiptsValidated.length !== 1) {
+      fail(`expected 1 validated receipt in scratch audit, got ${scratchAudit.receiptsValidated.length}`);
+    }
+  } else {
+    pass('writeValidatedBenchmarkBundle + auditBenchmarkResultsDirectory verified in work/bench-integrity-ci/');
+  }
+} finally {
+  await rm(ciScratchRoot, { recursive: true, force: true });
 }
 
 if (failures > 0) {

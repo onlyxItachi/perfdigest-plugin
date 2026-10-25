@@ -1,6 +1,6 @@
 # CLAUDE.md — Repository Engineering & Benchmark Integrity Policy
 
-This document defines **mandatory, repository-wide engineering and measurement rules** for Claude Code and all AI coding agents or contributors working in `perfdigest-plugin`. It is kept in strict parity with [`AGENTS.md`](./AGENTS.md) and enforced in code and CI (`npm run test:bench-integrity`, `node bench/validate.mjs`, `npm test`).
+This document defines **mandatory, repository-wide engineering and measurement rules** for all AI coding agents and human contributors working in `perfdigest-plugin`. It is kept byte-for-byte identical after the title line with `CLAUDE.md` and enforced in code and CI (`npm run test:bench-integrity`, `node bench/validate.mjs`, `npm test`).
 
 The scientific question in this repository is **whether a workflow works**, not how to produce favorable benchmark scores. Negative findings, regressions, unsupported runtimes, abstentions, and incomplete measurements are valid engineering results—never reasons to alter baselines, prompts, or grading rubrics.
 
@@ -20,7 +20,7 @@ Every benchmark, evaluation, or performance measurement run **must** pin and rep
 - **Never** silently change models, efforts, prompts, timeouts, or budgets mid-experiment to rescue an outcome.
 
 ### 1.2 Fair Baselines & Access Parity
-- **Native tool autonomy**: `raw` agents retain their full authorized native file, search, and shell tool discovery and investigation capabilities (`Read`, `Bash`, `Glob`, `Grep`, `read_file`, `run_command`, etc.). Never disable native tools (`--tools ""`) in an agentic evaluation to make MCP or Evidence appear stronger.
+- **Native tool autonomy**: `raw` agents retain their full authorized native file, search, and shell tool discovery and investigation capabilities (`Read`, `Bash`, `Glob`, `Grep`, `read_file`, `run_command`, `list_dir`, `grep_search`, etc.). Never disable native tools (`--tools ""`) in an agentic evaluation to make MCP or Evidence appear stronger.
 - **Task & rubric parity**: `raw`, `mcp_digest`, and `evidence` arms must receive comparable task descriptions, identical workspace safety boundaries, and the exact same `grading_rubric_id` and `total_checks`.
 - **Zero oracle or answer leakage**: Never inject answer keys, oracle-selected report IDs, pre-verified root causes, or privileged grader thresholds into agent prompts or worker inputs.
 
@@ -29,6 +29,7 @@ Every benchmark, evaluation, or performance measurement run **must** pin and rep
   - `contract_fixture`: deterministic unit/protocol test with mocked or synthetic inputs.
   - `mock_loopback`: local HTTP loopback server simulating a decision endpoint.
   - `offline_simulation`: deterministic manifest-order selection (`--routing offline`).
+  - `local_daemon`: locally hosted model/router daemon process.
   - `live_hosted`: genuine authenticated request to a hosted provider (e.g., Cloudflare Workers AI Clef or OpenAI Decisions).
   - `agentic_e2e`: genuine coding-agent CLI/SDK execution in an isolated study workspace.
 - **Never** label a `mock_loopback` or `offline_simulation` run as `live_hosted`, and **never** present an arithmetic sum of independently prefetched sequential stages as observed concurrent E2E execution.
@@ -38,12 +39,18 @@ Every benchmark, evaluation, or performance measurement run **must** pin and rep
 - **Never** suppress failed or slow cells, drop failed attempts from aggregate summaries, silently repair grading outputs, or state causal performance explanations without event-level trace proof.
 
 ### 1.5 Immutable History & Versioned Reconciliation
-- Preserve all published and historical benchmark artifacts, CSVs, schemas, and raw observations unchanged (`bench/results/2026-10-18-*`, `bench/results/2026-10-24-*`, `bench/results/2026-10-25-gemini-iterative-eval*`).
+- Preserve all 5 committed historical benchmark artifacts in `bench/results/` unchanged and verified by SHA-256 digest (`FROZEN_HISTORICAL_BENCHMARK_ARTIFACTS_SHA256`):
+  - `bench/results/2026-10-18-amd-ryzen-ai-9-hx-370-x64.json` (`6260002be9b4e59af599067acf33dd1c4a9d3d263e7dae83650cb3b2eacfb5fb`)
+  - `bench/results/2026-10-18-lifecycle-and-orchestration.json` (`b3750be508572e42a0fb2d481571be35401e77b12e7d38dbfbe20f6e241389ef`)
+  - `bench/results/2026-10-18-mcp-session-reuse.json` (`55f81aa7c3f1244404586ff45ebf762d2c79f017d6051d7d9d6e7d7c18c63ce1`)
+  - `bench/results/2026-10-18-real-workload-evaluation.json` (`f83be9f8b58be5c9dbba6b2c092a7cd74749f6088a8e10f9adab4aae3d439980`)
+  - `bench/results/2026-10-24-multi-model-evaluation.json` (`4dd8331acd567bbdbc233cd7b0a2c39dc79bc27cf4f337c0c486e693bf6d71ec`)
+- New evaluation CSVs (`*-cells.csv`, `*-summary.csv`), machine-readable source traces (`*.json` / `*.jsonl`), and measurement receipts (`*-measurement-receipt.json`) are generated into local/CI artifact directories (such as `work/bench-results/`) and validated via `writeValidatedBenchmarkBundle` + `auditBenchmarkResultsDirectory` without committing ad-hoc experimental runs to Git.
 - Version every new runner, schema, result bundle, and post-hoc correction.
 - Any corrected interpretation (such as reconciling cumulative session trajectory token reporting) must be written to a new versioned artifact that explicitly links to `reconciledFromSourceArtifact` and documents the mathematical reconciliation.
 
 ### 1.6 Secrets, Sanitization & Provenance
-- Never write API keys, tokens, credentials, or sensitive local paths (`/home/<user>`, `/tmp/perfdigest-...`) into committed logs, CSVs, or JSON traces; sanitize local paths to `<WORKSPACE>`, `<HOME>`, `<TMP>` and redact secrets to `[REDACTED]`.
+- Never write API keys, tokens, credentials, or sensitive local paths (`/home/<user>`, `/Users/<user>`, `/var/folders/...`, `C:\Users\<user>`, `/tmp/perfdigest-...`) into committed logs, CSVs, receipts, or JSON traces; sanitize local paths to `<WORKSPACE>`, `<HOME>`, `<TMP>` and redact secrets to `[REDACTED]`.
 - Preserve SHA-256 provenance hashes, byte sizes, exit codes, and sanitized tool argument/result previews.
 - Never weaken report immutability checks (pre/post SHA-256 verification) or independent workload verification.
 
@@ -52,9 +59,9 @@ Every benchmark, evaluation, or performance measurement run **must** pin and rep
 ## 2. Mandatory Machine-Readable Outputs for Every Benchmark Run
 
 Every comparative benchmark or measurement run must produce:
-1. **Per-Cell CSV (`*-cells.csv`)** and **Aggregate Summary CSV (`*-summary.csv`)** with explicit units (`ms`, `tokens`, `usd`, `pct`, `bytes`).
-2. **Source-Linked Machine-Readable Trace (`*.json` / `*.jsonl`)** containing ordered monotonic (`monotonicMs`) and UTC (`utcIso`) events.
-3. **Measurement Receipt (`*-measurement-receipt.json`)** stating experiment scope, sample size, exact efforts, access parity, limitations, observed outcomes, and artifact links.
+1. **Per-Cell CSV (`*-cells.csv`, 72 columns)** and **Aggregate Summary CSV (`*-summary.csv`, 30 columns)** with explicit units (`ms`, `tokens`, `usd`, `pct`, `bytes`).
+2. **Source-Linked Machine-Readable Trace (`*.json` / `*.jsonl`)** containing cell identity, telemetry, provenance, and ordered monotonic (`elapsedMs` / `monotonicMs`) and UTC (`utcIso`) events.
+3. **Measurement Receipt (`*-measurement-receipt.json`)** stating experiment scope, sample size breakdown, exact models and efforts, arms, access parity, limitations, and same-directory artifact links.
 
 ### Required Per-Cell Telemetry Fields
 - **Identity & Validity**: `run_id`, `cell_id`, `study_id`, `arm`, `model_id`, `effort`, `runner_version`, `git_sha`, `workload_sha256`, `provider`, `provider_execution_mode`, `agent_execution_mode`, `native_tools_enabled`, `attempt`, `retries`, `status` (`complete` | `failed` | `timed_out` | `abstained` | `invalid_incomplete`), `failure_or_invalid_reason`, `grading_rubric_id`, `checks_passed`, `total_checks`, `accuracy_pct`, `verification_status`.

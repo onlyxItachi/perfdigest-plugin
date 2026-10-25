@@ -411,8 +411,9 @@ if (summaryFile) {
       process.exit(1);
     }
 
-    await mkdir(resolve(repo, 'bench/results'), { recursive: true });
-    const outPath = resolve(repo, 'bench/results/2026-10-18-mcp-session-reuse.json');
+    const outDir = resolve(repo, 'work/bench-results');
+    await mkdir(outDir, { recursive: true });
+    const outPath = resolve(outDir, `${new Date().toISOString().slice(0, 10)}-mcp-session-reuse.json`);
     await writeFile(outPath, `${JSON.stringify(output, null, 2)}\n`);
     console.log(JSON.stringify(output, null, 2));
   } finally {
