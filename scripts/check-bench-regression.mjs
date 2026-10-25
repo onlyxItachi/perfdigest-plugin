@@ -71,13 +71,25 @@ const server = createServer((req, res) => {
   req.on('data', (chunk) => { body += chunk.toString(); });
   req.on('end', () => {
     const parsed = JSON.parse(body);
+    const stateObj = parsed?.state ? JSON.parse(parsed.state) : {};
+    const stepNum = stateObj?.step ?? 1;
     const criteria = parsed?.questions?.next_evidence?.criteria ?? {};
-    const keys = Object.keys(criteria);
+    const keys = Object.keys(criteria).sort();
+    let chosen = targetChoice;
+    if (!keys.includes(chosen)) {
+      if (stepNum === 2) {
+        chosen = keys.find((k) => k.startsWith('list_kernels:')) ?? keys.find((k) => k.startsWith('expand:')) ?? keys[0];
+      } else if (stepNum === 3) {
+        chosen = keys.find((k) => k.startsWith('compare_units:')) ?? keys.find((k) => k.startsWith('compare_reports:')) ?? keys.find((k) => k.startsWith('expand:')) ?? (keys.includes('stop_sufficient') ? 'stop_sufficient' : keys[0]);
+      } else {
+        chosen = keys.includes('stop_sufficient') ? 'stop_sufficient' : keys[0];
+      }
+    }
     const confidence = 0.88;
-    const otherKeys = keys.filter((k) => k !== targetChoice);
+    const otherKeys = keys.filter((k) => k !== chosen);
     const probs = {};
     let allocated = confidence;
-    probs[targetChoice] = confidence;
+    probs[chosen] = confidence;
     otherKeys.forEach((k, idx) => {
       if (idx === otherKeys.length - 1) {
         probs[k] = Number((1 - allocated).toFixed(4));
@@ -94,7 +106,7 @@ const server = createServer((req, res) => {
       answers: {
         next_evidence: {
           type: 'choice',
-          choice: targetChoice,
+          choice: chosen,
           confidence,
           probabilities: probs,
         },
@@ -248,11 +260,14 @@ try {
         }
       }
 
-      // Assert Go vs Node/TS parity on provenance, decisionOutcome, and selected digest
+      // Assert Go vs Node/TS parity on provenance, decisionOutcome, selected digest, and iterative extractions
       assert.deepEqual(goResult.provenance, nodeResult.provenance, `${study.id}: Go vs Node provenance mismatch`);
       assert.equal(goResult.decisionOutcome, nodeResult.decisionOutcome, `${study.id}: Go vs Node decisionOutcome mismatch`);
       assert.equal(goResult.evidence.decision.selectedId, nodeResult.evidence.decision.selectedId, `${study.id}: Go vs Node selectedId mismatch`);
       assert.deepEqual(goResult.evidence.evidence[0].digest, nodeResult.evidence.evidence[0].digest, `${study.id}: Go vs Node selected digest mismatch`);
+      assert.ok(Array.isArray(goResult.evidence.extractions) && goResult.evidence.extractions.length >= 2, `${study.id}: expected >=2 iterative MCP extractions`);
+      assert.deepEqual(goResult.evidence.extractions, nodeResult.evidence.extractions, `${study.id}: Go vs Node iterative extractions mismatch`);
+      assert.equal(goResult.evidence.steps?.length, nodeResult.evidence.steps?.length, `${study.id}: Go vs Node iterative steps length mismatch`);
 
       studySummaries.push({
         studyId: study.id,
@@ -260,6 +275,8 @@ try {
         totalRawBytes: study.reports.reduce((acc, r) => acc + r.bytes, 0),
         selectedReportId: goResult.evidence.decision.selectedId,
         topUnitName: goResult.evidence.evidence[0].digest.units[0].name,
+        iterativeSteps: goResult.evidence.steps?.length ?? 1,
+        extractionsCount: goResult.evidence.extractions?.length ?? 0,
         goWallMs,
         nodeWallMs,
       });

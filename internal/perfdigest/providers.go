@@ -442,14 +442,30 @@ type DecisionProvider interface {
 	Select(ctx context.Context, issue string, reports []ReportSpec, evidence []CollectedEvidence) (RouteDecision, error)
 }
 
+type IterativeDecisionProvider interface {
+	DecisionProvider
+	CanDecideAction() bool
+	DecideAction(ctx context.Context, stateJson string, actions []CandidateMcpAction, evidenceCount int) (RouteDecision, error)
+}
+
 type funcProvider struct {
-	name string
-	fn   func(ctx context.Context, issue string, reports []ReportSpec, evidence []CollectedEvidence) (RouteDecision, error)
+	name       string
+	fn         func(ctx context.Context, issue string, reports []ReportSpec, evidence []CollectedEvidence) (RouteDecision, error)
+	actionFn   func(ctx context.Context, stateJson string, actions []CandidateMcpAction, evidenceCount int) (RouteDecision, error)
 }
 
 func (p *funcProvider) Name() string { return p.name }
 func (p *funcProvider) Select(ctx context.Context, issue string, reports []ReportSpec, evidence []CollectedEvidence) (RouteDecision, error) {
 	return p.fn(ctx, issue, reports, evidence)
+}
+func (p *funcProvider) CanDecideAction() bool {
+	return p.actionFn != nil
+}
+func (p *funcProvider) DecideAction(ctx context.Context, stateJson string, actions []CandidateMcpAction, evidenceCount int) (RouteDecision, error) {
+	if p.actionFn == nil {
+		return RouteDecision{}, NewDecisionsError(ErrUnexpected, nil)
+	}
+	return p.actionFn(ctx, stateJson, actions, evidenceCount)
 }
 
 func NewMockDecisionProvider(name string, fn func(ctx context.Context, issue string, reports []ReportSpec, evidence []CollectedEvidence) (RouteDecision, error)) DecisionProvider {
@@ -524,6 +540,9 @@ func CreateDecisionProvider(mode string, opts DecisionProviderOptions) (Decision
 			fn: func(ctx context.Context, issue string, reports []ReportSpec, evidence []CollectedEvidence) (RouteDecision, error) {
 				return selectOpenAIReport(ctx, opts.DecisionsMockURL, issue, reports, evidence)
 			},
+			actionFn: func(ctx context.Context, stateJson string, actions []CandidateMcpAction, evidenceCount int) (RouteDecision, error) {
+				return selectOpenAIAction(ctx, opts.DecisionsMockURL, stateJson, actions, evidenceCount)
+			},
 		}, nil
 	}
 
@@ -554,6 +573,148 @@ func CreateDecisionProvider(mode string, opts DecisionProviderOptions) (Decision
 		headers["Authorization"] = "Bearer " + token
 	}
 
+	querySystemOne := func(ctx context.Context, inputStr string, questions []DecisionQuestion) (map[string]any, error) {
+		wrapErr := func(err error) error {
+			if de, ok := err.(*DecisionsError); ok {
+				if de.Provider != "" {
+					return de
+				}
+				if ctx != nil && ctx.Err() != nil {
+					return NewProviderError(name, ErrCancelled, nil)
+				}
+				return NewProviderError(name, de.Kind, de.HttpStatus)
+			}
+			if ctx != nil && ctx.Err() != nil {
+				return NewProviderError(name, ErrCancelled, nil)
+			}
+			return NewProviderError(name, ErrUnexpected, nil)
+		}
+
+		if ctx != nil && ctx.Err() != nil {
+			return nil, NewProviderError(name, ErrCancelled, nil)
+		}
+		reqModel := DefaultCloudflareModel
+		if cfModel != nil {
+			reqModel = cfModel.RequestModel
+		}
+		sysReq, err := ToSystemOne(inputStr, questions, reqModel)
+		if err != nil {
+			return nil, wrapErr(err)
+		}
+		reqBytes, err := json.Marshal(sysReq)
+		if err != nil {
+			return nil, NewProviderError(name, ErrSchema, nil)
+		}
+
+		timeout := 30 * time.Second
+		if name == "local" {
+			timeout = 120 * time.Second
+		}
+		reqCtx, cancel := context.WithTimeout(ctxOrBg(ctx), timeout)
+		defer cancel()
+
+		req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, endpoint, bytes.NewReader(reqBytes))
+		if err != nil {
+			return nil, NewProviderError(name, ErrNetwork, nil)
+		}
+		for hk, hv := range headers {
+			req.Header.Set(hk, hv)
+		}
+		client := &http.Client{
+			CheckRedirect: func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			if ctx != nil && ctx.Err() != nil {
+				return nil, NewProviderError(name, ErrCancelled, nil)
+			}
+			return nil, NewProviderError(name, ErrNetwork, nil)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+			return nil, NewProviderError(name, ErrNetwork, nil)
+		}
+
+		bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 128_001))
+		if err != nil {
+			if ctx != nil && ctx.Err() != nil {
+				return nil, NewProviderError(name, ErrCancelled, nil)
+			}
+			return nil, NewProviderError(name, ErrNetwork, nil)
+		}
+		if len(bodyBytes) > 128_000 {
+			return nil, NewProviderError(name, ErrSchema, nil)
+		}
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			code := 0
+			if name == "cloudflare" {
+				var errEnv struct {
+					Errors []struct {
+						Code int `json:"code"`
+					} `json:"errors"`
+				}
+				if json.Unmarshal(bodyBytes, &errEnv) == nil {
+					for _, e := range errEnv.Errors {
+						if e.Code == 3036 || e.Code == 5035 {
+							code = e.Code
+							break
+						}
+					}
+				}
+			}
+			return nil, classifySystemOneHttpFailure(name, resp.StatusCode, code)
+		}
+
+		var raw any
+		if err := json.Unmarshal(bodyBytes, &raw); err != nil {
+			return nil, NewProviderError(name, ErrSchema, nil)
+		}
+		if name == "cloudflare" {
+			envMap, ok := raw.(map[string]any)
+			if !ok || envMap == nil {
+				return nil, NewProviderError(name, ErrSchema, nil)
+			}
+			succ, ok := envMap["success"].(bool)
+			if !ok {
+				return nil, NewProviderError(name, ErrSchema, nil)
+			}
+			if !succ {
+				st := resp.StatusCode
+				return nil, NewProviderError(name, ErrService, &st)
+			}
+			raw = envMap["result"]
+		}
+
+		normalized, err := NormalizeSystemOne(raw, questions)
+		if err != nil {
+			return nil, wrapErr(err)
+		}
+		normModel, _ := normalized["model"].(string)
+		allowedIdentities := []string{"clef-flash", "@cf/cloudflare/clef-flash"}
+		if cfModel != nil {
+			allowedIdentities = cfModel.Identities
+		}
+		if !slices.Contains(allowedIdentities, normModel) {
+			return nil, NewProviderError(name, ErrSchema, nil)
+		}
+		return normalized, nil
+	}
+
+	source := "clef_local"
+	transport := "loopback_http"
+	reqModelID := ""
+	if name == "cloudflare" {
+		source = "clef_cloudflare"
+		transport = "cloudflare_https"
+		if cfModel != nil {
+			reqModelID = cfModel.ID
+		}
+	}
+
 	return &funcProvider{
 		name: name,
 		fn: func(ctx context.Context, issue string, reports []ReportSpec, evidence []CollectedEvidence) (RouteDecision, error) {
@@ -573,7 +734,6 @@ func CreateDecisionProvider(mode string, opts DecisionProviderOptions) (Decision
 				}
 				return NewProviderError(name, ErrUnexpected, nil)
 			}
-
 			if ctx != nil && ctx.Err() != nil {
 				return RouteDecision{}, NewProviderError(name, ErrCancelled, nil)
 			}
@@ -582,131 +742,62 @@ func CreateDecisionProvider(mode string, opts DecisionProviderOptions) (Decision
 				return RouteDecision{}, wrapErr(err)
 			}
 			questions := []DecisionQuestion{RoutingQuestion(reports)}
-			reqModel := DefaultCloudflareModel
-			if cfModel != nil {
-				reqModel = cfModel.RequestModel
-			}
-			sysReq, err := ToSystemOne(inputStr, questions, reqModel)
+			normalized, err := querySystemOne(ctx, inputStr, questions)
 			if err != nil {
 				return RouteDecision{}, wrapErr(err)
-			}
-			reqBytes, err := json.Marshal(sysReq)
-			if err != nil {
-				return RouteDecision{}, NewProviderError(name, ErrSchema, nil)
-			}
-
-			timeout := 30 * time.Second
-			if name == "local" {
-				timeout = 120 * time.Second
-			}
-			reqCtx, cancel := context.WithTimeout(ctxOrBg(ctx), timeout)
-			defer cancel()
-
-			req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, endpoint, bytes.NewReader(reqBytes))
-			if err != nil {
-				return RouteDecision{}, NewProviderError(name, ErrNetwork, nil)
-			}
-			for hk, hv := range headers {
-				req.Header.Set(hk, hv)
-			}
-			client := &http.Client{
-				CheckRedirect: func(*http.Request, []*http.Request) error {
-					return http.ErrUseLastResponse
-				},
-			}
-			resp, err := client.Do(req)
-			if err != nil {
-				if ctx != nil && ctx.Err() != nil {
-					return RouteDecision{}, NewProviderError(name, ErrCancelled, nil)
-				}
-				return RouteDecision{}, NewProviderError(name, ErrNetwork, nil)
-			}
-			defer resp.Body.Close()
-
-			if resp.StatusCode >= 300 && resp.StatusCode < 400 {
-				return RouteDecision{}, NewProviderError(name, ErrNetwork, nil)
-			}
-
-			bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 128_001))
-			if err != nil {
-				if ctx != nil && ctx.Err() != nil {
-					return RouteDecision{}, NewProviderError(name, ErrCancelled, nil)
-				}
-				return RouteDecision{}, NewProviderError(name, ErrNetwork, nil)
-			}
-			if len(bodyBytes) > 128_000 {
-				return RouteDecision{}, NewProviderError(name, ErrSchema, nil)
-			}
-
-			if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-				code := 0
-				if name == "cloudflare" {
-					var errEnv struct {
-						Errors []struct {
-							Code int `json:"code"`
-						} `json:"errors"`
-					}
-					if json.Unmarshal(bodyBytes, &errEnv) == nil {
-						for _, e := range errEnv.Errors {
-							if e.Code == 3036 || e.Code == 5035 {
-								code = e.Code
-								break
-							}
-						}
-					}
-				}
-				return RouteDecision{}, classifySystemOneHttpFailure(name, resp.StatusCode, code)
-			}
-
-			var raw any
-			if err := json.Unmarshal(bodyBytes, &raw); err != nil {
-				return RouteDecision{}, NewProviderError(name, ErrSchema, nil)
-			}
-			if name == "cloudflare" {
-				envMap, ok := raw.(map[string]any)
-				if !ok || envMap == nil {
-					return RouteDecision{}, NewProviderError(name, ErrSchema, nil)
-				}
-				succ, ok := envMap["success"].(bool)
-				if !ok {
-					return RouteDecision{}, NewProviderError(name, ErrSchema, nil)
-				}
-				if !succ {
-					st := resp.StatusCode
-					return RouteDecision{}, NewProviderError(name, ErrService, &st)
-				}
-				raw = envMap["result"]
-			}
-
-			normalized, err := NormalizeSystemOne(raw, questions)
-			if err != nil {
-				return RouteDecision{}, wrapErr(err)
-			}
-			normModel, _ := normalized["model"].(string)
-			allowedIdentities := []string{"clef-flash", "@cf/cloudflare/clef-flash"}
-			if cfModel != nil {
-				allowedIdentities = cfModel.Identities
-			}
-			if !slices.Contains(allowedIdentities, normModel) {
-				return RouteDecision{}, NewProviderError(name, ErrSchema, nil)
-			}
-
-			source := "clef_local"
-			transport := "loopback_http"
-			reqModelID := ""
-			if name == "cloudflare" {
-				source = "clef_cloudflare"
-				transport = "cloudflare_https"
-				if cfModel != nil {
-					reqModelID = cfModel.ID
-				}
 			}
 			sum := sha256.Sum256([]byte(inputStr))
 			inputSha := hex.EncodeToString(sum[:])
 			evCount := len(evidence)
 			latencyMs := math.Round(float64(time.Since(start).Microseconds()) / 1000.0)
-
 			dec, err := RouteDecisionFromResponse(normalized, reports, RouteDecision{
+				Source:              source,
+				Provider:            name,
+				RequestedModel:      reqModelID,
+				ConfidenceSemantics: "systemone_uniform_zero",
+				Transport:           transport,
+				InputSha256:         inputSha,
+				EvidenceCount:       &evCount,
+				LatencyMs:           latencyMs,
+			})
+			if err != nil {
+				return RouteDecision{}, wrapErr(err)
+			}
+			return dec, nil
+		},
+		actionFn: func(ctx context.Context, stateJson string, actions []CandidateMcpAction, evidenceCount int) (RouteDecision, error) {
+			start := time.Now()
+			wrapErr := func(err error) error {
+				if de, ok := err.(*DecisionsError); ok {
+					if de.Provider != "" {
+						return de
+					}
+					if ctx != nil && ctx.Err() != nil {
+						return NewProviderError(name, ErrCancelled, nil)
+					}
+					return NewProviderError(name, de.Kind, de.HttpStatus)
+				}
+				if ctx != nil && ctx.Err() != nil {
+					return NewProviderError(name, ErrCancelled, nil)
+				}
+				return NewProviderError(name, ErrUnexpected, nil)
+			}
+			if ctx != nil && ctx.Err() != nil {
+				return RouteDecision{}, NewProviderError(name, ErrCancelled, nil)
+			}
+			q, err := IterativeActionQuestion(actions)
+			if err != nil {
+				return RouteDecision{}, wrapErr(err)
+			}
+			normalized, err := querySystemOne(ctx, stateJson, []DecisionQuestion{q})
+			if err != nil {
+				return RouteDecision{}, wrapErr(err)
+			}
+			sum := sha256.Sum256([]byte(stateJson))
+			inputSha := hex.EncodeToString(sum[:])
+			evCount := evidenceCount
+			latencyMs := math.Round(float64(time.Since(start).Microseconds()) / 1000.0)
+			dec, err := RouteActionDecisionFromResponse(normalized, actions, RouteDecision{
 				Source:              source,
 				Provider:            name,
 				RequestedModel:      reqModelID,

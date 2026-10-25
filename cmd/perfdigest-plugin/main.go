@@ -21,13 +21,16 @@ import (
 const helpText = `PerfDigest Evidence — Codex-first MVP
 
   perfdigest-plugin init [--provider cloudflare|local|openai|offline --yes] [--env-file PATH] [--endpoint URL] [--decision-model clef-flash|clef|clef-omni] [--check-connection]
-  perfdigest-plugin demo [--agent none|codex|generic] [--agent-command PATH] [--agent-sessions] [--routing offline|decisions] [--decision-model NAME] [--perf]
-  perfdigest-plugin run manifest.json [--workspace PATH] [--routing decisions|offline] [--agent codex|none|generic] [--agent-command PATH] [--agent-sessions] [--decision-model NAME]
+  perfdigest-plugin demo [--agent none|codex|generic] [--agent-command PATH] [--agent-sessions] [--agent-in-execution-async] [--agent-delivery auto|in_execution|single_turn|two_turn] [--strict-delivery-mode] [--routing offline|decisions] [--decision-model NAME] [--perf]
+  perfdigest-plugin run manifest.json [--workspace PATH] [--routing decisions|offline] [--agent codex|none|generic] [--agent-command PATH] [--agent-sessions] [--agent-in-execution-async] [--agent-delivery auto|in_execution|single_turn|two_turn] [--strict-delivery-mode] [--decision-model NAME]
   perfdigest-plugin mcp [--workspace PATH]
 
 Unconfigured demo defaults: real local CPU measurements + verification, offline routing, no model calls.
 Unconfigured run defaults: existing Codex ChatGPT login + live Decisions (PERFDIGEST_DECISIONS_API_KEY).
 Use --agent codex to demonstrate overlap with a real Codex session, or --agent generic --agent-command PATH for a JSONL CLI agent.
+--agent-delivery selects auto, in_execution, single_turn (evidence-first single turn), or two_turn (default concurrent analysis + review).
+--agent-in-execution-async opts a generic CLI agent into the perfdigest-agent/v1 in-execution async evidence streaming protocol.
+--strict-delivery-mode fails closed if in_execution delivery is requested on an adapter without inExecutionAsyncInput support.
 --perf adds Linux hardware counters; otherwise the demo uses genuine elapsed-time traces.
 Raw reports, command receipts and timeline are saved under .perfdigest/runs/.
 --provider cloudflare|local|openai|offline explicitly selects inference; --routing keeps legacy aliases.
@@ -36,13 +39,15 @@ init --check-connection opts in to one read-only Cloudflare check; inference and
 `
 
 type cliFlags struct {
-	help                 bool
-	workspace            *string
-	agent                *string
-	agentCommand         *string
-	agentSessions        *bool
-	agentDelivery        *string
-	routing              *string
+	help                  bool
+	workspace             *string
+	agent                 *string
+	agentCommand          *string
+	agentSessions         *bool
+	agentInExecutionAsync *bool
+	agentDelivery         *string
+	strictDeliveryMode    bool
+	routing               *string
 	provider             *string
 	model                *string
 	perf                 bool
@@ -78,18 +83,20 @@ func parseCLIArgs(args []string) (cliFlags, error) {
 		warmup:    0,
 	}
 	boolFlags := map[string]bool{
-		"--help":                  true,
-		"-h":                      true,
-		"--agent-sessions":        true,
-		"--perf":                  true,
-		"--yes":                   true,
-		"--check-connection":      true,
-		"--include-corroborating": true,
-		"--compact-evidence":      true,
-		"--serve-jsonl":           true,
-		"--bench-investigate":     true,
-		"--zero-cost-mcp":         true,
-		"--live-mcp":              true,
+		"--help":                     true,
+		"-h":                         true,
+		"--agent-sessions":           true,
+		"--agent-in-execution-async": true,
+		"--strict-delivery-mode":     true,
+		"--perf":                     true,
+		"--yes":                      true,
+		"--check-connection":         true,
+		"--include-corroborating":    true,
+		"--compact-evidence":         true,
+		"--serve-jsonl":              true,
+		"--bench-investigate":        true,
+		"--zero-cost-mcp":            true,
+		"--live-mcp":                 true,
 	}
 	stringFlags := map[string]bool{
 		"--workspace":          true,
@@ -142,6 +149,10 @@ func parseCLIArgs(args []string) (cliFlags, error) {
 				f.help = val
 			case "--agent-sessions":
 				f.agentSessions = &val
+			case "--agent-in-execution-async":
+				f.agentInExecutionAsync = &val
+			case "--strict-delivery-mode":
+				f.strictDeliveryMode = val
 			case "--perf":
 				f.perf = val
 			case "--yes":
@@ -761,8 +772,8 @@ func runCLI() error {
 	if agent != "none" && agent != "codex" && agent != "generic" {
 		return errors.New("--agent must be none, codex or generic")
 	}
-	if agent != "generic" && (f.agentCommand != nil || f.agentSessions != nil) {
-		return errors.New("--agent-command and --agent-sessions require --agent generic")
+	if agent != "generic" && (f.agentCommand != nil || f.agentSessions != nil || f.agentInExecutionAsync != nil) {
+		return errors.New("--agent-command, --agent-sessions and --agent-in-execution-async require --agent generic")
 	}
 	if agent == "generic" && (f.agentCommand == nil || *f.agentCommand == "") {
 		return errors.New("--agent generic requires --agent-command PATH")
@@ -771,9 +782,11 @@ func runCLI() error {
 	var agentAdapter perfdigest.AgentAdapter
 	if agent == "generic" {
 		sessions := f.agentSessions != nil && *f.agentSessions
+		inExecAsync := f.agentInExecutionAsync != nil && *f.agentInExecutionAsync
 		agentAdapter, err = perfdigest.GenericCliAdapter(perfdigest.GenericCliAgentOptions{
-			Command:  *f.agentCommand,
-			Sessions: sessions,
+			Command:          *f.agentCommand,
+			Sessions:         sessions,
+			InExecutionAsync: inExecAsync,
 		})
 		if err != nil {
 			return err
@@ -822,8 +835,8 @@ func runCLI() error {
 	if f.agentDelivery != nil && *f.agentDelivery != "" {
 		agentDelivery = *f.agentDelivery
 	}
-	if agentDelivery != "two_turn" && agentDelivery != "single_turn" {
-		return errors.New("--agent-delivery must be two_turn or single_turn")
+	if agentDelivery != "two_turn" && agentDelivery != "single_turn" && agentDelivery != "in_execution" && agentDelivery != "auto" {
+		return errors.New("--agent-delivery must be auto, in_execution, two_turn or single_turn")
 	}
 
 	result, err := perfdigest.Investigate(ctx, perfdigest.RunOptions{
@@ -832,6 +845,7 @@ func runCLI() error {
 		Routing:              routing,
 		Agent:                agent,
 		AgentDelivery:        agentDelivery,
+		StrictDeliveryMode:   f.strictDeliveryMode,
 		Model:                modelStr,
 		CloudflareModel:      cloudflareModel,
 		DecisionsMockURL:     decisionsMockURL,

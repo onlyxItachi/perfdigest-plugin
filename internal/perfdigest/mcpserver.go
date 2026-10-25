@@ -141,7 +141,7 @@ func mcpToolsSchema(defaultRouting string) []map[string]any {
 		},
 		{
 			"name":        "get_evidence_job",
-			"description": "Poll an evidence job. A terminal result is consumed once; jobs expire after five minutes.",
+			"description": "Poll or await an evidence job in-execution. A terminal result is consumed once; jobs expire after five minutes.",
 			"inputSchema": map[string]any{
 				"$schema": "http://json-schema.org/draft-07/schema#",
 				"type":    "object",
@@ -153,7 +153,7 @@ func mcpToolsSchema(defaultRouting string) []map[string]any {
 						"default": 0,
 						"type":    "integer",
 						"minimum": 0,
-						"maximum": 5000,
+						"maximum": 60000,
 					},
 				},
 				"required": []string{"jobId"},
@@ -404,14 +404,14 @@ func ServeMCP(ctx context.Context, workspace string, defaultRouting string, opti
 			if wRaw, exists := argsRaw["waitMs"]; exists && wRaw != nil {
 				switch v := wRaw.(type) {
 				case float64:
-					if v < 0 || v > 5000 || v != float64(int(v)) {
-						sendResult(id, mcpToolError("Invalid waitMs: must be an integer between 0 and 5000"))
+					if v < 0 || v > 60000 || v != float64(int(v)) {
+						sendResult(id, mcpToolError("Invalid waitMs: must be an integer between 0 and 60000"))
 						return
 					}
 					waitMs = int(v)
 				case int:
-					if v < 0 || v > 5000 {
-						sendResult(id, mcpToolError("Invalid waitMs: must be an integer between 0 and 5000"))
+					if v < 0 || v > 60000 {
+						sendResult(id, mcpToolError("Invalid waitMs: must be an integer between 0 and 60000"))
 						return
 					}
 					waitMs = v
@@ -433,6 +433,7 @@ func ServeMCP(ctx context.Context, workspace string, defaultRouting string, opti
 				return
 			}
 
+			waitStart := time.Now()
 			job.mu.Lock()
 			st := job.state
 			job.mu.Unlock()
@@ -445,6 +446,7 @@ func ServeMCP(ctx context.Context, workspace string, defaultRouting string, opti
 				}
 				timer.Stop()
 			}
+			waitedMs := int(time.Since(waitStart).Milliseconds())
 
 			job.mu.Lock()
 			st = job.state
@@ -457,9 +459,15 @@ func ServeMCP(ctx context.Context, workspace string, defaultRouting string, opti
 				delete(jobs, jobID)
 				jobsMu.Unlock()
 			}
+			var deliveryMode any = nil
+			if st == "complete" {
+				deliveryMode = "in_execution_tool_delivery"
+			}
 			payload := map[string]any{
-				"jobId":  jobID,
-				"status": st,
+				"jobId":        jobID,
+				"status":       st,
+				"deliveryMode": deliveryMode,
+				"waitedMs":     waitedMs,
 			}
 			if resPkt != nil {
 				payload["packet"] = resPkt

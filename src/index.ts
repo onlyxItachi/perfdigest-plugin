@@ -45,3 +45,36 @@ export {
   type BenchmarkIntegrityValidationResult,
   type BenchmarkDirectoryAuditResult,
 } from './benchmark-integrity.js';
+export { type RunTelemetry } from './run.js';
+export { buildCandidateActions, mightNeedIterativeDrillDown } from './evidence.js';
+export {
+  type McpExtractionRecord,
+  type EvidenceAcquisitionStep,
+  type PerfDigestMcpToolName,
+  type ReportSpec,
+  type AgentDeliveryMode,
+} from './config.js';
+export {
+  iterativeDecisionsInput,
+  iterativeActionQuestion,
+  routeActionDecision,
+  selectNextAction,
+  sanitizeUnitLabel,
+  type CandidateMcpAction,
+} from './decisions.js';
+export {
+  getRuntimeCapabilityProfile,
+  negotiateEvidenceDeliveryMode,
+  formatAgentEvidence,
+  type InExecutionTurnResult,
+  type KnownAgentRuntimeId,
+  type CapabilitySupportStatus,
+  type RuntimeUsageReportingSemantics,
+  type NegotiatedDeliveryPlan,
+} from './agents.js';
+export {
+  validateListKernels,
+  validateGetMetrics,
+  validateExpand,
+  validateCompareMetrics,
+} from './perfdigest.js';
