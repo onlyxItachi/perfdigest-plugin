@@ -1,0 +1,42 @@
+{
+  "schema": "perfdigest.benchmark.measurement-receipt.v1",
+  "experimentId": "2026-10-25-v3-reconciled-v2",
+  "generatedAtUtc": "2026-10-25T15:00:00.000Z",
+  "gitSha": "daf32c53ddf1e189d4fa2a5f0bfacc670bb85325",
+  "runnerVersion": "1.0.0",
+  "reconciledFromSourceArtifact": "bench/results/2026-10-25-gemini-iterative-eval.json",
+  "cellsCsvRef": "bench/results/2026-10-25-v3-reconciled-v2-cells.csv",
+  "summaryCsvRef": "bench/results/2026-10-25-v3-reconciled-v2-summary.csv",
+  "sourceTraceRef": "bench/results/2026-10-25-v3-timing-and-usage-audit.md",
+  "sampleSize": {
+    "totalCells": 24,
+    "completeCells": 24,
+    "failedCells": 0,
+    "timedOutCells": 0,
+    "abstainedCells": 0,
+    "invalidIncompleteCells": 0
+  },
+  "models": [
+    {
+      "modelId": "gemini-4-argon-high",
+      "effort": "high"
+    },
+    {
+      "modelId": "gemini-3.8-flash-high",
+      "effort": "high"
+    }
+  ],
+  "arms": [
+    "raw",
+    "mcp_digest",
+    "evidence"
+  ],
+  "baselineParityVerified": true,
+  "nativeToolsEnabledInRawBaseline": true,
+  "oracleLeakageCheckPassed": true,
+  "limitations": [
+    "agy --conversation <sessionId> reports cumulative session trajectory usage and duration in Turn 2; reconciled incremental values are derived as Turn 2 reported minus Turn 1.",
+    "In two-turn sequential continuation, the evidence worker finishes in 2.15s-5.18s while Turn 1 runs for 34.9s-90.6s, delaying evidence consumption by 29.7s-88.4s.",
+    "Neither agy CLI nor Cloudflare Workers AI returns direct USD billing in response payloads; cost fields are explicitly null with documented unavailable reasons."
+  ]
+}
