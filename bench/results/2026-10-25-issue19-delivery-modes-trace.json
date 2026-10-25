@@ -1,0 +1,1899 @@
+{
+  "schema": "perfdigest.benchmark.source-trace.v1",
+  "experimentId": "2026-10-25-issue19-delivery-modes",
+  "generatedAtUtc": "2026-10-25T19:38:00.000Z",
+  "cells": [
+    {
+      "cell_id": "generic-cli-in-execution-v1__cuda_opt_loop__raw",
+      "study_id": "cuda_opt_loop",
+      "arm": "raw",
+      "model_id": "generic-cli-in-execution-v1",
+      "status": "complete",
+      "workload_sha256": "bab57f3d2b553d3cb61c56a8e0fd0cf5d26f19512a475f769c23290437022b8b",
+      "e2e_wall_ms": 63.1,
+      "agent_input_tokens": 1420,
+      "agent_output_tokens": 210,
+      "checks_passed": 5,
+      "decision_requests": 0,
+      "provenance_count": 0,
+      "events": [
+        {
+          "seq": 1,
+          "event": "run.started",
+          "elapsedMs": 0
+        },
+        {
+          "seq": 2,
+          "event": "agent.analysis.started",
+          "elapsedMs": 0.18
+        },
+        {
+          "seq": 3,
+          "event": "agent.analysis.turn_started",
+          "elapsedMs": 59.53
+        },
+        {
+          "seq": 4,
+          "event": "agent.analysis.completed",
+          "elapsedMs": 62.72
+        },
+        {
+          "seq": 5,
+          "event": "run.completed",
+          "elapsedMs": 63.1
+        }
+      ]
+    },
+    {
+      "cell_id": "generic-cli-in-execution-v1__cuda_opt_loop__mcp_digest",
+      "study_id": "cuda_opt_loop",
+      "arm": "mcp_digest",
+      "model_id": "generic-cli-in-execution-v1",
+      "status": "complete",
+      "workload_sha256": "bab57f3d2b553d3cb61c56a8e0fd0cf5d26f19512a475f769c23290437022b8b",
+      "e2e_wall_ms": 49.57,
+      "agent_input_tokens": 920,
+      "agent_output_tokens": 175,
+      "checks_passed": 5,
+      "decision_requests": 0,
+      "provenance_count": 0,
+      "events": [
+        {
+          "seq": 1,
+          "event": "run.started",
+          "elapsedMs": 0
+        },
+        {
+          "seq": 2,
+          "event": "agent.analysis.started",
+          "elapsedMs": 0.05
+        },
+        {
+          "seq": 3,
+          "event": "agent.analysis.turn_started",
+          "elapsedMs": 45.91
+        },
+        {
+          "seq": 4,
+          "event": "agent.analysis.completed",
+          "elapsedMs": 49.37
+        },
+        {
+          "seq": 5,
+          "event": "run.completed",
+          "elapsedMs": 49.57
+        }
+      ]
+    },
+    {
+      "cell_id": "generic-cli-in-execution-v1__cuda_opt_loop__evidence",
+      "study_id": "cuda_opt_loop",
+      "arm": "evidence",
+      "model_id": "generic-cli-in-execution-v1",
+      "status": "complete",
+      "workload_sha256": "bab57f3d2b553d3cb61c56a8e0fd0cf5d26f19512a475f769c23290437022b8b",
+      "e2e_wall_ms": 103.23,
+      "agent_input_tokens": 610,
+      "agent_output_tokens": 155,
+      "checks_passed": 5,
+      "decision_requests": 1,
+      "provenance_count": 2,
+      "events": [
+        {
+          "seq": 1,
+          "event": "run.started",
+          "elapsedMs": 0.21
+        },
+        {
+          "seq": 2,
+          "event": "provider.selected",
+          "elapsedMs": 0.23,
+          "detail": "cloudflare"
+        },
+        {
+          "seq": 3,
+          "event": "evidence.delivery.negotiated",
+          "elapsedMs": 0.48,
+          "detail": "in_execution (runtime_supports_in_execution_async_input)"
+        },
+        {
+          "seq": 4,
+          "event": "evidence.prefetch.started",
+          "elapsedMs": 0.65
+        },
+        {
+          "seq": 5,
+          "event": "agent.in_execution.started",
+          "elapsedMs": 0.85
+        },
+        {
+          "seq": 6,
+          "event": "agent.analysis.started",
+          "elapsedMs": 0.85
+        },
+        {
+          "seq": 7,
+          "event": "routing.evidence.started",
+          "elapsedMs": 4.75
+        },
+        {
+          "seq": 8,
+          "event": "digest.started",
+          "elapsedMs": 5.03,
+          "detail": "primary-trace"
+        },
+        {
+          "seq": 9,
+          "event": "agent.analysis.turn_started",
+          "elapsedMs": 23.8
+        },
+        {
+          "seq": 10,
+          "event": "digest.completed",
+          "elapsedMs": 43.09,
+          "detail": "primary-trace"
+        },
+        {
+          "seq": 11,
+          "event": "digest.started",
+          "elapsedMs": 43.51,
+          "detail": "secondary-trace"
+        },
+        {
+          "seq": 12,
+          "event": "digest.completed",
+          "elapsedMs": 53.03,
+          "detail": "secondary-trace"
+        },
+        {
+          "seq": 13,
+          "event": "routing.evidence.completed",
+          "elapsedMs": 53.21,
+          "detail": "2"
+        },
+        {
+          "seq": 14,
+          "event": "routing.started",
+          "elapsedMs": 57.95
+        },
+        {
+          "seq": 15,
+          "event": "routing.completed",
+          "elapsedMs": 65.46,
+          "detail": "selected"
+        },
+        {
+          "seq": 16,
+          "event": "evidence.ready",
+          "elapsedMs": 65.66,
+          "detail": "primary-trace"
+        },
+        {
+          "seq": 17,
+          "event": "verification.started",
+          "elapsedMs": 65.76,
+          "detail": "<HOME>/.nvm/versions/node/v22.22.1/bin/node"
+        },
+        {
+          "seq": 18,
+          "event": "verification.completed",
+          "elapsedMs": 82.34,
+          "detail": "passed"
+        },
+        {
+          "seq": 19,
+          "event": "evidence.delivered",
+          "elapsedMs": 82.73,
+          "detail": "In-execution asynchronous evidence frame sent to active generic-cli stream"
+        },
+        {
+          "seq": 20,
+          "event": "evidence.accepted_by_runtime",
+          "elapsedMs": 94.59,
+          "detail": "generic-cli in-execution evidence_ack"
+        },
+        {
+          "seq": 21,
+          "event": "evidence.model_visible",
+          "elapsedMs": 97.71,
+          "detail": "generic-cli in-execution stream"
+        },
+        {
+          "seq": 22,
+          "event": "evidence.consumed",
+          "elapsedMs": 97.83,
+          "detail": "Agent consumed in-execution evidence in single execution"
+        },
+        {
+          "seq": 23,
+          "event": "agent.analysis.completed",
+          "elapsedMs": 98.01
+        },
+        {
+          "seq": 24,
+          "event": "agent.review.completed",
+          "elapsedMs": 98.01
+        },
+        {
+          "seq": 25,
+          "event": "agent.in_execution.completed",
+          "elapsedMs": 98.01
+        },
+        {
+          "seq": 26,
+          "event": "run.completed",
+          "elapsedMs": 98.35,
+          "detail": "complete"
+        }
+      ]
+    },
+    {
+      "cell_id": "generic-cli-in-execution-v1__cpp_build_loop__raw",
+      "study_id": "cpp_build_loop",
+      "arm": "raw",
+      "model_id": "generic-cli-in-execution-v1",
+      "status": "complete",
+      "workload_sha256": "4bf47b0ee8fdbdfa5e8e894b65e19cc382211d10997c503e50ec0ee434bbf67b",
+      "e2e_wall_ms": 60.97,
+      "agent_input_tokens": 1530,
+      "agent_output_tokens": 225,
+      "checks_passed": 5,
+      "decision_requests": 0,
+      "provenance_count": 0,
+      "events": [
+        {
+          "seq": 1,
+          "event": "run.started",
+          "elapsedMs": 0
+        },
+        {
+          "seq": 2,
+          "event": "agent.analysis.started",
+          "elapsedMs": 0.04
+        },
+        {
+          "seq": 3,
+          "event": "agent.analysis.turn_started",
+          "elapsedMs": 57.56
+        },
+        {
+          "seq": 4,
+          "event": "agent.analysis.completed",
+          "elapsedMs": 60.69
+        },
+        {
+          "seq": 5,
+          "event": "run.completed",
+          "elapsedMs": 60.97
+        }
+      ]
+    },
+    {
+      "cell_id": "generic-cli-in-execution-v1__cpp_build_loop__mcp_digest",
+      "study_id": "cpp_build_loop",
+      "arm": "mcp_digest",
+      "model_id": "generic-cli-in-execution-v1",
+      "status": "complete",
+      "workload_sha256": "4bf47b0ee8fdbdfa5e8e894b65e19cc382211d10997c503e50ec0ee434bbf67b",
+      "e2e_wall_ms": 48.9,
+      "agent_input_tokens": 990,
+      "agent_output_tokens": 187,
+      "checks_passed": 5,
+      "decision_requests": 0,
+      "provenance_count": 0,
+      "events": [
+        {
+          "seq": 1,
+          "event": "run.started",
+          "elapsedMs": 0
+        },
+        {
+          "seq": 2,
+          "event": "agent.analysis.started",
+          "elapsedMs": 0.07
+        },
+        {
+          "seq": 3,
+          "event": "agent.analysis.turn_started",
+          "elapsedMs": 45.95
+        },
+        {
+          "seq": 4,
+          "event": "agent.analysis.completed",
+          "elapsedMs": 48.66
+        },
+        {
+          "seq": 5,
+          "event": "run.completed",
+          "elapsedMs": 48.9
+        }
+      ]
+    },
+    {
+      "cell_id": "generic-cli-in-execution-v1__cpp_build_loop__evidence",
+      "study_id": "cpp_build_loop",
+      "arm": "evidence",
+      "model_id": "generic-cli-in-execution-v1",
+      "status": "complete",
+      "workload_sha256": "4bf47b0ee8fdbdfa5e8e894b65e19cc382211d10997c503e50ec0ee434bbf67b",
+      "e2e_wall_ms": 89.49,
+      "agent_input_tokens": 655,
+      "agent_output_tokens": 165,
+      "checks_passed": 5,
+      "decision_requests": 1,
+      "provenance_count": 2,
+      "events": [
+        {
+          "seq": 1,
+          "event": "run.started",
+          "elapsedMs": 0.03
+        },
+        {
+          "seq": 2,
+          "event": "provider.selected",
+          "elapsedMs": 0.03,
+          "detail": "cloudflare"
+        },
+        {
+          "seq": 3,
+          "event": "evidence.delivery.negotiated",
+          "elapsedMs": 0.15,
+          "detail": "in_execution (runtime_supports_in_execution_async_input)"
+        },
+        {
+          "seq": 4,
+          "event": "evidence.prefetch.started",
+          "elapsedMs": 0.38
+        },
+        {
+          "seq": 5,
+          "event": "agent.in_execution.started",
+          "elapsedMs": 0.42
+        },
+        {
+          "seq": 6,
+          "event": "agent.analysis.started",
+          "elapsedMs": 0.43
+        },
+        {
+          "seq": 7,
+          "event": "routing.evidence.started",
+          "elapsedMs": 2.85
+        },
+        {
+          "seq": 8,
+          "event": "digest.started",
+          "elapsedMs": 3.07,
+          "detail": "primary-trace"
+        },
+        {
+          "seq": 9,
+          "event": "agent.analysis.turn_started",
+          "elapsedMs": 22.44
+        },
+        {
+          "seq": 10,
+          "event": "digest.completed",
+          "elapsedMs": 34.84,
+          "detail": "primary-trace"
+        },
+        {
+          "seq": 11,
+          "event": "digest.started",
+          "elapsedMs": 35.26,
+          "detail": "secondary-trace"
+        },
+        {
+          "seq": 12,
+          "event": "digest.completed",
+          "elapsedMs": 44.44,
+          "detail": "secondary-trace"
+        },
+        {
+          "seq": 13,
+          "event": "routing.evidence.completed",
+          "elapsedMs": 44.59,
+          "detail": "2"
+        },
+        {
+          "seq": 14,
+          "event": "routing.started",
+          "elapsedMs": 48.67
+        },
+        {
+          "seq": 15,
+          "event": "routing.completed",
+          "elapsedMs": 55.34,
+          "detail": "selected"
+        },
+        {
+          "seq": 16,
+          "event": "evidence.ready",
+          "elapsedMs": 55.54,
+          "detail": "primary-trace"
+        },
+        {
+          "seq": 17,
+          "event": "verification.started",
+          "elapsedMs": 55.65,
+          "detail": "<HOME>/.nvm/versions/node/v22.22.1/bin/node"
+        },
+        {
+          "seq": 18,
+          "event": "verification.completed",
+          "elapsedMs": 71.18,
+          "detail": "passed"
+        },
+        {
+          "seq": 19,
+          "event": "evidence.delivered",
+          "elapsedMs": 71.36,
+          "detail": "In-execution asynchronous evidence frame sent to active generic-cli stream"
+        },
+        {
+          "seq": 20,
+          "event": "evidence.accepted_by_runtime",
+          "elapsedMs": 84.42,
+          "detail": "generic-cli in-execution evidence_ack"
+        },
+        {
+          "seq": 21,
+          "event": "evidence.model_visible",
+          "elapsedMs": 87.3,
+          "detail": "generic-cli in-execution stream"
+        },
+        {
+          "seq": 22,
+          "event": "evidence.consumed",
+          "elapsedMs": 87.4,
+          "detail": "Agent consumed in-execution evidence in single execution"
+        },
+        {
+          "seq": 23,
+          "event": "agent.analysis.completed",
+          "elapsedMs": 87.52
+        },
+        {
+          "seq": 24,
+          "event": "agent.review.completed",
+          "elapsedMs": 87.52
+        },
+        {
+          "seq": 25,
+          "event": "agent.in_execution.completed",
+          "elapsedMs": 87.53
+        },
+        {
+          "seq": 26,
+          "event": "run.completed",
+          "elapsedMs": 87.8,
+          "detail": "complete"
+        }
+      ]
+    },
+    {
+      "cell_id": "generic-cli-in-execution-v1__pytorch_inductor_training__raw",
+      "study_id": "pytorch_inductor_training",
+      "arm": "raw",
+      "model_id": "generic-cli-in-execution-v1",
+      "status": "complete",
+      "workload_sha256": "b8d1a2381f2c0859661682fdb9601412c7a4854e878685fb5b8b3e7a26f84086",
+      "e2e_wall_ms": 60.39,
+      "agent_input_tokens": 1640,
+      "agent_output_tokens": 240,
+      "checks_passed": 5,
+      "decision_requests": 0,
+      "provenance_count": 0,
+      "events": [
+        {
+          "seq": 1,
+          "event": "run.started",
+          "elapsedMs": 0
+        },
+        {
+          "seq": 2,
+          "event": "agent.analysis.started",
+          "elapsedMs": 0.04
+        },
+        {
+          "seq": 3,
+          "event": "agent.analysis.turn_started",
+          "elapsedMs": 57.14
+        },
+        {
+          "seq": 4,
+          "event": "agent.analysis.completed",
+          "elapsedMs": 60.24
+        },
+        {
+          "seq": 5,
+          "event": "run.completed",
+          "elapsedMs": 60.39
+        }
+      ]
+    },
+    {
+      "cell_id": "generic-cli-in-execution-v1__pytorch_inductor_training__mcp_digest",
+      "study_id": "pytorch_inductor_training",
+      "arm": "mcp_digest",
+      "model_id": "generic-cli-in-execution-v1",
+      "status": "complete",
+      "workload_sha256": "b8d1a2381f2c0859661682fdb9601412c7a4854e878685fb5b8b3e7a26f84086",
+      "e2e_wall_ms": 50.83,
+      "agent_input_tokens": 1060,
+      "agent_output_tokens": 199,
+      "checks_passed": 5,
+      "decision_requests": 0,
+      "provenance_count": 0,
+      "events": [
+        {
+          "seq": 1,
+          "event": "run.started",
+          "elapsedMs": 0
+        },
+        {
+          "seq": 2,
+          "event": "agent.analysis.started",
+          "elapsedMs": 0.04
+        },
+        {
+          "seq": 3,
+          "event": "agent.analysis.turn_started",
+          "elapsedMs": 47.82
+        },
+        {
+          "seq": 4,
+          "event": "agent.analysis.completed",
+          "elapsedMs": 50.64
+        },
+        {
+          "seq": 5,
+          "event": "run.completed",
+          "elapsedMs": 50.83
+        }
+      ]
+    },
+    {
+      "cell_id": "generic-cli-in-execution-v1__pytorch_inductor_training__evidence",
+      "study_id": "pytorch_inductor_training",
+      "arm": "evidence",
+      "model_id": "generic-cli-in-execution-v1",
+      "status": "complete",
+      "workload_sha256": "b8d1a2381f2c0859661682fdb9601412c7a4854e878685fb5b8b3e7a26f84086",
+      "e2e_wall_ms": 89.26,
+      "agent_input_tokens": 700,
+      "agent_output_tokens": 175,
+      "checks_passed": 5,
+      "decision_requests": 1,
+      "provenance_count": 2,
+      "events": [
+        {
+          "seq": 1,
+          "event": "run.started",
+          "elapsedMs": 0.03
+        },
+        {
+          "seq": 2,
+          "event": "provider.selected",
+          "elapsedMs": 0.03,
+          "detail": "cloudflare"
+        },
+        {
+          "seq": 3,
+          "event": "evidence.delivery.negotiated",
+          "elapsedMs": 0.17,
+          "detail": "in_execution (runtime_supports_in_execution_async_input)"
+        },
+        {
+          "seq": 4,
+          "event": "evidence.prefetch.started",
+          "elapsedMs": 0.3
+        },
+        {
+          "seq": 5,
+          "event": "agent.in_execution.started",
+          "elapsedMs": 0.33
+        },
+        {
+          "seq": 6,
+          "event": "agent.analysis.started",
+          "elapsedMs": 0.33
+        },
+        {
+          "seq": 7,
+          "event": "routing.evidence.started",
+          "elapsedMs": 2.25
+        },
+        {
+          "seq": 8,
+          "event": "digest.started",
+          "elapsedMs": 2.4,
+          "detail": "primary-trace"
+        },
+        {
+          "seq": 9,
+          "event": "agent.analysis.turn_started",
+          "elapsedMs": 21.97
+        },
+        {
+          "seq": 10,
+          "event": "digest.completed",
+          "elapsedMs": 33.63,
+          "detail": "primary-trace"
+        },
+        {
+          "seq": 11,
+          "event": "digest.started",
+          "elapsedMs": 33.93,
+          "detail": "secondary-trace"
+        },
+        {
+          "seq": 12,
+          "event": "digest.completed",
+          "elapsedMs": 43.62,
+          "detail": "secondary-trace"
+        },
+        {
+          "seq": 13,
+          "event": "routing.evidence.completed",
+          "elapsedMs": 43.77,
+          "detail": "2"
+        },
+        {
+          "seq": 14,
+          "event": "routing.started",
+          "elapsedMs": 48.55
+        },
+        {
+          "seq": 15,
+          "event": "routing.completed",
+          "elapsedMs": 55.09,
+          "detail": "selected"
+        },
+        {
+          "seq": 16,
+          "event": "evidence.ready",
+          "elapsedMs": 55.27,
+          "detail": "primary-trace"
+        },
+        {
+          "seq": 17,
+          "event": "verification.started",
+          "elapsedMs": 55.35,
+          "detail": "<HOME>/.nvm/versions/node/v22.22.1/bin/node"
+        },
+        {
+          "seq": 18,
+          "event": "verification.completed",
+          "elapsedMs": 71.15,
+          "detail": "passed"
+        },
+        {
+          "seq": 19,
+          "event": "evidence.delivered",
+          "elapsedMs": 71.31,
+          "detail": "In-execution asynchronous evidence frame sent to active generic-cli stream"
+        },
+        {
+          "seq": 20,
+          "event": "evidence.accepted_by_runtime",
+          "elapsedMs": 84,
+          "detail": "generic-cli in-execution evidence_ack"
+        },
+        {
+          "seq": 21,
+          "event": "evidence.model_visible",
+          "elapsedMs": 86.95,
+          "detail": "generic-cli in-execution stream"
+        },
+        {
+          "seq": 22,
+          "event": "evidence.consumed",
+          "elapsedMs": 87.05,
+          "detail": "Agent consumed in-execution evidence in single execution"
+        },
+        {
+          "seq": 23,
+          "event": "agent.analysis.completed",
+          "elapsedMs": 87.17
+        },
+        {
+          "seq": 24,
+          "event": "agent.review.completed",
+          "elapsedMs": 87.17
+        },
+        {
+          "seq": 25,
+          "event": "agent.in_execution.completed",
+          "elapsedMs": 87.17
+        },
+        {
+          "seq": 26,
+          "event": "run.completed",
+          "elapsedMs": 87.49,
+          "detail": "complete"
+        }
+      ]
+    },
+    {
+      "cell_id": "generic-cli-in-execution-v1__linux_perf_cpu__raw",
+      "study_id": "linux_perf_cpu",
+      "arm": "raw",
+      "model_id": "generic-cli-in-execution-v1",
+      "status": "complete",
+      "workload_sha256": "3003c74662b23e1196b06c9f326fbe1262d8d0ac81d82e109806e1b32cefd596",
+      "e2e_wall_ms": 60.1,
+      "agent_input_tokens": 1750,
+      "agent_output_tokens": 255,
+      "checks_passed": 5,
+      "decision_requests": 0,
+      "provenance_count": 0,
+      "events": [
+        {
+          "seq": 1,
+          "event": "run.started",
+          "elapsedMs": 0
+        },
+        {
+          "seq": 2,
+          "event": "agent.analysis.started",
+          "elapsedMs": 0.04
+        },
+        {
+          "seq": 3,
+          "event": "agent.analysis.turn_started",
+          "elapsedMs": 56.68
+        },
+        {
+          "seq": 4,
+          "event": "agent.analysis.completed",
+          "elapsedMs": 59.89
+        },
+        {
+          "seq": 5,
+          "event": "run.completed",
+          "elapsedMs": 60.1
+        }
+      ]
+    },
+    {
+      "cell_id": "generic-cli-in-execution-v1__linux_perf_cpu__mcp_digest",
+      "study_id": "linux_perf_cpu",
+      "arm": "mcp_digest",
+      "model_id": "generic-cli-in-execution-v1",
+      "status": "complete",
+      "workload_sha256": "3003c74662b23e1196b06c9f326fbe1262d8d0ac81d82e109806e1b32cefd596",
+      "e2e_wall_ms": 48.99,
+      "agent_input_tokens": 1130,
+      "agent_output_tokens": 211,
+      "checks_passed": 5,
+      "decision_requests": 0,
+      "provenance_count": 0,
+      "events": [
+        {
+          "seq": 1,
+          "event": "run.started",
+          "elapsedMs": 0
+        },
+        {
+          "seq": 2,
+          "event": "agent.analysis.started",
+          "elapsedMs": 0.06
+        },
+        {
+          "seq": 3,
+          "event": "agent.analysis.turn_started",
+          "elapsedMs": 46.13
+        },
+        {
+          "seq": 4,
+          "event": "agent.analysis.completed",
+          "elapsedMs": 48.84
+        },
+        {
+          "seq": 5,
+          "event": "run.completed",
+          "elapsedMs": 48.99
+        }
+      ]
+    },
+    {
+      "cell_id": "generic-cli-in-execution-v1__linux_perf_cpu__evidence",
+      "study_id": "linux_perf_cpu",
+      "arm": "evidence",
+      "model_id": "generic-cli-in-execution-v1",
+      "status": "complete",
+      "workload_sha256": "3003c74662b23e1196b06c9f326fbe1262d8d0ac81d82e109806e1b32cefd596",
+      "e2e_wall_ms": 84.62,
+      "agent_input_tokens": 745,
+      "agent_output_tokens": 185,
+      "checks_passed": 5,
+      "decision_requests": 1,
+      "provenance_count": 2,
+      "events": [
+        {
+          "seq": 1,
+          "event": "run.started",
+          "elapsedMs": 0.02
+        },
+        {
+          "seq": 2,
+          "event": "provider.selected",
+          "elapsedMs": 0.03,
+          "detail": "cloudflare"
+        },
+        {
+          "seq": 3,
+          "event": "evidence.delivery.negotiated",
+          "elapsedMs": 0.11,
+          "detail": "in_execution (runtime_supports_in_execution_async_input)"
+        },
+        {
+          "seq": 4,
+          "event": "evidence.prefetch.started",
+          "elapsedMs": 0.21
+        },
+        {
+          "seq": 5,
+          "event": "agent.in_execution.started",
+          "elapsedMs": 0.23
+        },
+        {
+          "seq": 6,
+          "event": "agent.analysis.started",
+          "elapsedMs": 0.23
+        },
+        {
+          "seq": 7,
+          "event": "routing.evidence.started",
+          "elapsedMs": 1.8
+        },
+        {
+          "seq": 8,
+          "event": "digest.started",
+          "elapsedMs": 1.97,
+          "detail": "primary-trace"
+        },
+        {
+          "seq": 9,
+          "event": "agent.analysis.turn_started",
+          "elapsedMs": 21.59
+        },
+        {
+          "seq": 10,
+          "event": "digest.completed",
+          "elapsedMs": 30.9,
+          "detail": "primary-trace"
+        },
+        {
+          "seq": 11,
+          "event": "digest.started",
+          "elapsedMs": 31.24,
+          "detail": "secondary-trace"
+        },
+        {
+          "seq": 12,
+          "event": "digest.completed",
+          "elapsedMs": 40.3,
+          "detail": "secondary-trace"
+        },
+        {
+          "seq": 13,
+          "event": "routing.evidence.completed",
+          "elapsedMs": 40.5,
+          "detail": "2"
+        },
+        {
+          "seq": 14,
+          "event": "routing.started",
+          "elapsedMs": 43.44
+        },
+        {
+          "seq": 15,
+          "event": "routing.completed",
+          "elapsedMs": 49.98,
+          "detail": "selected"
+        },
+        {
+          "seq": 16,
+          "event": "evidence.ready",
+          "elapsedMs": 50.15,
+          "detail": "primary-trace"
+        },
+        {
+          "seq": 17,
+          "event": "verification.started",
+          "elapsedMs": 50.26,
+          "detail": "<HOME>/.nvm/versions/node/v22.22.1/bin/node"
+        },
+        {
+          "seq": 18,
+          "event": "verification.completed",
+          "elapsedMs": 66.02,
+          "detail": "passed"
+        },
+        {
+          "seq": 19,
+          "event": "evidence.delivered",
+          "elapsedMs": 66.17,
+          "detail": "In-execution asynchronous evidence frame sent to active generic-cli stream"
+        },
+        {
+          "seq": 20,
+          "event": "evidence.accepted_by_runtime",
+          "elapsedMs": 79.16,
+          "detail": "generic-cli in-execution evidence_ack"
+        },
+        {
+          "seq": 21,
+          "event": "evidence.model_visible",
+          "elapsedMs": 82.53,
+          "detail": "generic-cli in-execution stream"
+        },
+        {
+          "seq": 22,
+          "event": "evidence.consumed",
+          "elapsedMs": 82.66,
+          "detail": "Agent consumed in-execution evidence in single execution"
+        },
+        {
+          "seq": 23,
+          "event": "agent.analysis.completed",
+          "elapsedMs": 82.79
+        },
+        {
+          "seq": 24,
+          "event": "agent.review.completed",
+          "elapsedMs": 82.79
+        },
+        {
+          "seq": 25,
+          "event": "agent.in_execution.completed",
+          "elapsedMs": 82.79
+        },
+        {
+          "seq": 26,
+          "event": "run.completed",
+          "elapsedMs": 82.99,
+          "detail": "complete"
+        }
+      ]
+    },
+    {
+      "cell_id": "generic-cli-single-turn-fallback-v1__cuda_opt_loop__raw",
+      "study_id": "cuda_opt_loop",
+      "arm": "raw",
+      "model_id": "generic-cli-single-turn-fallback-v1",
+      "status": "complete",
+      "workload_sha256": "bab57f3d2b553d3cb61c56a8e0fd0cf5d26f19512a475f769c23290437022b8b",
+      "e2e_wall_ms": 60.24,
+      "agent_input_tokens": 1420,
+      "agent_output_tokens": 210,
+      "checks_passed": 5,
+      "decision_requests": 0,
+      "provenance_count": 0,
+      "events": [
+        {
+          "seq": 1,
+          "event": "run.started",
+          "elapsedMs": 0
+        },
+        {
+          "seq": 2,
+          "event": "agent.analysis.started",
+          "elapsedMs": 0.07
+        },
+        {
+          "seq": 3,
+          "event": "agent.analysis.turn_started",
+          "elapsedMs": 56.53
+        },
+        {
+          "seq": 4,
+          "event": "agent.analysis.completed",
+          "elapsedMs": 59.8
+        },
+        {
+          "seq": 5,
+          "event": "run.completed",
+          "elapsedMs": 60.24
+        }
+      ]
+    },
+    {
+      "cell_id": "generic-cli-single-turn-fallback-v1__cuda_opt_loop__mcp_digest",
+      "study_id": "cuda_opt_loop",
+      "arm": "mcp_digest",
+      "model_id": "generic-cli-single-turn-fallback-v1",
+      "status": "complete",
+      "workload_sha256": "bab57f3d2b553d3cb61c56a8e0fd0cf5d26f19512a475f769c23290437022b8b",
+      "e2e_wall_ms": 49.41,
+      "agent_input_tokens": 920,
+      "agent_output_tokens": 175,
+      "checks_passed": 5,
+      "decision_requests": 0,
+      "provenance_count": 0,
+      "events": [
+        {
+          "seq": 1,
+          "event": "run.started",
+          "elapsedMs": 0
+        },
+        {
+          "seq": 2,
+          "event": "agent.analysis.started",
+          "elapsedMs": 0.04
+        },
+        {
+          "seq": 3,
+          "event": "agent.analysis.turn_started",
+          "elapsedMs": 46.21
+        },
+        {
+          "seq": 4,
+          "event": "agent.analysis.completed",
+          "elapsedMs": 49.21
+        },
+        {
+          "seq": 5,
+          "event": "run.completed",
+          "elapsedMs": 49.41
+        }
+      ]
+    },
+    {
+      "cell_id": "generic-cli-single-turn-fallback-v1__cuda_opt_loop__evidence",
+      "study_id": "cuda_opt_loop",
+      "arm": "evidence",
+      "model_id": "generic-cli-single-turn-fallback-v1",
+      "status": "complete",
+      "workload_sha256": "bab57f3d2b553d3cb61c56a8e0fd0cf5d26f19512a475f769c23290437022b8b",
+      "e2e_wall_ms": 96.32,
+      "agent_input_tokens": 760,
+      "agent_output_tokens": 170,
+      "checks_passed": 5,
+      "decision_requests": 1,
+      "provenance_count": 2,
+      "events": [
+        {
+          "seq": 1,
+          "event": "run.started",
+          "elapsedMs": 0.05
+        },
+        {
+          "seq": 2,
+          "event": "provider.selected",
+          "elapsedMs": 0.06,
+          "detail": "cloudflare"
+        },
+        {
+          "seq": 3,
+          "event": "evidence.delivery.negotiated",
+          "elapsedMs": 0.21,
+          "detail": "single_turn (runtime_lacks_in_execution_async_input_selected_single_turn_fallback)"
+        },
+        {
+          "seq": 4,
+          "event": "evidence.prefetch.started",
+          "elapsedMs": 0.34
+        },
+        {
+          "seq": 5,
+          "event": "routing.evidence.started",
+          "elapsedMs": 0.68
+        },
+        {
+          "seq": 6,
+          "event": "digest.started",
+          "elapsedMs": 0.83,
+          "detail": "primary-trace"
+        },
+        {
+          "seq": 7,
+          "event": "digest.completed",
+          "elapsedMs": 26.68,
+          "detail": "primary-trace"
+        },
+        {
+          "seq": 8,
+          "event": "digest.started",
+          "elapsedMs": 27.09,
+          "detail": "secondary-trace"
+        },
+        {
+          "seq": 9,
+          "event": "digest.completed",
+          "elapsedMs": 36.33,
+          "detail": "secondary-trace"
+        },
+        {
+          "seq": 10,
+          "event": "routing.evidence.completed",
+          "elapsedMs": 36.44,
+          "detail": "2"
+        },
+        {
+          "seq": 11,
+          "event": "routing.started",
+          "elapsedMs": 39.25
+        },
+        {
+          "seq": 12,
+          "event": "routing.completed",
+          "elapsedMs": 45.9,
+          "detail": "selected"
+        },
+        {
+          "seq": 13,
+          "event": "evidence.ready",
+          "elapsedMs": 46,
+          "detail": "primary-trace"
+        },
+        {
+          "seq": 14,
+          "event": "verification.started",
+          "elapsedMs": 46.08,
+          "detail": "<HOME>/.nvm/versions/node/v22.22.1/bin/node"
+        },
+        {
+          "seq": 15,
+          "event": "verification.completed",
+          "elapsedMs": 59.28,
+          "detail": "passed"
+        },
+        {
+          "seq": 16,
+          "event": "evidence.delivered",
+          "elapsedMs": 59.4,
+          "detail": "Single-turn evidence-first delivery to generic-cli after local verification"
+        },
+        {
+          "seq": 17,
+          "event": "evidence.accepted_by_runtime",
+          "elapsedMs": 59.46,
+          "detail": "generic-cli single_turn prompt"
+        },
+        {
+          "seq": 18,
+          "event": "evidence.model_visible",
+          "elapsedMs": 59.51,
+          "detail": "generic-cli single_turn prompt"
+        },
+        {
+          "seq": 19,
+          "event": "agent.review.started",
+          "elapsedMs": 59.56
+        },
+        {
+          "seq": 20,
+          "event": "agent.review.turn_started",
+          "elapsedMs": 92.82
+        },
+        {
+          "seq": 21,
+          "event": "agent.review.completed",
+          "elapsedMs": 94.16
+        },
+        {
+          "seq": 22,
+          "event": "evidence.consumed",
+          "elapsedMs": 94.32,
+          "detail": "generic-cli single_turn review completed"
+        },
+        {
+          "seq": 23,
+          "event": "run.completed",
+          "elapsedMs": 94.59,
+          "detail": "complete"
+        }
+      ]
+    },
+    {
+      "cell_id": "generic-cli-single-turn-fallback-v1__cpp_build_loop__raw",
+      "study_id": "cpp_build_loop",
+      "arm": "raw",
+      "model_id": "generic-cli-single-turn-fallback-v1",
+      "status": "complete",
+      "workload_sha256": "4bf47b0ee8fdbdfa5e8e894b65e19cc382211d10997c503e50ec0ee434bbf67b",
+      "e2e_wall_ms": 58.24,
+      "agent_input_tokens": 1530,
+      "agent_output_tokens": 225,
+      "checks_passed": 5,
+      "decision_requests": 0,
+      "provenance_count": 0,
+      "events": [
+        {
+          "seq": 1,
+          "event": "run.started",
+          "elapsedMs": 0
+        },
+        {
+          "seq": 2,
+          "event": "agent.analysis.started",
+          "elapsedMs": 0.02
+        },
+        {
+          "seq": 3,
+          "event": "agent.analysis.turn_started",
+          "elapsedMs": 55.3
+        },
+        {
+          "seq": 4,
+          "event": "agent.analysis.completed",
+          "elapsedMs": 57.95
+        },
+        {
+          "seq": 5,
+          "event": "run.completed",
+          "elapsedMs": 58.24
+        }
+      ]
+    },
+    {
+      "cell_id": "generic-cli-single-turn-fallback-v1__cpp_build_loop__mcp_digest",
+      "study_id": "cpp_build_loop",
+      "arm": "mcp_digest",
+      "model_id": "generic-cli-single-turn-fallback-v1",
+      "status": "complete",
+      "workload_sha256": "4bf47b0ee8fdbdfa5e8e894b65e19cc382211d10997c503e50ec0ee434bbf67b",
+      "e2e_wall_ms": 45.24,
+      "agent_input_tokens": 990,
+      "agent_output_tokens": 187,
+      "checks_passed": 5,
+      "decision_requests": 0,
+      "provenance_count": 0,
+      "events": [
+        {
+          "seq": 1,
+          "event": "run.started",
+          "elapsedMs": 0
+        },
+        {
+          "seq": 2,
+          "event": "agent.analysis.started",
+          "elapsedMs": 0.05
+        },
+        {
+          "seq": 3,
+          "event": "agent.analysis.turn_started",
+          "elapsedMs": 42
+        },
+        {
+          "seq": 4,
+          "event": "agent.analysis.completed",
+          "elapsedMs": 44.99
+        },
+        {
+          "seq": 5,
+          "event": "run.completed",
+          "elapsedMs": 45.24
+        }
+      ]
+    },
+    {
+      "cell_id": "generic-cli-single-turn-fallback-v1__cpp_build_loop__evidence",
+      "study_id": "cpp_build_loop",
+      "arm": "evidence",
+      "model_id": "generic-cli-single-turn-fallback-v1",
+      "status": "complete",
+      "workload_sha256": "4bf47b0ee8fdbdfa5e8e894b65e19cc382211d10997c503e50ec0ee434bbf67b",
+      "e2e_wall_ms": 113.63,
+      "agent_input_tokens": 805,
+      "agent_output_tokens": 180,
+      "checks_passed": 5,
+      "decision_requests": 1,
+      "provenance_count": 2,
+      "events": [
+        {
+          "seq": 1,
+          "event": "run.started",
+          "elapsedMs": 0.02
+        },
+        {
+          "seq": 2,
+          "event": "provider.selected",
+          "elapsedMs": 0.02,
+          "detail": "cloudflare"
+        },
+        {
+          "seq": 3,
+          "event": "evidence.delivery.negotiated",
+          "elapsedMs": 0.11,
+          "detail": "single_turn (runtime_lacks_in_execution_async_input_selected_single_turn_fallback)"
+        },
+        {
+          "seq": 4,
+          "event": "evidence.prefetch.started",
+          "elapsedMs": 0.19
+        },
+        {
+          "seq": 5,
+          "event": "routing.evidence.started",
+          "elapsedMs": 0.53
+        },
+        {
+          "seq": 6,
+          "event": "digest.started",
+          "elapsedMs": 0.69,
+          "detail": "primary-trace"
+        },
+        {
+          "seq": 7,
+          "event": "digest.completed",
+          "elapsedMs": 31.44,
+          "detail": "primary-trace"
+        },
+        {
+          "seq": 8,
+          "event": "digest.started",
+          "elapsedMs": 32.03,
+          "detail": "secondary-trace"
+        },
+        {
+          "seq": 9,
+          "event": "digest.completed",
+          "elapsedMs": 41.08,
+          "detail": "secondary-trace"
+        },
+        {
+          "seq": 10,
+          "event": "routing.evidence.completed",
+          "elapsedMs": 41.17,
+          "detail": "2"
+        },
+        {
+          "seq": 11,
+          "event": "routing.started",
+          "elapsedMs": 46.12
+        },
+        {
+          "seq": 12,
+          "event": "routing.completed",
+          "elapsedMs": 52.91,
+          "detail": "selected"
+        },
+        {
+          "seq": 13,
+          "event": "evidence.ready",
+          "elapsedMs": 53.18,
+          "detail": "primary-trace"
+        },
+        {
+          "seq": 14,
+          "event": "verification.started",
+          "elapsedMs": 53.37,
+          "detail": "<HOME>/.nvm/versions/node/v22.22.1/bin/node"
+        },
+        {
+          "seq": 15,
+          "event": "verification.completed",
+          "elapsedMs": 69.35,
+          "detail": "passed"
+        },
+        {
+          "seq": 16,
+          "event": "evidence.delivered",
+          "elapsedMs": 69.57,
+          "detail": "Single-turn evidence-first delivery to generic-cli after local verification"
+        },
+        {
+          "seq": 17,
+          "event": "evidence.accepted_by_runtime",
+          "elapsedMs": 69.7,
+          "detail": "generic-cli single_turn prompt"
+        },
+        {
+          "seq": 18,
+          "event": "evidence.model_visible",
+          "elapsedMs": 69.76,
+          "detail": "generic-cli single_turn prompt"
+        },
+        {
+          "seq": 19,
+          "event": "agent.review.started",
+          "elapsedMs": 69.81
+        },
+        {
+          "seq": 20,
+          "event": "agent.review.turn_started",
+          "elapsedMs": 109.55
+        },
+        {
+          "seq": 21,
+          "event": "agent.review.completed",
+          "elapsedMs": 111.8
+        },
+        {
+          "seq": 22,
+          "event": "evidence.consumed",
+          "elapsedMs": 111.97,
+          "detail": "generic-cli single_turn review completed"
+        },
+        {
+          "seq": 23,
+          "event": "run.completed",
+          "elapsedMs": 112.16,
+          "detail": "complete"
+        }
+      ]
+    },
+    {
+      "cell_id": "generic-cli-single-turn-fallback-v1__pytorch_inductor_training__raw",
+      "study_id": "pytorch_inductor_training",
+      "arm": "raw",
+      "model_id": "generic-cli-single-turn-fallback-v1",
+      "status": "complete",
+      "workload_sha256": "b8d1a2381f2c0859661682fdb9601412c7a4854e878685fb5b8b3e7a26f84086",
+      "e2e_wall_ms": 53.36,
+      "agent_input_tokens": 1640,
+      "agent_output_tokens": 240,
+      "checks_passed": 5,
+      "decision_requests": 0,
+      "provenance_count": 0,
+      "events": [
+        {
+          "seq": 1,
+          "event": "run.started",
+          "elapsedMs": 0
+        },
+        {
+          "seq": 2,
+          "event": "agent.analysis.started",
+          "elapsedMs": 0.02
+        },
+        {
+          "seq": 3,
+          "event": "agent.analysis.turn_started",
+          "elapsedMs": 50.61
+        },
+        {
+          "seq": 4,
+          "event": "agent.analysis.completed",
+          "elapsedMs": 53.23
+        },
+        {
+          "seq": 5,
+          "event": "run.completed",
+          "elapsedMs": 53.36
+        }
+      ]
+    },
+    {
+      "cell_id": "generic-cli-single-turn-fallback-v1__pytorch_inductor_training__mcp_digest",
+      "study_id": "pytorch_inductor_training",
+      "arm": "mcp_digest",
+      "model_id": "generic-cli-single-turn-fallback-v1",
+      "status": "complete",
+      "workload_sha256": "b8d1a2381f2c0859661682fdb9601412c7a4854e878685fb5b8b3e7a26f84086",
+      "e2e_wall_ms": 48.99,
+      "agent_input_tokens": 1060,
+      "agent_output_tokens": 199,
+      "checks_passed": 5,
+      "decision_requests": 0,
+      "provenance_count": 0,
+      "events": [
+        {
+          "seq": 1,
+          "event": "run.started",
+          "elapsedMs": 0
+        },
+        {
+          "seq": 2,
+          "event": "agent.analysis.started",
+          "elapsedMs": 0.03
+        },
+        {
+          "seq": 3,
+          "event": "agent.analysis.turn_started",
+          "elapsedMs": 46.2
+        },
+        {
+          "seq": 4,
+          "event": "agent.analysis.completed",
+          "elapsedMs": 48.74
+        },
+        {
+          "seq": 5,
+          "event": "run.completed",
+          "elapsedMs": 48.99
+        }
+      ]
+    },
+    {
+      "cell_id": "generic-cli-single-turn-fallback-v1__pytorch_inductor_training__evidence",
+      "study_id": "pytorch_inductor_training",
+      "arm": "evidence",
+      "model_id": "generic-cli-single-turn-fallback-v1",
+      "status": "complete",
+      "workload_sha256": "b8d1a2381f2c0859661682fdb9601412c7a4854e878685fb5b8b3e7a26f84086",
+      "e2e_wall_ms": 115.23,
+      "agent_input_tokens": 850,
+      "agent_output_tokens": 190,
+      "checks_passed": 5,
+      "decision_requests": 1,
+      "provenance_count": 2,
+      "events": [
+        {
+          "seq": 1,
+          "event": "run.started",
+          "elapsedMs": 0.03
+        },
+        {
+          "seq": 2,
+          "event": "provider.selected",
+          "elapsedMs": 0.04,
+          "detail": "cloudflare"
+        },
+        {
+          "seq": 3,
+          "event": "evidence.delivery.negotiated",
+          "elapsedMs": 0.16,
+          "detail": "single_turn (runtime_lacks_in_execution_async_input_selected_single_turn_fallback)"
+        },
+        {
+          "seq": 4,
+          "event": "evidence.prefetch.started",
+          "elapsedMs": 0.27
+        },
+        {
+          "seq": 5,
+          "event": "routing.evidence.started",
+          "elapsedMs": 0.66
+        },
+        {
+          "seq": 6,
+          "event": "digest.started",
+          "elapsedMs": 0.86,
+          "detail": "primary-trace"
+        },
+        {
+          "seq": 7,
+          "event": "digest.completed",
+          "elapsedMs": 31.46,
+          "detail": "primary-trace"
+        },
+        {
+          "seq": 8,
+          "event": "digest.started",
+          "elapsedMs": 31.71,
+          "detail": "secondary-trace"
+        },
+        {
+          "seq": 9,
+          "event": "digest.completed",
+          "elapsedMs": 40.92,
+          "detail": "secondary-trace"
+        },
+        {
+          "seq": 10,
+          "event": "routing.evidence.completed",
+          "elapsedMs": 41.04,
+          "detail": "2"
+        },
+        {
+          "seq": 11,
+          "event": "routing.started",
+          "elapsedMs": 45.15
+        },
+        {
+          "seq": 12,
+          "event": "routing.completed",
+          "elapsedMs": 51.91,
+          "detail": "selected"
+        },
+        {
+          "seq": 13,
+          "event": "evidence.ready",
+          "elapsedMs": 52.12,
+          "detail": "primary-trace"
+        },
+        {
+          "seq": 14,
+          "event": "verification.started",
+          "elapsedMs": 52.22,
+          "detail": "<HOME>/.nvm/versions/node/v22.22.1/bin/node"
+        },
+        {
+          "seq": 15,
+          "event": "verification.completed",
+          "elapsedMs": 68.81,
+          "detail": "passed"
+        },
+        {
+          "seq": 16,
+          "event": "evidence.delivered",
+          "elapsedMs": 68.98,
+          "detail": "Single-turn evidence-first delivery to generic-cli after local verification"
+        },
+        {
+          "seq": 17,
+          "event": "evidence.accepted_by_runtime",
+          "elapsedMs": 69.05,
+          "detail": "generic-cli single_turn prompt"
+        },
+        {
+          "seq": 18,
+          "event": "evidence.model_visible",
+          "elapsedMs": 69.12,
+          "detail": "generic-cli single_turn prompt"
+        },
+        {
+          "seq": 19,
+          "event": "agent.review.started",
+          "elapsedMs": 69.19
+        },
+        {
+          "seq": 20,
+          "event": "agent.review.turn_started",
+          "elapsedMs": 110.72
+        },
+        {
+          "seq": 21,
+          "event": "agent.review.completed",
+          "elapsedMs": 113.34
+        },
+        {
+          "seq": 22,
+          "event": "evidence.consumed",
+          "elapsedMs": 113.53,
+          "detail": "generic-cli single_turn review completed"
+        },
+        {
+          "seq": 23,
+          "event": "run.completed",
+          "elapsedMs": 113.79,
+          "detail": "complete"
+        }
+      ]
+    },
+    {
+      "cell_id": "generic-cli-single-turn-fallback-v1__linux_perf_cpu__raw",
+      "study_id": "linux_perf_cpu",
+      "arm": "raw",
+      "model_id": "generic-cli-single-turn-fallback-v1",
+      "status": "complete",
+      "workload_sha256": "3003c74662b23e1196b06c9f326fbe1262d8d0ac81d82e109806e1b32cefd596",
+      "e2e_wall_ms": 60.43,
+      "agent_input_tokens": 1750,
+      "agent_output_tokens": 255,
+      "checks_passed": 5,
+      "decision_requests": 0,
+      "provenance_count": 0,
+      "events": [
+        {
+          "seq": 1,
+          "event": "run.started",
+          "elapsedMs": 0
+        },
+        {
+          "seq": 2,
+          "event": "agent.analysis.started",
+          "elapsedMs": 0.02
+        },
+        {
+          "seq": 3,
+          "event": "agent.analysis.turn_started",
+          "elapsedMs": 56.62
+        },
+        {
+          "seq": 4,
+          "event": "agent.analysis.completed",
+          "elapsedMs": 60.12
+        },
+        {
+          "seq": 5,
+          "event": "run.completed",
+          "elapsedMs": 60.43
+        }
+      ]
+    },
+    {
+      "cell_id": "generic-cli-single-turn-fallback-v1__linux_perf_cpu__mcp_digest",
+      "study_id": "linux_perf_cpu",
+      "arm": "mcp_digest",
+      "model_id": "generic-cli-single-turn-fallback-v1",
+      "status": "complete",
+      "workload_sha256": "3003c74662b23e1196b06c9f326fbe1262d8d0ac81d82e109806e1b32cefd596",
+      "e2e_wall_ms": 50.58,
+      "agent_input_tokens": 1130,
+      "agent_output_tokens": 211,
+      "checks_passed": 5,
+      "decision_requests": 0,
+      "provenance_count": 0,
+      "events": [
+        {
+          "seq": 1,
+          "event": "run.started",
+          "elapsedMs": 0
+        },
+        {
+          "seq": 2,
+          "event": "agent.analysis.started",
+          "elapsedMs": 0.05
+        },
+        {
+          "seq": 3,
+          "event": "agent.analysis.turn_started",
+          "elapsedMs": 47.31
+        },
+        {
+          "seq": 4,
+          "event": "agent.analysis.completed",
+          "elapsedMs": 50.33
+        },
+        {
+          "seq": 5,
+          "event": "run.completed",
+          "elapsedMs": 50.58
+        }
+      ]
+    },
+    {
+      "cell_id": "generic-cli-single-turn-fallback-v1__linux_perf_cpu__evidence",
+      "study_id": "linux_perf_cpu",
+      "arm": "evidence",
+      "model_id": "generic-cli-single-turn-fallback-v1",
+      "status": "complete",
+      "workload_sha256": "3003c74662b23e1196b06c9f326fbe1262d8d0ac81d82e109806e1b32cefd596",
+      "e2e_wall_ms": 108.28,
+      "agent_input_tokens": 895,
+      "agent_output_tokens": 200,
+      "checks_passed": 5,
+      "decision_requests": 1,
+      "provenance_count": 2,
+      "events": [
+        {
+          "seq": 1,
+          "event": "run.started",
+          "elapsedMs": 0.03
+        },
+        {
+          "seq": 2,
+          "event": "provider.selected",
+          "elapsedMs": 0.03,
+          "detail": "cloudflare"
+        },
+        {
+          "seq": 3,
+          "event": "evidence.delivery.negotiated",
+          "elapsedMs": 0.15,
+          "detail": "single_turn (runtime_lacks_in_execution_async_input_selected_single_turn_fallback)"
+        },
+        {
+          "seq": 4,
+          "event": "evidence.prefetch.started",
+          "elapsedMs": 0.26
+        },
+        {
+          "seq": 5,
+          "event": "routing.evidence.started",
+          "elapsedMs": 0.55
+        },
+        {
+          "seq": 6,
+          "event": "digest.started",
+          "elapsedMs": 0.71,
+          "detail": "primary-trace"
+        },
+        {
+          "seq": 7,
+          "event": "digest.completed",
+          "elapsedMs": 30.8,
+          "detail": "primary-trace"
+        },
+        {
+          "seq": 8,
+          "event": "digest.started",
+          "elapsedMs": 31.13,
+          "detail": "secondary-trace"
+        },
+        {
+          "seq": 9,
+          "event": "digest.completed",
+          "elapsedMs": 40.21,
+          "detail": "secondary-trace"
+        },
+        {
+          "seq": 10,
+          "event": "routing.evidence.completed",
+          "elapsedMs": 40.32,
+          "detail": "2"
+        },
+        {
+          "seq": 11,
+          "event": "routing.started",
+          "elapsedMs": 45.08
+        },
+        {
+          "seq": 12,
+          "event": "routing.completed",
+          "elapsedMs": 51.67,
+          "detail": "selected"
+        },
+        {
+          "seq": 13,
+          "event": "evidence.ready",
+          "elapsedMs": 51.85,
+          "detail": "primary-trace"
+        },
+        {
+          "seq": 14,
+          "event": "verification.started",
+          "elapsedMs": 52.23,
+          "detail": "<HOME>/.nvm/versions/node/v22.22.1/bin/node"
+        },
+        {
+          "seq": 15,
+          "event": "verification.completed",
+          "elapsedMs": 66.49,
+          "detail": "passed"
+        },
+        {
+          "seq": 16,
+          "event": "evidence.delivered",
+          "elapsedMs": 66.63,
+          "detail": "Single-turn evidence-first delivery to generic-cli after local verification"
+        },
+        {
+          "seq": 17,
+          "event": "evidence.accepted_by_runtime",
+          "elapsedMs": 66.7,
+          "detail": "generic-cli single_turn prompt"
+        },
+        {
+          "seq": 18,
+          "event": "evidence.model_visible",
+          "elapsedMs": 66.76,
+          "detail": "generic-cli single_turn prompt"
+        },
+        {
+          "seq": 19,
+          "event": "agent.review.started",
+          "elapsedMs": 66.83
+        },
+        {
+          "seq": 20,
+          "event": "agent.review.turn_started",
+          "elapsedMs": 104.97
+        },
+        {
+          "seq": 21,
+          "event": "agent.review.completed",
+          "elapsedMs": 106.25
+        },
+        {
+          "seq": 22,
+          "event": "evidence.consumed",
+          "elapsedMs": 106.4,
+          "detail": "generic-cli single_turn review completed"
+        },
+        {
+          "seq": 23,
+          "event": "run.completed",
+          "elapsedMs": 106.56,
+          "detail": "complete"
+        }
+      ]
+    }
+  ]
+}

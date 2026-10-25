@@ -9,7 +9,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { manifestSchema, mcpReuseResultSchema, realWorkloadEvalResultSchema, resultSchema, lifecycleBenchmarkResultSchema, regressionCorpusSchema, multiModelEvalResultSchema, measurementReceiptSchema } from './schema/formats.mjs';
+import { manifestSchema, mcpReuseResultSchema, realWorkloadEvalResultSchema, resultSchema, lifecycleBenchmarkResultSchema, regressionCorpusSchema, multiModelEvalResultSchema, measurementReceiptSchema, benchmarkSourceTraceSchema } from './schema/formats.mjs';
 
 const benchDir = dirname(fileURLToPath(import.meta.url));
 const listJson = async (dir) => (await readdir(join(benchDir, dir)).catch(() => [])).filter((f) => f.endsWith('.json')).map((f) => join(benchDir, dir, f));
@@ -39,6 +39,9 @@ function selectSchema(doc) {
       return { kind: 'multi-model-eval', schema: multiModelEvalResultSchema };
     case 'perfdigest.benchmark.measurement-receipt.v1':
       return { kind: 'measurement-receipt', schema: measurementReceiptSchema };
+    case 'perfdigest.benchmark.v3-reconciled-v2-audit.v1':
+    case 'perfdigest.benchmark.source-trace.v1':
+      return { kind: 'source-trace', schema: benchmarkSourceTraceSchema };
     default:
       return { kind: 'unknown', schema: resultSchema };
   }
@@ -148,7 +151,9 @@ for (const file of files) {
                 ? `multi-model-eval, ${doc.summary.totalModels} models × ${doc.summary.totalStudies} studies (${doc.summary.totalEvaluations} evals)`
                 : kind === 'measurement-receipt'
                   ? `measurement-receipt, ${doc.experimentId} (${doc.sampleSize.totalCells} cells)`
-                  : `result, ${doc.cells.length} cells`;
+                  : kind === 'source-trace'
+                    ? `source-trace, ${(doc.cells ?? doc.reconciledCells ?? []).length} cells`
+                    : `result, ${doc.cells.length} cells`;
     console.log(`ok   ${file} (${summary})`);
   }
 }

@@ -505,6 +505,17 @@ export function genericCliAdapter(options: GenericCliAgentOptions): AgentAdapter
             }, timeoutMs);
             timer.unref?.();
             const combined = AbortSignal.any([signal, deadlineController.signal]);
+            let supplyError: unknown;
+            let hasSupplyError = false;
+            const trackedSupplyEvidence = async () => {
+              try {
+                return await supplyEvidence();
+              } catch (err) {
+                hasSupplyError = true;
+                supplyError = err;
+                throw err;
+              }
+            };
             const result = await runInExecutionTurn(
               options.command,
               options.args ?? [],
@@ -516,11 +527,12 @@ export function genericCliAdapter(options: GenericCliAgentOptions): AgentAdapter
                 prompt,
                 sessionId: sessions ? sessionId : null,
               }),
-              supplyEvidence,
+              trackedSupplyEvidence,
               maxOutputBytes,
               emit,
             )
               .catch((error: unknown) => {
+                if (hasSupplyError) throw supplyError;
                 if (error instanceof AgentError) throw new AgentError(error.kind, phase, error.message);
                 if (timedOut) throw new AgentError('timed_out', phase, `no result within ${timeoutMs} ms`);
                 if (signal.aborted) throw new AgentError('cancelled', phase, 'run cancelled');
@@ -661,7 +673,6 @@ function runInExecutionTurn(
       if (!ackEmitted && (stdout.includes('"type":"evidence_ack"') || stdout.includes('"type": "evidence_ack"'))) {
         ackEmitted = true;
         emit('evidence.accepted_by_runtime', 'generic-cli in-execution evidence_ack');
-        emit('evidence.model_visible', 'generic-cli in-execution stream');
       }
     });
 
@@ -725,16 +736,19 @@ function runInExecutionTurn(
         }
         const usage = r.usage && typeof r.usage === 'object' ? (r.usage as Usage) : null;
         const earlyAgentCompletion = !evidenceDelivered;
+        const hasAckFrame = ackEmitted || lines.some(l => l.type === 'evidence_ack');
         const evidenceConsumed =
           evidenceDelivered &&
-          (r.evidenceConsumed === true || lines.some(l => l.type === 'evidence_ack'));
+          (typeof r.evidenceConsumed === 'boolean'
+            ? r.evidenceConsumed
+            : hasAckFrame);
         if (earlyAgentCompletion) {
           emit('agent.in_execution.completed_before_evidence', 'Agent solved and exited before background evidence arrived');
         } else if (evidenceConsumed) {
           if (!ackEmitted) {
             emit('evidence.accepted_by_runtime', 'generic-cli in-execution result');
-            emit('evidence.model_visible', 'generic-cli in-execution stream');
           }
+          emit('evidence.model_visible', 'generic-cli in-execution stream');
           emit('evidence.consumed', 'Agent consumed in-execution evidence in single execution');
         }
         finish(null, {

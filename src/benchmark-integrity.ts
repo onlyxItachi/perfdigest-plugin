@@ -1,3 +1,6 @@
+import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join, posix } from 'node:path';
+
 export type CellExecutionStatus =
   | 'complete'
   | 'failed'
@@ -132,6 +135,19 @@ export const MANDATORY_SUMMARY_CSV_COLUMNS = [
   'decision_cost_unavailable_reason',
 ] as const;
 
+/**
+ * Closed set of pre-Issue-#18 historical benchmark artifacts preserved as immutable history.
+ * Any new artifact in `bench/results/` outside this frozen list MUST be bound to and validated by
+ * a `*-measurement-receipt.json` bundle.
+ */
+export const FROZEN_HISTORICAL_BENCHMARK_ARTIFACTS = [
+  'bench/results/2026-10-18-amd-ryzen-ai-9-hx-370-x64.json',
+  'bench/results/2026-10-18-lifecycle-and-orchestration.json',
+  'bench/results/2026-10-18-mcp-session-reuse.json',
+  'bench/results/2026-10-18-real-workload-evaluation.json',
+  'bench/results/2026-10-24-multi-model-evaluation.json',
+] as const;
+
 export interface BenchmarkMeasurementReceipt {
   schema: 'perfdigest.benchmark.measurement-receipt.v1';
   experimentId: string;
@@ -142,6 +158,8 @@ export interface BenchmarkMeasurementReceipt {
   cellsCsvRef: string;
   summaryCsvRef: string;
   sourceTraceRef: string;
+  /** Companion artifacts (e.g. markdown audit reports or auxiliary tool-call tables) bound to this receipt. */
+  auxiliaryArtifactRefs?: string[];
   sampleSize: {
     totalCells: number;
     completeCells: number;
@@ -161,28 +179,38 @@ export interface BenchmarkMeasurementReceipt {
   limitations: string[];
 }
 
+export type IntegrityViolationCode =
+  | 'missing_csv_column'
+  | 'empty_csv'
+  | 'invalid_status'
+  | 'missing_critical_telemetry_on_complete_cell'
+  | 'invalid_monotonic_interval'
+  | 'invalid_stage_overlap_math'
+  | 'service_duration_exceeds_wall_without_cumulative_explanation'
+  | 'cumulative_session_token_double_count'
+  | 'incremental_token_sum_mismatch'
+  | 'zero_filled_unobserved_cost'
+  | 'missing_cost_unavailable_reason'
+  | 'mock_or_offline_mislabeled_as_live_hosted'
+  | 'blinded_raw_baseline_native_tools_disabled'
+  | 'rubric_mismatch_across_arms'
+  | 'oracle_or_answer_leakage_detected'
+  | 'unsanitized_path_or_secret_in_artifact'
+  | 'summary_cell_count_mismatch'
+  | 'summary_dropped_failed_or_abstained_trials'
+  | 'summary_metric_reconciliation_mismatch'
+  | 'invalid_measurement_receipt'
+  | 'invalid_source_trace_format'
+  | 'missing_or_unreadable_source_trace'
+  | 'source_trace_cell_missing'
+  | 'source_trace_identity_mismatch'
+  | 'source_trace_telemetry_mismatch'
+  | 'source_trace_provenance_mismatch'
+  | 'untracked_or_receiptless_benchmark_artifact'
+  | 'missing_historical_benchmark_artifact';
+
 export interface IntegrityViolation {
-  code:
-    | 'missing_csv_column'
-    | 'empty_csv'
-    | 'invalid_status'
-    | 'missing_critical_telemetry_on_complete_cell'
-    | 'invalid_monotonic_interval'
-    | 'invalid_stage_overlap_math'
-    | 'service_duration_exceeds_wall_without_cumulative_explanation'
-    | 'cumulative_session_token_double_count'
-    | 'incremental_token_sum_mismatch'
-    | 'zero_filled_unobserved_cost'
-    | 'missing_cost_unavailable_reason'
-    | 'mock_or_offline_mislabeled_as_live_hosted'
-    | 'blinded_raw_baseline_native_tools_disabled'
-    | 'rubric_mismatch_across_arms'
-    | 'oracle_or_answer_leakage_detected'
-    | 'unsanitized_path_or_secret_in_artifact'
-    | 'summary_cell_count_mismatch'
-    | 'summary_dropped_failed_or_abstained_trials'
-    | 'summary_metric_reconciliation_mismatch'
-    | 'invalid_measurement_receipt';
+  code: IntegrityViolationCode;
   message: string;
   rowOrRef?: string;
 }
@@ -192,6 +220,18 @@ export interface BenchmarkIntegrityValidationResult {
   violations: IntegrityViolation[];
   checkedCellsCount: number;
   checkedSummaryRowsCount: number;
+}
+
+export class BenchmarkIntegrityError extends Error {
+  constructor(
+    message: string,
+    readonly violations: IntegrityViolation[],
+  ) {
+    super(
+      `${message}: ${violations.map((v) => `[${v.code}] ${v.message}`).join('; ')}`,
+    );
+    this.name = 'BenchmarkIntegrityError';
+  }
 }
 
 /**
@@ -265,6 +305,30 @@ function parseOptionalNumber(raw: string | undefined): number | null {
   return Number.isFinite(num) ? num : null;
 }
 
+function readTraceNumber(obj: Record<string, unknown>, ...keys: string[]): number | null {
+  for (const k of keys) {
+    const val = obj[k];
+    if (typeof val === 'number' && Number.isFinite(val)) {
+      return val;
+    }
+    if (typeof val === 'string') {
+      const parsed = parseOptionalNumber(val);
+      if (parsed !== null) return parsed;
+    }
+  }
+  return null;
+}
+
+function readTraceString(obj: Record<string, unknown>, ...keys: string[]): string | null {
+  for (const k of keys) {
+    const val = obj[k];
+    if (typeof val === 'string' && val.trim().length > 0) {
+      return val.trim();
+    }
+  }
+  return null;
+}
+
 function computeMedian(values: number[]): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -300,14 +364,106 @@ const UNSANITIZED_PATH_OR_SECRET_PATTERNS = [
   /\bBearer\s+[a-zA-Z0-9._-]{20,}\b/i,
 ];
 
+interface ParsedTraceBundle {
+  cellsByKey: Map<string, Record<string, unknown>>;
+  rawObjects: Array<Record<string, unknown>>;
+}
+
+function parseMachineReadableTrace(
+  traceRef: string,
+  rawContent: string,
+): { ok: true; trace: ParsedTraceBundle } | { ok: false; reason: string } {
+  const trimmed = rawContent.trim();
+  if (!trimmed) {
+    return { ok: false, reason: `Source trace "${traceRef}" is empty.` };
+  }
+
+  let cellObjects: Array<Record<string, unknown>> = [];
+  if (traceRef.endsWith('.jsonl')) {
+    try {
+      cellObjects = trimmed
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .map((l) => JSON.parse(l) as Record<string, unknown>);
+    } catch (err) {
+      return {
+        ok: false,
+        reason: `Source trace "${traceRef}" is not valid JSONL: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+  } else if (traceRef.endsWith('.json')) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch (err) {
+      return {
+        ok: false,
+        reason: `Source trace "${traceRef}" is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+    if (Array.isArray(parsed)) {
+      cellObjects = parsed.filter(
+        (item): item is Record<string, unknown> => Boolean(item && typeof item === 'object' && !Array.isArray(item)),
+      );
+    } else if (parsed && typeof parsed === 'object') {
+      const obj = parsed as Record<string, unknown>;
+      if (Array.isArray(obj.cells)) {
+        cellObjects = obj.cells.filter(
+          (item): item is Record<string, unknown> => Boolean(item && typeof item === 'object' && !Array.isArray(item)),
+        );
+      } else if (Array.isArray(obj.reconciledCells)) {
+        cellObjects = obj.reconciledCells.filter(
+          (item): item is Record<string, unknown> => Boolean(item && typeof item === 'object' && !Array.isArray(item)),
+        );
+      } else if (typeof obj.cell_id === 'string' || typeof obj.model_id === 'string') {
+        cellObjects = [obj];
+      }
+    }
+  } else {
+    return {
+      ok: false,
+      reason: `Source trace "${traceRef}" must be a machine-readable .json or .jsonl file.`,
+    };
+  }
+
+  if (cellObjects.length === 0) {
+    return {
+      ok: false,
+      reason: `Source trace "${traceRef}" contains no machine-readable cell trace records.`,
+    };
+  }
+
+  const cellsByKey = new Map<string, Record<string, unknown>>();
+  for (const item of cellObjects) {
+    const explicitCellId = readTraceString(item, 'cell_id', 'cellId');
+    const modelId = readTraceString(item, 'model_id', 'modelId');
+    const studyId = readTraceString(item, 'study_id', 'studyId');
+    const arm = readTraceString(item, 'arm');
+    if (explicitCellId) {
+      cellsByKey.set(explicitCellId, item);
+    }
+    if (modelId && studyId && arm) {
+      const compositeId = `${modelId}__${studyId}__${arm}`;
+      if (!cellsByKey.has(compositeId)) {
+        cellsByKey.set(compositeId, item);
+      }
+    }
+  }
+
+  return { ok: true, trace: { cellsByKey, rawObjects: cellObjects } };
+}
+
 /**
  * Validates a complete benchmark integrity bundle (Per-Cell CSV, Summary CSV,
- * optional Source Trace text, and optional Measurement Receipt).
+ * optional Source Trace map/text, and optional Measurement Receipt).
  */
 export function validateBenchmarkIntegrityBundle(input: {
   cellsCsv: string;
   summaryCsv: string;
   sourceTraceText?: string;
+  sourceTracesByRef?: Record<string, string | null | undefined>;
+  requireSourceTraceVerification?: boolean;
   receipt?: BenchmarkMeasurementReceipt;
   promptsOrInputsToScanForLeakage?: string[];
 }): BenchmarkIntegrityValidationResult {
@@ -347,6 +503,21 @@ export function validateBenchmarkIntegrityBundle(input: {
     }
   }
 
+  // Build resolved map of sourceTracesByRef
+  const tracesMap: Record<string, string | null | undefined> = {
+    ...(input.sourceTracesByRef ?? {}),
+  };
+  if (input.sourceTraceText !== undefined && input.receipt?.sourceTraceRef) {
+    if (tracesMap[input.receipt.sourceTraceRef] === undefined) {
+      tracesMap[input.receipt.sourceTraceRef] = input.sourceTraceText;
+    }
+  }
+  const verifyTraces =
+    input.requireSourceTraceVerification ??
+    (input.receipt !== undefined ||
+      input.sourceTracesByRef !== undefined ||
+      input.sourceTraceText !== undefined);
+
   // Scan CSVs and source traces for unsanitized local paths or secrets
   const textsToCheckSanitization: Array<{ label: string; text: string }> = [
     { label: 'cellsCsv', text: input.cellsCsv },
@@ -354,6 +525,11 @@ export function validateBenchmarkIntegrityBundle(input: {
   ];
   if (input.sourceTraceText) {
     textsToCheckSanitization.push({ label: 'sourceTraceText', text: input.sourceTraceText });
+  }
+  for (const [ref, content] of Object.entries(tracesMap)) {
+    if (typeof content === 'string') {
+      textsToCheckSanitization.push({ label: `sourceTrace:${ref}`, text: content });
+    }
   }
   for (const item of textsToCheckSanitization) {
     for (const pattern of UNSANITIZED_PATH_OR_SECRET_PATTERNS) {
@@ -376,6 +552,53 @@ export function validateBenchmarkIntegrityBundle(input: {
             message: `Oracle or privileged grader answer leakage pattern ${pattern.toString()} detected in prompt/input.`,
           });
         }
+      }
+    }
+  }
+
+  // Pre-parse referenced source traces when trace verification is active
+  const parsedTraceCache = new Map<string, ParsedTraceBundle | null>();
+  if (verifyTraces) {
+    const referencedTracePaths = new Set<string>();
+    if (input.receipt?.sourceTraceRef) {
+      referencedTracePaths.add(input.receipt.sourceTraceRef.trim());
+    }
+    for (const row of parsedCells.rows) {
+      const ref = (row.source_trace_ref || '').trim();
+      if (ref) {
+        referencedTracePaths.add(ref);
+      }
+    }
+    for (const ref of referencedTracePaths) {
+      if (!ref.endsWith('.json') && !ref.endsWith('.jsonl')) {
+        violations.push({
+          code: 'invalid_source_trace_format',
+          message: `source_trace_ref "${ref}" must reference a machine-readable .json or .jsonl trace artifact, not a prose/markdown document.`,
+          rowOrRef: ref,
+        });
+        parsedTraceCache.set(ref, null);
+        continue;
+      }
+      const rawContent = tracesMap[ref];
+      if (typeof rawContent !== 'string' || rawContent.trim().length === 0) {
+        violations.push({
+          code: 'missing_or_unreadable_source_trace',
+          message: `Referenced machine-readable source trace "${ref}" does not exist or was not provided.`,
+          rowOrRef: ref,
+        });
+        parsedTraceCache.set(ref, null);
+        continue;
+      }
+      const parsed = parseMachineReadableTrace(ref, rawContent);
+      if (!parsed.ok) {
+        violations.push({
+          code: 'missing_or_unreadable_source_trace',
+          message: parsed.reason,
+          rowOrRef: ref,
+        });
+        parsedTraceCache.set(ref, null);
+      } else {
+        parsedTraceCache.set(ref, parsed.trace);
       }
     }
   }
@@ -533,6 +756,167 @@ export function validateBenchmarkIntegrityBundle(input: {
           message: `Cell "${cellId}" is marked "complete" but is missing critical timing, token usage, or source_trace_ref telemetry.`,
           rowOrRef: cellId,
         });
+      }
+    }
+
+    // Verify cell against its machine-readable source trace when trace verification is active
+    if (verifyTraces && sourceTraceRef) {
+      const parsedTrace = parsedTraceCache.get(sourceTraceRef);
+      if (parsedTrace) {
+        const compositeKey = `${row.model_id || ''}__${row.study_id || ''}__${row.arm || ''}`;
+        const traceCell =
+          parsedTrace.cellsByKey.get(cellId) ?? parsedTrace.cellsByKey.get(compositeKey);
+        if (!traceCell) {
+          violations.push({
+            code: 'source_trace_cell_missing',
+            message: `Cell "${cellId}" is not present in its declared source_trace_ref "${sourceTraceRef}".`,
+            rowOrRef: cellId,
+          });
+        } else {
+          const traceModelId = readTraceString(traceCell, 'model_id', 'modelId');
+          const traceStudyId = readTraceString(traceCell, 'study_id', 'studyId');
+          const traceArm = readTraceString(traceCell, 'arm');
+          const traceStatus = readTraceString(traceCell, 'status');
+          if (
+            (traceModelId && traceModelId !== row.model_id) ||
+            (traceStudyId && traceStudyId !== row.study_id) ||
+            (traceArm && traceArm !== row.arm) ||
+            (traceStatus && traceStatus !== row.status)
+          ) {
+            violations.push({
+              code: 'source_trace_identity_mismatch',
+              message: `Cell "${cellId}" identity (${row.model_id}/${row.study_id}/${row.arm}/${row.status}) does not match trace record (${traceModelId}/${traceStudyId}/${traceArm}/${traceStatus}).`,
+              rowOrRef: cellId,
+            });
+          }
+
+          const traceE2eMs = readTraceNumber(traceCell, 'e2e_wall_ms', 'e2eWallMs', 'wallMs');
+          if (e2eMs !== null && traceE2eMs !== null && Math.abs(e2eMs - traceE2eMs) > 1.5) {
+            violations.push({
+              code: 'source_trace_telemetry_mismatch',
+              message: `Cell "${cellId}" e2e_wall_ms (${e2eMs}) does not match source trace e2e_wall_ms (${traceE2eMs}).`,
+              rowOrRef: cellId,
+            });
+          }
+
+          const traceInputTokens = readTraceNumber(
+            traceCell,
+            'reconciled_total_input_tokens',
+            'agent_input_tokens',
+            'agentInputTokens',
+          );
+          if (
+            agentInputTokens !== null &&
+            traceInputTokens !== null &&
+            Math.abs(agentInputTokens - traceInputTokens) > 1
+          ) {
+            violations.push({
+              code: 'source_trace_telemetry_mismatch',
+              message: `Cell "${cellId}" agent_input_tokens (${agentInputTokens}) does not match source trace input tokens (${traceInputTokens}).`,
+              rowOrRef: cellId,
+            });
+          }
+
+          const traceOutputTokens = readTraceNumber(
+            traceCell,
+            'reconciled_total_output_tokens',
+            'agent_output_tokens',
+            'agentOutputTokens',
+          );
+          if (
+            agentOutputTokens !== null &&
+            traceOutputTokens !== null &&
+            Math.abs(agentOutputTokens - traceOutputTokens) > 1
+          ) {
+            violations.push({
+              code: 'source_trace_telemetry_mismatch',
+              message: `Cell "${cellId}" agent_output_tokens (${agentOutputTokens}) does not match source trace output tokens (${traceOutputTokens}).`,
+              rowOrRef: cellId,
+            });
+          }
+
+          const rowChecksPassed = parseOptionalNumber(row.checks_passed);
+          const traceChecksPassed = readTraceNumber(traceCell, 'checks_passed', 'checksPassed');
+          if (
+            rowChecksPassed !== null &&
+            traceChecksPassed !== null &&
+            rowChecksPassed !== traceChecksPassed
+          ) {
+            violations.push({
+              code: 'source_trace_telemetry_mismatch',
+              message: `Cell "${cellId}" checks_passed (${rowChecksPassed}) does not match source trace checks_passed (${traceChecksPassed}).`,
+              rowOrRef: cellId,
+            });
+          }
+
+          const traceWorkloadSha = readTraceString(traceCell, 'workload_sha256', 'workloadSha256');
+          if (traceWorkloadSha && row.workload_sha256 && traceWorkloadSha !== row.workload_sha256) {
+            violations.push({
+              code: 'source_trace_provenance_mismatch',
+              message: `Cell "${cellId}" workload_sha256 (${row.workload_sha256}) does not match source trace workload_sha256 (${traceWorkloadSha}).`,
+              rowOrRef: cellId,
+            });
+          }
+
+          const rowProvCount = parseOptionalNumber(row.provenance_count);
+          const traceProvCount = readTraceNumber(traceCell, 'provenance_count', 'provenanceCount');
+          if (
+            rowProvCount !== null &&
+            traceProvCount !== null &&
+            rowProvCount !== traceProvCount
+          ) {
+            violations.push({
+              code: 'source_trace_provenance_mismatch',
+              message: `Cell "${cellId}" provenance_count (${rowProvCount}) does not match source trace provenance_count (${traceProvCount}).`,
+              rowOrRef: cellId,
+            });
+          }
+
+          const rowDecisionReqs = parseOptionalNumber(row.decision_requests);
+          const traceDecisionReqs = readTraceNumber(
+            traceCell,
+            'decision_requests',
+            'clef_requests',
+            'decisionRequests',
+          );
+          if (
+            rowDecisionReqs !== null &&
+            traceDecisionReqs !== null &&
+            rowDecisionReqs !== traceDecisionReqs
+          ) {
+            violations.push({
+              code: 'source_trace_telemetry_mismatch',
+              message: `Cell "${cellId}" decision_requests (${rowDecisionReqs}) does not match source trace decision requests (${traceDecisionReqs}).`,
+              rowOrRef: cellId,
+            });
+          }
+
+          if (Array.isArray(traceCell.events)) {
+            const evs = traceCell.events as Array<Record<string, unknown>>;
+            if (status === 'complete' && evs.length === 0) {
+              violations.push({
+                code: 'source_trace_telemetry_mismatch',
+                message: `Cell "${cellId}" has an empty events array in its source trace.`,
+                rowOrRef: cellId,
+              });
+            }
+            let prevElapsed = -1;
+            for (const ev of evs) {
+              const el = readTraceNumber(ev, 'elapsedMs', 'elapsed_ms', 'monotonicMs');
+              if (el !== null) {
+                if (el + 0.05 < prevElapsed) {
+                  violations.push({
+                    code: 'source_trace_telemetry_mismatch',
+                    message: `Cell "${cellId}" source trace has non-monotonic event timestamps (${el} < ${prevElapsed}).`,
+                    rowOrRef: cellId,
+                  });
+                  break;
+                }
+                prevElapsed = el;
+              }
+            }
+          }
+        }
       }
     }
 
@@ -768,5 +1152,226 @@ export function validateBenchmarkIntegrityBundle(input: {
     violations,
     checkedCellsCount: parsedCells.rows.length,
     checkedSummaryRowsCount: parsedSummary.rows.length,
+  };
+}
+
+/**
+ * Producer/output boundary gate: validates a complete benchmark bundle (Cells CSV, Summary CSV,
+ * Machine-Readable Source Trace JSON, and Measurement Receipt) BEFORE writing any file to disk.
+ * Throws `BenchmarkIntegrityError` if any violation is detected so no invalid or unreceipted
+ * benchmark result can ever be emitted by a producer.
+ */
+export async function writeValidatedBenchmarkBundle(options: {
+  rootDir: string;
+  receiptRelPath: string;
+  cellsCsv: string;
+  summaryCsv: string;
+  sourceTraceContent: string;
+  receipt: BenchmarkMeasurementReceipt;
+  promptsOrInputsToScanForLeakage?: string[];
+}): Promise<BenchmarkIntegrityValidationResult> {
+  const { rootDir, receiptRelPath, cellsCsv, summaryCsv, sourceTraceContent, receipt } = options;
+  if (!receiptRelPath.endsWith('-measurement-receipt.json')) {
+    throw new BenchmarkIntegrityError('Invalid measurement receipt path', [
+      {
+        code: 'invalid_measurement_receipt',
+        message: `Receipt path "${receiptRelPath}" must end with "-measurement-receipt.json".`,
+        rowOrRef: receiptRelPath,
+      },
+    ]);
+  }
+
+  const validation = validateBenchmarkIntegrityBundle({
+    cellsCsv,
+    summaryCsv,
+    sourceTracesByRef: {
+      [receipt.sourceTraceRef]: sourceTraceContent,
+    },
+    requireSourceTraceVerification: true,
+    receipt,
+    ...(options.promptsOrInputsToScanForLeakage
+      ? { promptsOrInputsToScanForLeakage: options.promptsOrInputsToScanForLeakage }
+      : {}),
+  });
+
+  if (!validation.valid) {
+    throw new BenchmarkIntegrityError(
+      `Refusing to write benchmark bundle "${receipt.experimentId}" at producer boundary`,
+      validation.violations,
+    );
+  }
+
+  const cellsPath = join(rootDir, receipt.cellsCsvRef);
+  const summaryPath = join(rootDir, receipt.summaryCsvRef);
+  const tracePath = join(rootDir, receipt.sourceTraceRef);
+  const receiptPath = join(rootDir, receiptRelPath);
+
+  await mkdir(dirname(cellsPath), { recursive: true });
+  await mkdir(dirname(summaryPath), { recursive: true });
+  await mkdir(dirname(tracePath), { recursive: true });
+  await mkdir(dirname(receiptPath), { recursive: true });
+
+  await writeFile(cellsPath, cellsCsv, 'utf8');
+  await writeFile(summaryPath, summaryCsv, 'utf8');
+  await writeFile(tracePath, sourceTraceContent, 'utf8');
+  await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
+
+  return validation;
+}
+
+export interface BenchmarkDirectoryAuditResult {
+  valid: boolean;
+  violations: IntegrityViolation[];
+  receiptsValidated: string[];
+  historicalFilesVerified: string[];
+  untrackedFiles: string[];
+}
+
+/**
+ * Directory-level benchmark integrity audit:
+ * 1. Verifies that all frozen pre-Issue-#18 historical benchmark artifacts remain intact.
+ * 2. Discovers and validates all `*-measurement-receipt.json` bundles (including machine-readable
+ *    `source_trace_ref` existence, cell identity, and telemetry reconciliation).
+ * 3. Fails closed (`untracked_or_receiptless_benchmark_artifact`) if ANY file in `bench/results/`
+ *    is neither in `FROZEN_HISTORICAL_BENCHMARK_ARTIFACTS` nor bound to a valid measurement receipt.
+ */
+export async function auditBenchmarkResultsDirectory(
+  rootDir: string,
+  resultsRelDir = 'bench/results',
+  frozenHistoricalArtifacts: readonly string[] = FROZEN_HISTORICAL_BENCHMARK_ARTIFACTS,
+): Promise<BenchmarkDirectoryAuditResult> {
+  const violations: IntegrityViolation[] = [];
+  const receiptsValidated: string[] = [];
+  const historicalFilesVerified: string[] = [];
+  const coveredRelPaths = new Set<string>();
+
+  for (const histRel of frozenHistoricalArtifacts) {
+    const normalized = histRel.replace(/\\/g, '/');
+    try {
+      await access(join(rootDir, normalized));
+      historicalFilesVerified.push(normalized);
+      coveredRelPaths.add(normalized);
+    } catch {
+      violations.push({
+        code: 'missing_historical_benchmark_artifact',
+        message: `Frozen historical benchmark artifact is missing: "${normalized}".`,
+        rowOrRef: normalized,
+      });
+    }
+  }
+
+  const resultsDir = join(rootDir, resultsRelDir);
+  const entries = await readdir(resultsDir, { withFileTypes: true }).catch(() => []);
+  const allRelFiles = entries
+    .filter((e) => e.isFile())
+    .map((e) => posix.join(resultsRelDir.replace(/\\/g, '/'), e.name))
+    .sort();
+
+  const receiptRelFiles = allRelFiles.filter((f) => f.endsWith('-measurement-receipt.json'));
+  if (receiptRelFiles.length === 0) {
+    violations.push({
+      code: 'invalid_measurement_receipt',
+      message: `No "*-measurement-receipt.json" files found in "${resultsRelDir}".`,
+      rowOrRef: resultsRelDir,
+    });
+  }
+
+  for (const receiptRel of receiptRelFiles) {
+    coveredRelPaths.add(receiptRel);
+    let receipt: BenchmarkMeasurementReceipt;
+    try {
+      receipt = JSON.parse(await readFile(join(rootDir, receiptRel), 'utf8')) as BenchmarkMeasurementReceipt;
+    } catch (err) {
+      violations.push({
+        code: 'invalid_measurement_receipt',
+        message: `Failed to parse receipt "${receiptRel}": ${err instanceof Error ? err.message : String(err)}`,
+        rowOrRef: receiptRel,
+      });
+      continue;
+    }
+
+    if (receipt.cellsCsvRef) coveredRelPaths.add(receipt.cellsCsvRef.replace(/\\/g, '/'));
+    if (receipt.summaryCsvRef) coveredRelPaths.add(receipt.summaryCsvRef.replace(/\\/g, '/'));
+    if (receipt.sourceTraceRef) coveredRelPaths.add(receipt.sourceTraceRef.replace(/\\/g, '/'));
+    if (Array.isArray(receipt.auxiliaryArtifactRefs)) {
+      for (const auxRef of receipt.auxiliaryArtifactRefs) {
+        const normAux = auxRef.replace(/\\/g, '/');
+        coveredRelPaths.add(normAux);
+        const auxContent = await readFile(join(rootDir, normAux), 'utf8').catch(() => null);
+        if (auxContent === null) {
+          violations.push({
+            code: 'invalid_measurement_receipt',
+            message: `Receipt "${receiptRel}" references missing auxiliaryArtifactRef "${normAux}".`,
+            rowOrRef: normAux,
+          });
+        } else {
+          for (const pattern of UNSANITIZED_PATH_OR_SECRET_PATTERNS) {
+            if (pattern.test(auxContent)) {
+              violations.push({
+                code: 'unsanitized_path_or_secret_in_artifact',
+                message: `Unsanitized local path or secret matching ${pattern.toString()} found in auxiliary artifact "${normAux}".`,
+                rowOrRef: normAux,
+              });
+            }
+          }
+        }
+      }
+    }
+
+    const cellsCsv = await readFile(join(rootDir, receipt.cellsCsvRef || ''), 'utf8').catch(() => '');
+    const summaryCsv = await readFile(join(rootDir, receipt.summaryCsvRef || ''), 'utf8').catch(() => '');
+
+    // Collect all referenced source_trace_ref paths from receipt + cells CSV
+    const traceRefs = new Set<string>();
+    if (receipt.sourceTraceRef) {
+      traceRefs.add(receipt.sourceTraceRef.replace(/\\/g, '/'));
+    }
+    for (const row of parseCsvRecords(cellsCsv).rows) {
+      const ref = (row.source_trace_ref || '').trim();
+      if (ref) {
+        const normRef = ref.replace(/\\/g, '/');
+        traceRefs.add(normRef);
+        coveredRelPaths.add(normRef);
+      }
+    }
+
+    const sourceTracesByRef: Record<string, string | null> = {};
+    for (const ref of traceRefs) {
+      sourceTracesByRef[ref] = await readFile(join(rootDir, ref), 'utf8').catch(() => null);
+    }
+
+    const bundleRes = validateBenchmarkIntegrityBundle({
+      cellsCsv,
+      summaryCsv,
+      sourceTracesByRef,
+      requireSourceTraceVerification: true,
+      receipt,
+    });
+
+    if (!bundleRes.valid) {
+      violations.push(...bundleRes.violations);
+    } else {
+      receiptsValidated.push(receiptRel);
+    }
+  }
+
+  const untrackedFiles: string[] = [];
+  for (const relFile of allRelFiles) {
+    if (!coveredRelPaths.has(relFile)) {
+      untrackedFiles.push(relFile);
+      violations.push({
+        code: 'untracked_or_receiptless_benchmark_artifact',
+        message: `Benchmark result artifact "${relFile}" is not bound to any "*-measurement-receipt.json" bundle and is not in FROZEN_HISTORICAL_BENCHMARK_ARTIFACTS. Publishing unreceipted benchmark results is forbidden.`,
+        rowOrRef: relFile,
+      });
+    }
+  }
+
+  return {
+    valid: violations.length === 0,
+    violations,
+    receiptsValidated,
+    historicalFilesVerified,
+    untrackedFiles,
   };
 }

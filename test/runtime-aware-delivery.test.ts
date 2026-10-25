@@ -13,10 +13,12 @@ import {
   negotiateEvidenceDeliveryMode,
 } from '../src/agents.js';
 import {
+  auditBenchmarkResultsDirectory,
   validateBenchmarkIntegrityBundle,
   type BenchmarkMeasurementReceipt,
 } from '../src/benchmark-integrity.js';
 import { manifestSchema, type Manifest } from '../src/config.js';
+import { DecisionsError } from '../src/decisions.js';
 import type { DecisionProvider } from '../src/providers.js';
 import { investigate } from '../src/run.js';
 
@@ -674,17 +676,238 @@ setInterval(() => {}, 1000);
   }
 });
 
-test('Issue 19 delivery-mode evaluation bundle passes full Issue 18 benchmark integrity validation', async () => {
+test('in_execution mode distinguishes transport evidence_ack from model visibility/consumption when result.evidenceConsumed is false', async () => {
+  const ws = await makeWorkspace('in-exec-ack-not-consumed-');
+  try {
+    await writeFile(join(ws, 'trace.json'), JSON.stringify({ traceEvents: [{ name: 'hot_kernel_reduce', dur: 48200 }] }));
+    const mcpResponder = await createLocalMcpResponder(ws, 10);
+
+    // Agent runtime accepts the evidence frame at transport level (evidence_ack),
+    // but the model had already finalized its response before consuming the queued frame (evidenceConsumed: false).
+    const ackOnlyAgentScript = join(ws, 'ack-only-agent.mjs');
+    await writeFile(
+      ackOnlyAgentScript,
+      `#!/usr/bin/env node
+import { createInterface } from 'node:readline';
+
+const rl = createInterface({ input: process.stdin, crlfDelay: Infinity });
+for await (const line of rl) {
+  if (!line.trim()) continue;
+  const msg = JSON.parse(line);
+  if (msg.type === 'evidence') {
+    process.stdout.write(JSON.stringify({ protocol: 'perfdigest-agent/v1', type: 'evidence_ack' }) + '\\n');
+    process.stdout.write(JSON.stringify({
+      protocol: 'perfdigest-agent/v1',
+      type: 'result',
+      sessionId: 'ack-not-consumed-1',
+      evidenceConsumed: false,
+      text: 'Response was already finalized before queued evidence entered model context.',
+      usage: { input_tokens: 190, cached_input_tokens: 0, output_tokens: 42 }
+    }) + '\\n');
+    process.exit(0);
+  }
+}
+`,
+      { mode: 0o755 },
+    );
+    await chmod(ackOnlyAgentScript, 0o755);
+
+    const manifest: Manifest = manifestSchema.parse({
+      version: 1,
+      issue: 'Distinguish runtime transport ack from model consumption',
+      captures: [],
+      reports: [{ id: 'cpu-trace', path: 'trace.json', format: 'chrome-trace', description: 'CPU trace' }],
+      verification: { command: process.execPath, args: ['-e', 'process.exit(0)'] },
+    });
+
+    const result = await investigate({
+      workspace: ws,
+      manifest,
+      routing: 'cloudflare',
+      agent: 'generic',
+      agentDelivery: 'in_execution',
+      agentAdapter: genericCliAdapter({ command: process.execPath, args: [ackOnlyAgentScript], inExecutionAsync: true }),
+      decisionProvider: makeAcceptedProvider(10),
+      mcpSessionOptions: { command: process.execPath, args: [mcpResponder] },
+    });
+
+    assert.equal(result.status, 'complete');
+    assert.equal(result.telemetry.evidenceDelivery, 'in_execution_async_input');
+    assert.equal(result.telemetry.deliveryCount, 1);
+    assert.equal(result.telemetry.evidenceConsumedInExecution, false, 'Transport ack alone must not claim model consumption when evidenceConsumed === false');
+    assert.equal(result.telemetry.evidenceConsumedAtMs, null);
+    assert.ok(result.events.some(e => e.event === 'evidence.accepted_by_runtime'), 'Transport ack is recorded');
+    assert.ok(!result.events.some(e => e.event === 'evidence.model_visible'), 'Model visibility is NOT claimed');
+    assert.ok(!result.events.some(e => e.event === 'evidence.consumed'), 'Consumption is NOT claimed');
+  } finally {
+    await rm(ws, { recursive: true, force: true });
+  }
+});
+
+test('in_execution mode preserves DecisionsError (rejected/failed) from background supplyEvidence without wrapping in AgentError', async () => {
+  const ws = await makeWorkspace('in-exec-decisions-err-');
+  try {
+    await writeFile(join(ws, 'trace.json'), JSON.stringify({ traceEvents: [{ name: 'hot_kernel_reduce', dur: 48200 }] }));
+    const mcpResponder = await createLocalMcpResponder(ws, 10);
+
+    const waitingAgentScript = join(ws, 'waiting-agent.mjs');
+    await writeFile(
+      waitingAgentScript,
+      `#!/usr/bin/env node
+setInterval(() => {}, 1000);
+`,
+      { mode: 0o755 },
+    );
+    await chmod(waitingAgentScript, 0o755);
+
+    const manifest: Manifest = manifestSchema.parse({
+      version: 1,
+      issue: 'Preserve DecisionsError during in_execution mode',
+      captures: [],
+      reports: [{ id: 'cpu-trace', path: 'trace.json', format: 'chrome-trace', description: 'CPU trace' }],
+      verification: { command: process.execPath, args: ['-e', 'process.exit(0)'] },
+    });
+
+    const rejectingProvider: DecisionProvider = {
+      name: 'cloudflare',
+      async select() {
+        throw new DecisionsError('schema');
+      },
+    };
+
+    const result = await investigate({
+      workspace: ws,
+      manifest,
+      routing: 'cloudflare',
+      agent: 'generic',
+      agentDelivery: 'in_execution',
+      agentAdapter: genericCliAdapter({ command: process.execPath, args: [waitingAgentScript], inExecutionAsync: true }),
+      decisionProvider: rejectingProvider,
+      mcpSessionOptions: { command: process.execPath, args: [mcpResponder] },
+    });
+
+    assert.equal(result.status, 'failed');
+    assert.equal(result.decisionOutcome, 'rejected');
+    assert.ok(result.decisionsError !== null, 'DecisionsError is preserved');
+    assert.equal(result.decisionsError?.kind, 'schema');
+    assert.equal(result.agentError, null, 'Background DecisionsError must not be misattributed as AgentError');
+  } finally {
+    await rm(ws, { recursive: true, force: true });
+  }
+});
+
+test('in_execution and single_turn modes record status=failed when independent verification fails and preserve read-only workspace autonomy in single_turn', async () => {
+  const ws = await makeWorkspace('in-exec-failed-verify-');
+  try {
+    await writeFile(join(ws, 'trace.json'), JSON.stringify({ traceEvents: [{ name: 'hot_kernel_reduce', dur: 48200 }] }));
+    const mcpResponder = await createLocalMcpResponder(ws, 10);
+
+    const promptCheckFile = join(ws, 'single-turn-prompt.txt');
+    const agentScript = join(ws, 'verify-fail-agent.mjs');
+    await writeFile(
+      agentScript,
+      `#!/usr/bin/env node
+import { writeFileSync } from 'node:fs';
+import { createInterface } from 'node:readline';
+
+const rl = createInterface({ input: process.stdin, crlfDelay: Infinity });
+for await (const line of rl) {
+  if (!line.trim()) continue;
+  const msg = JSON.parse(line);
+  if (msg.phase === 'review') {
+    writeFileSync(${JSON.stringify(promptCheckFile)}, msg.prompt, 'utf8');
+    process.stdout.write(JSON.stringify({
+      protocol: 'perfdigest-agent/v1',
+      type: 'result',
+      sessionId: 'single-verify-fail-1',
+      text: 'Observed failed verification in single_turn.',
+      usage: { input_tokens: 215, cached_input_tokens: 0, output_tokens: 44 }
+    }) + '\\n');
+    process.exit(0);
+  }
+  if (msg.type === 'evidence') {
+    const ev = JSON.parse(msg.evidence);
+    process.stdout.write(JSON.stringify({ protocol: 'perfdigest-agent/v1', type: 'evidence_ack' }) + '\\n');
+    process.stdout.write(JSON.stringify({
+      protocol: 'perfdigest-agent/v1',
+      type: 'result',
+      sessionId: 'inexec-verify-fail-1',
+      evidenceConsumed: true,
+      text: 'Observed verification status: ' + ev.status,
+      usage: { input_tokens: 230, cached_input_tokens: 0, output_tokens: 48 }
+    }) + '\\n');
+    process.exit(0);
+  }
+}
+`,
+      { mode: 0o755 },
+    );
+    await chmod(agentScript, 0o755);
+
+    const failingManifest: Manifest = manifestSchema.parse({
+      version: 1,
+      issue: 'Failing verification check',
+      captures: [],
+      reports: [{ id: 'cpu-trace', path: 'trace.json', format: 'chrome-trace', description: 'CPU trace' }],
+      verification: { command: process.execPath, args: ['-e', 'process.exit(2)'] },
+    });
+
+    const inExecRes = await investigate({
+      workspace: ws,
+      manifest: failingManifest,
+      routing: 'cloudflare',
+      agent: 'generic',
+      agentDelivery: 'in_execution',
+      agentAdapter: genericCliAdapter({ command: process.execPath, args: [agentScript], inExecutionAsync: true }),
+      decisionProvider: makeAcceptedProvider(10),
+      mcpSessionOptions: { command: process.execPath, args: [mcpResponder] },
+    });
+    assert.equal(inExecRes.status, 'failed');
+    assert.equal(inExecRes.verification?.exitCode, 2);
+    assert.match(inExecRes.review?.text ?? '', /Observed verification status: failed/);
+
+    const singleRes = await investigate({
+      workspace: ws,
+      manifest: failingManifest,
+      routing: 'cloudflare',
+      agent: 'generic',
+      agentDelivery: 'single_turn',
+      agentAdapter: genericCliAdapter({ command: process.execPath, args: [agentScript], inExecutionAsync: false }),
+      decisionProvider: makeAcceptedProvider(10),
+      mcpSessionOptions: { command: process.execPath, args: [mcpResponder] },
+    });
+    assert.equal(singleRes.status, 'failed');
+    assert.equal(singleRes.verification?.exitCode, 2);
+
+    const capturedPrompt = await readFile(promptCheckFile, 'utf8');
+    assert.match(capturedPrompt, /in read-only mode using the workspace/);
+    assert.doesNotMatch(capturedPrompt, /Do not run commands/);
+  } finally {
+    await rm(ws, { recursive: true, force: true });
+  }
+});
+
+test('Issue 19 delivery-mode evaluation bundle passes full Issue 18 benchmark integrity validation and directory receipt audit', async () => {
   const cellsCsv = await readFile(join(process.cwd(), 'bench/results/2026-10-25-issue19-delivery-modes-cells.csv'), 'utf8');
   const summaryCsv = await readFile(join(process.cwd(), 'bench/results/2026-10-25-issue19-delivery-modes-summary.csv'), 'utf8');
+  const sourceTraceText = await readFile(join(process.cwd(), 'bench/results/2026-10-25-issue19-delivery-modes-trace.json'), 'utf8');
   const receipt = JSON.parse(
     await readFile(join(process.cwd(), 'bench/results/2026-10-25-issue19-measurement-receipt.json'), 'utf8'),
   ) as BenchmarkMeasurementReceipt;
 
-  const result = validateBenchmarkIntegrityBundle({ cellsCsv, summaryCsv, receipt });
+  const result = validateBenchmarkIntegrityBundle({
+    cellsCsv,
+    summaryCsv,
+    sourceTraceText,
+    requireSourceTraceVerification: true,
+    receipt,
+  });
   assert.equal(result.valid, true, `Violations: ${JSON.stringify(result.violations)}`);
   assert.equal(result.checkedCellsCount, 24);
   assert.equal(result.checkedSummaryRowsCount, 6);
+
+  const dirAudit = await auditBenchmarkResultsDirectory(process.cwd());
+  assert.equal(dirAudit.valid, true, `Directory audit violations: ${JSON.stringify(dirAudit.violations)}`);
 });
 
 

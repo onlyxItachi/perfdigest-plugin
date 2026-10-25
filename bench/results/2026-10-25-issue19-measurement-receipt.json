@@ -1,13 +1,13 @@
 {
   "schema": "perfdigest.benchmark.measurement-receipt.v1",
   "experimentId": "2026-10-25-issue19-delivery-modes",
-  "generatedAtUtc": "2026-10-25T18:35:00.000Z",
+  "generatedAtUtc": "2026-10-25T19:38:00.000Z",
   "gitSha": "daf32c53ddf1e189d4fa2a5f0bfacc670bb85325",
   "runnerVersion": "0.1.0",
   "reconciledFromSourceArtifact": null,
   "cellsCsvRef": "bench/results/2026-10-25-issue19-delivery-modes-cells.csv",
   "summaryCsvRef": "bench/results/2026-10-25-issue19-delivery-modes-summary.csv",
-  "sourceTraceRef": "docs/EVIDENCE_DELIVERY.md",
+  "sourceTraceRef": "bench/results/2026-10-25-issue19-delivery-modes-trace.json",
   "sampleSize": {
     "totalCells": 24,
     "completeCells": 24,
@@ -35,7 +35,7 @@
   "nativeToolsEnabledInRawBaseline": true,
   "oracleLeakageCheckPassed": true,
   "limitations": [
-    "Evaluates runtime-aware delivery modes (in_execution_async_input vs single_turn_with_evidence fallback) using local contract fixture agents and loopback SystemOne HTTP to avoid paid API spend.",
+    "Evaluates runtime-aware delivery modes (in_execution_async_input vs single_turn_with_evidence fallback) via real investigate() executions using local contract fixture CLI agents, real PerfDigest MCP stdio session digestion, and loopback SystemOne HTTP to avoid paid API spend.",
     "External CLIs without mid-turn stdin injection (codex, agy, claude) deterministically negotiate single_turn_with_evidence when invoked via perfdigest-plugin run --agent-delivery auto, or use get_evidence_job(waitMs) when connected via MCP."
   ]
 }

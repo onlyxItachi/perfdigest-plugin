@@ -450,7 +450,7 @@ func (s *genericSessionImpl) TurnInExecution(
 		if ae, ok := err.(*AgentError); ok {
 			return InExecutionTurnResult{}, NewAgentError(ae.Kind, "in_execution", ae.RawMessage)
 		}
-		return InExecutionTurnResult{}, NewAgentError(AgentErrFailed, "in_execution", err.Error())
+		return InExecutionTurnResult{}, err
 	}
 	if s.adapter.opts.Sessions && res.turn.sessionID != nil && *res.turn.sessionID != "" {
 		sid := *res.turn.sessionID
@@ -597,7 +597,6 @@ func runGenericInExecutionTurn(
 				}
 				if shouldAck {
 					emit("evidence.accepted_by_runtime", "generic-cli in-execution evidence_ack")
-					emit("evidence.model_visible", "generic-cli in-execution stream")
 				}
 			}
 			if rerr != nil {
@@ -728,15 +727,24 @@ func runGenericInExecutionTurn(
 	stdinMu.Unlock()
 
 	earlyCompletion := !delivered
-	evConsumedFlag, _ := r["evidenceConsumed"].(bool)
-	consumed := delivered && (evConsumedFlag || sawAckLine)
+	evConsumedRaw, hasEvConsumed := r["evidenceConsumed"]
+	evConsumedFlag, isBool := evConsumedRaw.(bool)
+	hasAckFrame := didAck || sawAckLine
+	var consumed bool
+	if delivered {
+		if hasEvConsumed && isBool {
+			consumed = evConsumedFlag
+		} else {
+			consumed = hasAckFrame
+		}
+	}
 	if earlyCompletion {
 		emit("agent.in_execution.completed_before_evidence", "Agent solved and exited before background evidence arrived")
 	} else if consumed {
 		if !didAck {
 			emit("evidence.accepted_by_runtime", "generic-cli in-execution result")
-			emit("evidence.model_visible", "generic-cli in-execution stream")
 		}
+		emit("evidence.model_visible", "generic-cli in-execution stream")
 		emit("evidence.consumed", "Agent consumed in-execution evidence in single execution")
 	}
 
