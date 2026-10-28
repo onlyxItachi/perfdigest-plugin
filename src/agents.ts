@@ -1,6 +1,13 @@
 import { spawn } from 'node:child_process';
 import type { ModelReasoningEffort, Thread, Usage } from '@openai/codex-sdk';
-import { codexThread, codexTurn } from './codex.js';
+import {
+  codexAppServerInExecutionTurn,
+  codexAppServerPreflight,
+  CodexProtocolError,
+  codexThread,
+  codexTurn,
+  type CodexSteeringMechanism,
+} from './codex.js';
 import { childEnvironment, redact } from './environment.js';
 import type { AgentDeliveryMode, CommandReceipt, Emit, EvidencePacket } from './config.js';
 
@@ -49,6 +56,7 @@ export interface AgentCapabilities {
 
 export type KnownAgentRuntimeId =
   | 'codex'
+  | 'codex-app-server'
   | 'agy'
   | 'claude'
   | 'generic-cli'
@@ -57,6 +65,11 @@ export type KnownAgentRuntimeId =
 /**
  * Returns the verified runtime capability profile for known agent CLIs and harnesses.
  * Notably:
+ * - `codex-app-server` (`codex app-server --listen stdio://` 0.165.0+) supports live mid-turn steering
+ *   via `turn/steer` (with `expectedTurnId` precondition) and `turn/start` `toolOutput` (`ExternalMessage`),
+ *   as well as `turn/interrupt` and incremental/total `ThreadTokenUsage`.
+ * - `codex` (`@openai/codex-sdk` `codex exec` per-turn CLI mode) supports `sameSessionContinuation`
+ *   across turns via `codex exec resume <threadId>`, but not mid-turn steering within a single `codex exec` invocation.
  * - `agy -p` and `claude -p` support `queuedStdinNextTurn` (`--input-format stream-json`) and
  *   `inExecutionToolDelivery` (MCP tools), but do NOT support unsolicited `inExecutionAsyncInput`
  *   into an active print-mode turn.
@@ -64,10 +77,26 @@ export type KnownAgentRuntimeId =
  */
 export function getRuntimeCapabilityProfile(
   runtimeId: KnownAgentRuntimeId,
-  options: { sessions?: boolean } = {},
+  options: { sessions?: boolean; inExecutionAsync?: boolean } = {},
 ): AgentCapabilities {
   switch (runtimeId) {
+    case 'codex-app-server':
+      return {
+        sameSessionContinuation: true,
+        nativeAsyncInput: true,
+        cancellation: true,
+        usageReporting: true,
+        sandbox: 'read-only',
+        inExecutionAsyncInput: 'supported',
+        inExecutionToolDelivery: 'supported',
+        queuedStdinNextTurn: 'unsupported',
+        interruptionAndSteering: 'supported',
+        usageReportingSemantics: 'incremental_per_turn',
+      };
     case 'codex':
+      if (options.inExecutionAsync) {
+        return getRuntimeCapabilityProfile('codex-app-server');
+      }
       return {
         sameSessionContinuation: true,
         nativeAsyncInput: false,
@@ -390,16 +419,121 @@ export interface AgentAdapter {
   start(options: { workspace: string; signal: AbortSignal }): Promise<AgentSession>;
 }
 
-/** Codex SDK adapter: preserves the existing same-thread delivery, isolation and event names. */
-export function codexAdapter(options: { model?: string; effort?: ModelReasoningEffort } = {}): AgentAdapter {
+export interface CodexAdapterOptions {
+  model?: string;
+  effort?: ModelReasoningEffort;
+  /** Enables live mid-turn steering via `codex app-server --listen stdio://`. */
+  inExecutionAsync?: boolean;
+  /** Selects `turn/steer` (with `expectedTurnId` precondition) or `toolOutput` (`ExternalMessage` wire format). */
+  steeringMechanism?: CodexSteeringMechanism;
+  /** Test-only override to verify mismatched/expired `expectedTurnId` rejection. */
+  overrideExpectedTurnId?: string;
+  /** Per-turn timeout in ms for `turnInExecution` (default 120000). */
+  timeoutMs?: number;
+  /** Bound on stdout bytes accepted from `codex app-server` (default 4 MiB). */
+  maxOutputBytes?: number;
+}
+
+/** Codex SDK & App Server adapter: supports both two-turn/single-turn SDK mode and live `codex app-server` mid-turn steering. */
+export function codexAdapter(options: CodexAdapterOptions = {}): AgentAdapter {
+  const inExecutionAsync = options.inExecutionAsync ?? false;
+  const timeoutMs = options.timeoutMs ?? 120_000;
+  const maxOutputBytes = options.maxOutputBytes ?? 4_194_304;
+  const capabilities: AgentCapabilities = inExecutionAsync
+    ? getRuntimeCapabilityProfile('codex-app-server')
+    : {
+        sameSessionContinuation: true,
+        nativeAsyncInput: false,
+        cancellation: true,
+        usageReporting: true,
+        sandbox: 'read-only',
+      };
+
   return {
-    name: 'codex', eventPrefix: 'codex',
-    capabilities: { sameSessionContinuation: true, nativeAsyncInput: false, cancellation: true, usageReporting: true, sandbox: 'read-only' },
+    name: 'codex',
+    eventPrefix: 'codex',
+    capabilities,
     async start({ workspace }) {
-      const thread: Thread = await codexThread(workspace, options.model, options.effort);
+      if (!inExecutionAsync) {
+        const thread: Thread = await codexThread(workspace, options.model, options.effort);
+        return {
+          get id() {
+            return thread.id;
+          },
+          turn: (prompt, phase, { signal, emit }) => codexTurn(thread, prompt, phase, signal, emit),
+        };
+      }
+
+      const preflight = await codexAppServerPreflight(workspace);
+      let currentThreadId: string | null = null;
+      let fallbackThread: Thread | null = null;
+
       return {
-        get id() { return thread.id; },
-        turn: (prompt, phase, { signal, emit }) => codexTurn(thread, prompt, phase, signal, emit),
+        get id() {
+          return currentThreadId ?? fallbackThread?.id ?? null;
+        },
+        async turn(prompt, phase, { signal, emit }) {
+          if (!fallbackThread) {
+            fallbackThread = await codexThread(workspace, options.model, options.effort);
+          }
+          const t = await codexTurn(fallbackThread, prompt, phase, signal, emit);
+          currentThreadId = t.threadId;
+          return t;
+        },
+        async turnInExecution(prompt, supplyEvidence, { signal, emit }) {
+          const phase: AgentPhase = 'in_execution';
+          emit('codex.in_execution.started');
+          emit('codex.analysis.started');
+          const deadlineController = new AbortController();
+          let timedOut = false;
+          const timer = setTimeout(() => {
+            timedOut = true;
+            deadlineController.abort(new Error(`no result within ${timeoutMs} ms`));
+          }, timeoutMs);
+          timer.unref?.();
+          const combined = AbortSignal.any([signal, deadlineController.signal]);
+          let supplyError: unknown;
+          let hasSupplyError = false;
+          const trackedSupplyEvidence = async () => {
+            try {
+              return await supplyEvidence();
+            } catch (err) {
+              hasSupplyError = true;
+              supplyError = err;
+              throw err;
+            }
+          };
+
+          const result = await codexAppServerInExecutionTurn({
+            workspace,
+            prompt,
+            supplyEvidence: trackedSupplyEvidence,
+            signal: combined,
+            emit,
+            preflight,
+            ...(options.model ? { model: options.model } : {}),
+            ...(options.effort ? { effort: options.effort } : {}),
+            ...(options.steeringMechanism ? { steeringMechanism: options.steeringMechanism } : {}),
+            ...(options.overrideExpectedTurnId ? { overrideExpectedTurnId: options.overrideExpectedTurnId } : {}),
+            timeoutMs,
+            maxOutputBytes,
+          })
+            .catch((error: unknown) => {
+              if (timedOut) throw new AgentError('timed_out', phase, `no result within ${timeoutMs} ms`);
+              if (signal.aborted) throw new AgentError('cancelled', phase, 'run cancelled');
+              if (hasSupplyError) throw supplyError;
+              if (error instanceof AgentError) throw new AgentError(error.kind, phase, error.message);
+              if (error instanceof CodexProtocolError) throw new AgentError('protocol', phase, error.message);
+              throw new AgentError('failed', phase, error instanceof Error ? error.message : String(error));
+            })
+            .finally(() => clearTimeout(timer));
+
+          currentThreadId = result.turn.threadId;
+          emit('codex.analysis.completed');
+          emit('codex.review.completed');
+          emit('codex.in_execution.completed');
+          return result;
+        },
       };
     },
   };

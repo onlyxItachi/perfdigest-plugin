@@ -28,8 +28,9 @@ type RunOptions struct {
 	DecisionProvider     DecisionProvider
 	McpSessionOptions    *SessionOptions
 	ReuseMcpSession      *bool
-	IncludeCorroborating bool
-	CompactEvidence      *bool
+	IncludeCorroborating   bool
+	CompactEvidence        *bool
+	CodexSteeringMechanism string
 }
 
 type RunTelemetry struct {
@@ -283,7 +284,13 @@ func resolveAgent(opts RunOptions) (AgentAdapter, error) {
 		return opts.AgentAdapter, nil
 	}
 	if opts.Agent == "codex" {
-		return CodexAdapter(opts.Model, opts.Effort), nil
+		enableInExec := opts.AgentDelivery == "in_execution" || opts.AgentDelivery == "auto"
+		return CodexAdapterWithOptions(CodexAdapterOptions{
+			Model:             opts.Model,
+			Effort:            opts.Effort,
+			InExecutionAsync:  enableInExec,
+			SteeringMechanism: opts.CodexSteeringMechanism,
+		}), nil
 	}
 	return nil, NewAgentError(AgentErrUnsupported, "start", fmt.Sprintf("agent %s requires an explicit adapter", opts.Agent))
 }
@@ -383,6 +390,11 @@ func Investigate(parentCtx context.Context, options RunOptions) (RunResult, erro
 
 	runPipeline := func() error {
 		var err error
+		if options.CodexSteeringMechanism != "" &&
+			options.CodexSteeringMechanism != "turn_steer" &&
+			options.CodexSteeringMechanism != "tool_output" {
+			return NewAgentError(AgentErrUnsupported, "start", "codexSteeringMechanism must be turn_steer or tool_output")
+		}
 		adapter, err = resolveAgent(options)
 		if err != nil {
 			return err
@@ -517,7 +529,7 @@ func Investigate(parentCtx context.Context, options RunOptions) (RunResult, erro
 					"Give a concise evidence report (at most 250 words): supported observations, alternatives, verification outcome, limitations and next step. "+
 					"A successful command is only that command's result, not proof of a fix. No patch was applied by this runner. "+
 					"Routing confidence is not correctness. Cost is unknown unless independently billed.\n<UNTRUSTED_ISSUE>\n%s\n</UNTRUSTED_ISSUE>",
-				manifest.Issue,
+				escapeUntrustedIssue(manifest.Issue),
 			)
 
 			var supplyOnce sync.Once
@@ -620,7 +632,7 @@ func Investigate(parentCtx context.Context, options RunOptions) (RunResult, erro
 						"Give a concise evidence report (at most 250 words): supported observations, alternatives, verification outcome, limitations and next step. "+
 						"A successful command is only that command's result, not proof of a fix. No patch was applied by this runner. "+
 						"Routing confidence is not correctness. Cost is unknown unless independently billed.\n<UNTRUSTED_ISSUE>\n%s\n</UNTRUSTED_ISSUE>\n<UNTRUSTED_EVIDENCE_DATA>\n%s\n</UNTRUSTED_EVIDENCE_DATA>",
-					manifest.Issue, FormatAgentEvidence(evidence, verification, status, useCompact),
+					escapeUntrustedIssue(manifest.Issue), escapeUntrustedEvidenceData(FormatAgentEvidence(evidence, verification, status, useCompact)),
 				)
 				deliv := "single_turn_with_evidence"
 				evidenceDelivery = &deliv
