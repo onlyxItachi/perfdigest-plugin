@@ -1041,17 +1041,20 @@ test('Issue 19 delivery-mode evaluation generator produces a receipt-validated b
   try {
     const evalScript = join(process.cwd(), 'scripts', 'evaluate-delivery-modes.mjs');
     const { stdout } = await execFileAsync(process.execPath, [evalScript, '--out-dir', outRootDir]);
-    const summaryJson = JSON.parse(stdout) as { valid: boolean; checkedCellsCount: number; checkedSummaryRowsCount: number };
+    const summaryJson = JSON.parse(stdout) as {
+      valid: boolean;
+      checkedCellsCount: number;
+      checkedSummaryRowsCount: number;
+      receiptPath: string;
+    };
     assert.equal(summaryJson.valid, true);
     assert.equal(summaryJson.checkedCellsCount, 24);
     assert.equal(summaryJson.checkedSummaryRowsCount, 6);
 
-    const cellsCsv = await readFile(join(outRootDir, 'bench/results/2026-10-25-issue19-delivery-modes-cells.csv'), 'utf8');
-    const summaryCsv = await readFile(join(outRootDir, 'bench/results/2026-10-25-issue19-delivery-modes-summary.csv'), 'utf8');
-    const sourceTraceText = await readFile(join(outRootDir, 'bench/results/2026-10-25-issue19-delivery-modes-trace.json'), 'utf8');
-    const receipt = JSON.parse(
-      await readFile(join(outRootDir, 'bench/results/2026-10-25-issue19-delivery-modes-measurement-receipt.json'), 'utf8'),
-    ) as BenchmarkMeasurementReceipt;
+    const receipt = JSON.parse(await readFile(summaryJson.receiptPath, 'utf8')) as BenchmarkMeasurementReceipt;
+    const cellsCsv = await readFile(join(outRootDir, receipt.cellsCsvRef), 'utf8');
+    const summaryCsv = await readFile(join(outRootDir, receipt.summaryCsvRef), 'utf8');
+    const sourceTraceText = await readFile(join(outRootDir, receipt.sourceTraceRef), 'utf8');
 
     const result = validateBenchmarkIntegrityBundle({
       cellsCsv,

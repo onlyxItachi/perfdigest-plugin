@@ -14,14 +14,15 @@ import { genericCliAdapter } from './agents.js';
 const help = `PerfDigest Evidence — Codex-first MVP
 
   perfdigest-plugin init [--provider cloudflare|local|openai|offline --yes] [--env-file PATH] [--endpoint URL] [--decision-model clef-flash|clef|clef-omni] [--check-connection]
-  perfdigest-plugin demo [--agent none|codex|generic] [--agent-command PATH] [--agent-sessions] [--agent-in-execution-async] [--agent-delivery auto|in_execution|single_turn|two_turn] [--strict-delivery-mode] [--routing offline|decisions] [--decision-model NAME] [--perf]
-  perfdigest-plugin run manifest.json [--workspace PATH] [--routing decisions|offline] [--agent codex|none|generic] [--agent-command PATH] [--agent-sessions] [--agent-in-execution-async] [--agent-delivery auto|in_execution|single_turn|two_turn] [--strict-delivery-mode] [--decision-model NAME]
+  perfdigest-plugin demo [--agent none|codex|generic] [--agent-command PATH] [--agent-sessions] [--agent-in-execution-async] [--agent-delivery auto|in_execution|single_turn|two_turn] [--codex-steering-mechanism turn_steer|tool_output] [--strict-delivery-mode] [--routing offline|decisions] [--decision-model NAME] [--perf]
+  perfdigest-plugin run manifest.json [--workspace PATH] [--routing decisions|offline] [--agent codex|none|generic] [--agent-command PATH] [--agent-sessions] [--agent-in-execution-async] [--agent-delivery auto|in_execution|single_turn|two_turn] [--codex-steering-mechanism turn_steer|tool_output] [--strict-delivery-mode] [--decision-model NAME]
   perfdigest-plugin mcp [--workspace PATH]
 
 Unconfigured demo defaults: real local CPU measurements + verification, offline routing, no model calls.
 Unconfigured run defaults: existing Codex ChatGPT login + live Decisions (PERFDIGEST_DECISIONS_API_KEY).
 Use --agent codex to demonstrate overlap with a real Codex session, or --agent generic --agent-command PATH for a JSONL CLI agent.
 --agent-delivery selects auto, in_execution, single_turn (evidence-first single turn), or two_turn (default concurrent analysis + review).
+--codex-steering-mechanism selects turn_steer (default) or tool_output for mid-turn evidence steering in Codex app-server mode.
 --agent-in-execution-async opts a generic CLI agent into the perfdigest-agent/v1 in-execution async evidence streaming protocol.
 --strict-delivery-mode fails closed if in_execution delivery is requested on an adapter without inExecutionAsyncInput support.
 --perf adds Linux hardware counters; otherwise the demo uses genuine elapsed-time traces.
@@ -37,6 +38,7 @@ async function main() {
     agent: { type: 'string' }, 'agent-command': { type: 'string' }, 'agent-sessions': { type: 'boolean' },
     'agent-in-execution-async': { type: 'boolean' },
     'agent-delivery': { type: 'string' }, 'strict-delivery-mode': { type: 'boolean' }, 'compact-evidence': { type: 'boolean' },
+    'codex-steering-mechanism': { type: 'string' },
     routing: { type: 'string' }, provider: { type: 'string' }, model: { type: 'string' }, perf: { type: 'boolean' },
     endpoint: { type: 'string' }, 'env-file': { type: 'string' }, 'decision-model': { type: 'string' }, yes: { type: 'boolean' }, 'check-connection': { type: 'boolean' },
   } });
@@ -91,6 +93,14 @@ async function main() {
     throw new Error('--agent-delivery must be auto, in_execution, two_turn or single_turn');
   }
   const agentDelivery = agentDeliveryRaw as AgentDeliveryMode | undefined;
+  const codexSteeringRaw = values['codex-steering-mechanism'];
+  if (codexSteeringRaw !== undefined && agent !== 'codex') {
+    throw new Error('--codex-steering-mechanism requires --agent codex');
+  }
+  if (codexSteeringRaw !== undefined && codexSteeringRaw !== 'turn_steer' && codexSteeringRaw !== 'tool_output') {
+    throw new Error('--codex-steering-mechanism must be turn_steer or tool_output');
+  }
+  const codexSteeringMechanism = codexSteeringRaw as 'turn_steer' | 'tool_output' | undefined;
   const agentAdapter = agent === 'generic'
     ? genericCliAdapter({
         command: values['agent-command']!,
@@ -109,6 +119,7 @@ async function main() {
     const result = await investigate({ workspace, manifest, routing, agent, signal: abort.signal, ...modelOption,
       ...(agentAdapter ? { agentAdapter } : {}),
       ...(agentDelivery !== undefined ? { agentDelivery } : {}),
+      ...(codexSteeringMechanism !== undefined ? { codexSteeringMechanism } : {}),
       ...(values['strict-delivery-mode'] !== undefined ? { strictDeliveryMode: values['strict-delivery-mode'] } : {}),
       ...(values['compact-evidence'] !== undefined ? { compactEvidence: values['compact-evidence'] } : {}),
       ...(values.model ? { model: values.model } : {}),
