@@ -24,6 +24,12 @@ const helpText = `PerfDigest Evidence — Codex-first MVP
   perfdigest-plugin demo [--agent none|codex|generic] [--agent-command PATH] [--agent-sessions] [--agent-in-execution-async] [--agent-delivery auto|in_execution|single_turn|two_turn] [--codex-steering-mechanism turn_steer|tool_output] [--strict-delivery-mode] [--routing offline|decisions] [--decision-model NAME] [--model NAME] [--effort minimal|low|medium|high|xhigh|max] [--perf]
   perfdigest-plugin run manifest.json [--workspace PATH] [--routing decisions|offline] [--agent codex|none|generic] [--agent-command PATH] [--agent-sessions] [--agent-in-execution-async] [--agent-delivery auto|in_execution|single_turn|two_turn] [--codex-steering-mechanism turn_steer|tool_output] [--strict-delivery-mode] [--decision-model NAME] [--model NAME] [--effort minimal|low|medium|high|xhigh|max]
   perfdigest-plugin mcp [--workspace PATH]
+  perfdigest-plugin evidence run manifest.json [--workspace PATH] [--provider cloudflare|local|openai|offline] [--decision-model NAME] [--compact-evidence] [--include-corroborating] [--json]
+  perfdigest-plugin evidence start manifest.json [--workspace PATH] [--provider cloudflare|local|openai|offline] [--decision-model NAME] [--compact-evidence] [--include-corroborating]
+  perfdigest-plugin evidence status <jobId> [--workspace PATH]
+  perfdigest-plugin evidence wait <jobId> [--workspace PATH] [--timeout-ms 30000]
+  perfdigest-plugin evidence collect <jobId> [--workspace PATH] [--full]
+  perfdigest-plugin evidence cancel <jobId> [--workspace PATH]
 
 Unconfigured demo defaults: real local CPU measurements + verification, offline routing, no model calls.
 Unconfigured run defaults: existing Codex ChatGPT login + live Decisions (PERFDIGEST_DECISIONS_API_KEY).
@@ -65,6 +71,10 @@ type cliFlags struct {
 	reuseMcpSession      *bool
 	includeCorroborating bool
 	compactEvidence      *bool
+	jsonOutput           bool
+	fullOutput           bool
+	timeoutMs            *string
+	jobID                *string
 	serveJSONL           bool
 	benchInvestigate     bool
 	zeroCostMcp          bool
@@ -96,6 +106,8 @@ func parseCLIArgs(args []string) (cliFlags, error) {
 		"--check-connection":         true,
 		"--include-corroborating":    true,
 		"--compact-evidence":         true,
+		"--json":                     true,
+		"--full":                     true,
 		"--serve-jsonl":              true,
 		"--bench-investigate":        true,
 		"--zero-cost-mcp":            true,
@@ -114,6 +126,8 @@ func parseCLIArgs(args []string) (cliFlags, error) {
 		"--endpoint":           true,
 		"--env-file":           true,
 		"--decision-model":     true,
+		"--timeout-ms":         true,
+		"--job-id":             true,
 		"--decisions-mock-url": true,
 		"--mcp-command":        true,
 		"--mcp-arg":            true,
@@ -168,6 +182,10 @@ func parseCLIArgs(args []string) (cliFlags, error) {
 				f.includeCorroborating = val
 			case "--compact-evidence":
 				f.compactEvidence = &val
+			case "--json":
+				f.jsonOutput = val
+			case "--full":
+				f.fullOutput = val
 			case "--serve-jsonl":
 				f.serveJSONL = val
 			case "--bench-investigate":
@@ -215,6 +233,10 @@ func parseCLIArgs(args []string) (cliFlags, error) {
 				f.envFile = &val
 			case "--decision-model":
 				f.decisionModel = &val
+			case "--timeout-ms":
+				f.timeoutMs = &val
+			case "--job-id":
+				f.jobID = &val
 			case "--decisions-mock-url":
 				f.decisionsMockURL = &val
 			case "--mcp-command":
@@ -690,8 +712,85 @@ func runCLI() error {
 	if f.yes != nil || f.endpoint != nil || f.envFile != nil || f.checkConnection != nil {
 		return errors.New("--yes, --endpoint, --env-file and --check-connection belong to init; configure the workspace first")
 	}
-	if command != "demo" && command != "run" && command != "mcp" {
+	if command != "demo" && command != "run" && command != "mcp" && command != "evidence" {
 		return errors.New("Unknown command; use --help")
+	}
+	if command == "evidence" {
+		if len(f.positionals) < 2 {
+			return errors.New("evidence requires a subcommand: run, start, status, wait, collect or cancel")
+		}
+		sub := f.positionals[1]
+		if sub == "_worker" {
+			jobID := ""
+			if f.jobID != nil {
+				jobID = *f.jobID
+			} else if len(f.positionals) >= 3 {
+				jobID = f.positionals[2]
+			}
+			if jobID == "" {
+				return errors.New("evidence _worker requires --job-id <id>")
+			}
+			return perfdigest.RunDetachedEvidenceWorker(ctx, workspace, jobID)
+		}
+		if sub == "status" || sub == "wait" || sub == "collect" || sub == "cancel" {
+			jobID := ""
+			if len(f.positionals) >= 3 {
+				jobID = f.positionals[2]
+			} else if f.jobID != nil {
+				jobID = *f.jobID
+			}
+			if jobID == "" {
+				return fmt.Errorf("evidence %s requires a jobId", sub)
+			}
+			switch sub {
+			case "status":
+				out, err := perfdigest.GetEvidenceWorkerStatus(workspace, jobID)
+				if err != nil {
+					return err
+				}
+				encoded, _ := json.MarshalIndent(out, "", "  ")
+				fmt.Println(perfdigest.Redact(string(encoded)))
+				return nil
+			case "wait":
+				timeoutMs := perfdigest.DefaultEvidenceWaitTimeoutMs
+				if f.timeoutMs != nil {
+					n, nerr := strconv.Atoi(*f.timeoutMs)
+					if nerr != nil || n < 0 || n > perfdigest.MaxEvidenceWaitTimeoutMs {
+						return fmt.Errorf("--timeout-ms must be an integer between 0 and %d", perfdigest.MaxEvidenceWaitTimeoutMs)
+					}
+					timeoutMs = n
+				}
+				out, err := perfdigest.WaitEvidenceWorker(ctx, workspace, jobID, timeoutMs)
+				if err != nil {
+					return err
+				}
+				encoded, _ := json.MarshalIndent(out, "", "  ")
+				fmt.Println(perfdigest.Redact(string(encoded)))
+				if out.Status != "complete" {
+					os.Exit(1)
+				}
+				return nil
+			case "collect":
+				out, err := perfdigest.CollectEvidenceWorker(workspace, jobID, f.fullOutput)
+				if err != nil {
+					return err
+				}
+				encoded, _ := json.MarshalIndent(out, "", "  ")
+				fmt.Println(perfdigest.Redact(string(encoded)))
+				return nil
+			case "cancel":
+				out, err := perfdigest.CancelEvidenceWorker(workspace, jobID)
+				if err != nil {
+					return err
+				}
+				encoded, _ := json.MarshalIndent(out, "", "  ")
+				fmt.Println(perfdigest.Redact(string(encoded)))
+				return nil
+			}
+		}
+		if sub != "run" && sub != "start" {
+			return fmt.Errorf("Unknown evidence subcommand: %s", sub)
+		}
 	}
 
 	configured, err := perfdigest.LoadConfiguration(workspace)
@@ -769,6 +868,76 @@ func runCLI() error {
 			McpSessionOptions: mcpSessionOptions,
 			ReuseMcpSession:   f.reuseMcpSession,
 		})
+	}
+
+	if command == "evidence" {
+		sub := f.positionals[1]
+		if len(f.positionals) < 3 {
+			return fmt.Errorf("evidence %s requires a manifest path", sub)
+		}
+		manifestPath := f.positionals[2]
+		if !filepath.IsAbs(manifestPath) {
+			cwd, _ := os.Getwd()
+			manifestPath = filepath.Join(cwd, manifestPath)
+		}
+		rawBytes, err := os.ReadFile(manifestPath)
+		if err != nil {
+			return err
+		}
+		manifest, err := perfdigest.ParseManifest(rawBytes)
+		if err != nil {
+			return err
+		}
+		compact := true
+		if f.compactEvidence != nil {
+			compact = *f.compactEvidence
+		}
+		if sub == "start" {
+			out, err := perfdigest.StartEvidenceWorker(perfdigest.EvidenceWorkerStartOptions{
+				Workspace:            workspace,
+				Manifest:             manifest,
+				Routing:              routing,
+				CloudflareModel:      cloudflareModel,
+				CompactEvidence:      &compact,
+				IncludeCorroborating: f.includeCorroborating,
+				DecisionsMockURL:     decisionsMockURL,
+				McpSessionOptions:    mcpSessionOptions,
+				ReuseMcpSession:      f.reuseMcpSession,
+			})
+			if err != nil {
+				return err
+			}
+			encoded, _ := json.MarshalIndent(out, "", "  ")
+			fmt.Println(perfdigest.Redact(string(encoded)))
+			return nil
+		}
+		out, err := perfdigest.RunEvidenceWorker(ctx, perfdigest.EvidenceWorkerRunOptions{
+			Workspace:            workspace,
+			Manifest:             manifest,
+			Routing:              routing,
+			CloudflareModel:      cloudflareModel,
+			CompactEvidence:      &compact,
+			IncludeCorroborating: f.includeCorroborating,
+			DecisionsMockURL:     decisionsMockURL,
+			McpSessionOptions:    mcpSessionOptions,
+			ReuseMcpSession:      f.reuseMcpSession,
+			OnEvent: func(event, detail string) {
+				if detail != "" {
+					_, _ = fmt.Fprintf(os.Stderr, "%s: %s\n", event, perfdigest.Redact(detail))
+				} else {
+					_, _ = fmt.Fprintf(os.Stderr, "%s\n", event)
+				}
+			},
+		})
+		if err != nil {
+			return err
+		}
+		encoded, _ := json.MarshalIndent(out, "", "  ")
+		fmt.Println(perfdigest.Redact(string(encoded)))
+		if out.Status != "complete" {
+			os.Exit(1)
+		}
+		return nil
 	}
 
 	agent := "codex"

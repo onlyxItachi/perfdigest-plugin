@@ -1,4 +1,4 @@
-import { realpath, writeFile } from 'node:fs/promises';
+import { realpath } from 'node:fs/promises';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import type { ModelReasoningEffort } from '@openai/codex-sdk';
@@ -21,7 +21,7 @@ import {
 import { DecisionsError, type DecisionsFailure } from './decisions.js';
 import { createDecisionProvider, providerName, type DecisionProvider } from './providers.js';
 import { gatherEvidence } from './evidence.js';
-import { newRunDirectory, reportFile, writeJson } from './files.js';
+import { ensureRunDirectory, newRunDirectory, reportFile, writeJson, writePrivateFile } from './files.js';
 import { redact } from './environment.js';
 import type { PerfDigestSessionOptions } from './perfdigest.js';
 
@@ -62,6 +62,10 @@ export interface RunOptions {
   compactEvidence?: boolean;
   /** Selects `turn_steer` (default) or `tool_output` when Codex App Server mid-turn steering is active. */
   codexSteeringMechanism?: CodexSteeringMechanism;
+  /** Optional pre-allocated run directory (must be a direct child of <workspace>/.perfdigest/runs). */
+  runDirectory?: string;
+  /** Optional explicit EvidenceDelivery label (e.g. 'skill_background_worker' when invoked via background worker). */
+  evidenceDeliveryOverride?: EvidenceDelivery;
 }
 
 export interface RunTelemetry {
@@ -121,7 +125,9 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
   const provider = options.decisionProvider ?? createDecisionProvider(options.routing, {
     ...(options.decisionsMockURL ? { decisionsMockURL: options.decisionsMockURL } : {}),
     ...(options.cloudflareModel !== undefined ? { cloudflareModel: options.cloudflareModel } : {}) });
-  const directory = await newRunDirectory(workspace);
+  const directory = options.runDirectory
+    ? await ensureRunDirectory(workspace, options.runDirectory)
+    : await newRunDirectory(workspace);
   const start = performance.now();
   const controller = new AbortController();
   const deadlineTimer = setTimeout(() => controller.abort(new Error('Investigation timed out after 240000 ms')), 240_000);
@@ -140,7 +146,7 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
   let analysis: AgentTurn | null = null;
   let review: AgentTurn | null = null;
   let agentError: RunResult['agentError'] = null;
-  let evidenceDelivery: EvidenceDelivery | null = null;
+  let evidenceDelivery: EvidenceDelivery | null = options.evidenceDeliveryOverride ?? null;
   let adapter: AgentAdapter | null = null;
   let verification: CommandReceipt | null = null;
   let failure: string | null = null;
@@ -445,7 +451,7 @@ export async function investigate(options: RunOptions): Promise<RunResult> {
     'No patch was applied. A single timing sample is not a performance improvement claim.',
     failure ? `\nError: ${failure}` : '', '', 'Exact commands, exit codes, artifact hashes, token usage and timeline: run.json', '',
   ].join('\n');
-  await writeFile(join(directory, 'report.md'), redact(text), { mode: 0o600 });
+  await writePrivateFile(join(directory, 'report.md'), redact(text));
   return result;
 }
 

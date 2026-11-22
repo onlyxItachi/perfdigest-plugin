@@ -29,8 +29,10 @@ type RunOptions struct {
 	McpSessionOptions    *SessionOptions
 	ReuseMcpSession      *bool
 	IncludeCorroborating   bool
-	CompactEvidence        *bool
-	CodexSteeringMechanism string
+	CompactEvidence          *bool
+	CodexSteeringMechanism   string
+	RunDirectory             string
+	EvidenceDeliveryOverride string
 }
 
 type RunTelemetry struct {
@@ -327,7 +329,12 @@ func Investigate(parentCtx context.Context, options RunOptions) (RunResult, erro
 		}
 	}
 
-	directory, err := NewRunDirectory(workspace)
+	var directory string
+	if options.RunDirectory != "" {
+		directory, err = EnsureRunDirectory(workspace, options.RunDirectory)
+	} else {
+		directory, err = NewRunDirectory(workspace)
+	}
 	if err != nil {
 		return RunResult{}, err
 	}
@@ -370,6 +377,10 @@ func Investigate(parentCtx context.Context, options RunOptions) (RunResult, erro
 	var review *AgentTurn
 	var agentError *AgentErrorReceipt
 	var evidenceDelivery *string
+	if options.EvidenceDeliveryOverride != "" {
+		deliv := options.EvidenceDeliveryOverride
+		evidenceDelivery = &deliv
+	}
 	var adapter AgentAdapter
 	var verification *CommandReceipt
 	var failure *string
