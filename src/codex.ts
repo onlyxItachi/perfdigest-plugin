@@ -1,10 +1,11 @@
 import { execFile, spawn } from 'node:child_process';
+import { StringDecoder } from 'node:string_decoder';
 import { promisify } from 'node:util';
 import { Codex, type Thread, type Usage, type ModelReasoningEffort } from '@openai/codex-sdk';
 import { childEnvironment, executable, redact } from './environment.js';
 import type { Emit } from './config.js';
 
-export interface CodexTurn { text: string; usage: Usage | null; threadId: string | null }
+export interface CodexTurn { text: string; usage: Usage | null; threadId: string | null; toolCallsCount?: number }
 
 export type CodexSteeringMechanism = 'turn_steer' | 'tool_output';
 
@@ -85,6 +86,7 @@ export function verifyCodexEvidenceConsumption(responseText: string, evidencePay
               const xo = x as Record<string, unknown>;
               addCandidate(xo.unit);
               addCandidate(xo.secondaryUnit);
+              addCandidate(xo.secondaryReportId);
             }
           }
         }
@@ -99,6 +101,17 @@ export function verifyCodexEvidenceConsumption(responseText: string, evidencePay
       if (innerDec) addCandidate(innerDec.selectedId);
       collectEntries(innerEv.evidence);
       collectEntries(innerEv.corroborating);
+      if (Array.isArray(innerEv.extractions)) {
+        for (const x of innerEv.extractions) {
+          if (x && typeof x === 'object') {
+            const xo = x as Record<string, unknown>;
+            addCandidate(xo.unit);
+            addCandidate(xo.secondaryUnit);
+            addCandidate(xo.reportId);
+            addCandidate(xo.secondaryReportId);
+          }
+        }
+      }
     } else {
       collectEntries(parsed.evidence);
     }
@@ -110,6 +123,7 @@ export function verifyCodexEvidenceConsumption(responseText: string, evidencePay
           addCandidate(xo.unit);
           addCandidate(xo.secondaryUnit);
           addCandidate(xo.reportId);
+          addCandidate(xo.secondaryReportId);
         }
       }
     }
@@ -129,12 +143,27 @@ export function verifyCodexEvidenceConsumption(responseText: string, evidencePay
     }
 
     // Abstained / empty selection packet: only match specific abstention or verification phrases
-    // when the JSON payload actually looks like a PerfDigest evidence envelope.
+    // when the JSON payload actually looks like a PerfDigest evidence envelope, and never
+    // match contradictory verification pass/fail claims.
     if (
       parsed.decision !== undefined ||
       parsed.verification !== undefined ||
-      parsed.status !== undefined
+      parsed.status !== undefined ||
+      parsed.pipelineStatus !== undefined
     ) {
+      const verificationObj =
+        parsed.verification && typeof parsed.verification === 'object'
+          ? (parsed.verification as Record<string, unknown>)
+          : null;
+      let verificationPassed: boolean | null = null;
+      if (verificationObj) {
+        if (typeof verificationObj.passed === 'boolean') {
+          verificationPassed = verificationObj.passed;
+        } else if (typeof verificationObj.exitCode === 'number') {
+          verificationPassed =
+            verificationObj.exitCode === 0 && !verificationObj.timedOut && !verificationObj.aborted;
+        }
+      }
       const abstainedPhrases = [
         'abstain',
         'needs_review',
@@ -142,13 +171,15 @@ export function verifyCodexEvidenceConsumption(responseText: string, evidencePay
         'no report',
         'no selected',
         'unselected',
-        'verification passed',
-        'verification failed',
-        'verification: passed',
-        'verification: failed',
         'exitcode',
         'exit code',
       ];
+      if (verificationPassed !== false) {
+        abstainedPhrases.push('verification passed', 'verification: passed');
+      }
+      if (verificationPassed !== true) {
+        abstainedPhrases.push('verification failed', 'verification: failed');
+      }
       return abstainedPhrases.some(phrase => lowerText.includes(phrase));
     }
     return false;
@@ -194,16 +225,28 @@ export async function codexTurn(thread: Thread, prompt: string, phase: string, s
   let text = '';
   let usage: Usage | null = null;
   let completed = false;
+  let toolCallsCount = 0;
   for await (const event of events) {
     if (event.type === 'turn.started') emit(`codex.${phase}.turn_started`);
     if (event.type === 'turn.failed') throw new Error(redact(event.error.message));
     if (event.type === 'error') throw new Error(redact(event.message));
-    if (event.type === 'item.completed' && event.item.type === 'agent_message') text = redact(event.item.text);
+    if (event.type === 'item.completed') {
+      if (event.item.type === 'agent_message') {
+        text = redact(event.item.text);
+      } else if (
+        event.item.type === 'command_execution' ||
+        event.item.type === 'mcp_tool_call' ||
+        event.item.type === 'file_change' ||
+        event.item.type === 'web_search'
+      ) {
+        toolCallsCount += 1;
+      }
+    }
     if (event.type === 'turn.completed') { usage = event.usage; completed = true; }
   }
   if (!completed || !text) throw new Error('Codex ended without a completed response');
   emit(`codex.${phase}.completed`);
-  return { text, usage, threadId: thread.id };
+  return { text, usage, threadId: thread.id, toolCallsCount };
 }
 
 export interface CodexAppServerPreflight {
@@ -232,6 +275,23 @@ export class CodexProtocolError extends Error {
   }
 }
 
+export class CodexTimeoutError extends Error {
+  constructor(message: string) {
+    super(redact(message));
+  }
+}
+
+export class CodexInterruptedError extends Error {
+  constructor(message: string) {
+    super(redact(message));
+  }
+}
+
+function toFiniteTokenCount(val: unknown): number {
+  const n = Number(val);
+  return Number.isFinite(n) ? n : 0;
+}
+
 export async function codexAppServerInExecutionTurn(
   options: CodexAppServerInExecutionOptions & { preflight?: CodexAppServerPreflight },
 ): Promise<CodexInExecutionTurnResult> {
@@ -245,8 +305,13 @@ export async function codexAppServerInExecutionTurn(
     effort = 'low',
     steeringMechanism = 'turn_steer',
     overrideExpectedTurnId,
+    timeoutMs,
     maxOutputBytes = 4_194_304,
   } = options;
+
+  if (!/^[a-zA-Z0-9_-]+$/.test(effort)) {
+    throw new CodexProtocolError(`Unsupported reasoning effort value: ${effort}`);
+  }
 
   if (signal.aborted) {
     throw new Error('aborted before start');
@@ -261,6 +326,8 @@ export async function codexAppServerInExecutionTurn(
     'approval_policy="never"',
     '-c',
     'sandbox_mode="read-only"',
+    '-c',
+    'web_search="disabled"',
     '-c',
     `model_reasoning_effort="${effort}"`,
     '-c',
@@ -283,6 +350,7 @@ export async function codexAppServerInExecutionTurn(
       cwd: workspace,
       env: preflight.env,
       shell: false,
+      detached: process.platform !== 'win32',
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
@@ -290,6 +358,7 @@ export async function codexAppServerInExecutionTurn(
     let processClosed = false;
     let bytes = 0;
     let lineBuf = '';
+    const stdoutDecoder = new StringDecoder('utf8');
     let nextRpcId = 1;
     let threadId: string | null = null;
     let activeTurnId: string | null = null;
@@ -302,16 +371,21 @@ export async function codexAppServerInExecutionTurn(
     let evidenceDelivered = false;
     let earlyAgentCompletion = false;
     let deliveryCount = 0;
+    let toolCallsCount = 0;
     let evidencePayloadDelivered: string | null = null;
     let latestUsage: Usage | null = null;
     let killTimer: NodeJS.Timeout | undefined;
+    let deadlineTimer: NodeJS.Timeout | undefined;
     let steerInFlightPromise: Promise<void> | null = null;
 
     const allAgentMessages: Array<{ phase: string | null; text: string }> = [];
     const postSteerAgentMessages: Array<{ phase: string | null; text: string }> = [];
     const pendingRpc = new Map<
       number,
-      { resolve: (res: Record<string, unknown>) => void; reject: (err: { code?: number; message?: string }) => void }
+      {
+        resolve: (res: Record<string, unknown>) => void;
+        reject: (err: { code?: number; message?: string; transportClosed?: boolean }) => void;
+      }
     >();
 
     let resolveTurnCompleted!: () => void;
@@ -321,25 +395,55 @@ export async function codexAppServerInExecutionTurn(
       rejectTurnCompleted = rej;
     });
 
+    const sendInterruptBestEffort = (targetTurnId: string) => {
+      if (threadId && targetTurnId && !child.stdin.destroyed && child.stdin.writable) {
+        try {
+          const intFrame = JSON.stringify({
+            jsonrpc: '2.0',
+            id: nextRpcId++,
+            method: 'turn/interrupt',
+            params: { threadId, turnId: targetTurnId },
+          });
+          child.stdin.write(`${intFrame}\n`);
+        } catch {}
+      }
+    };
+
+    const signalChildGroup = (sig: NodeJS.Signals) => {
+      if (process.platform !== 'win32' && child.pid) {
+        try {
+          process.kill(-child.pid, sig);
+          return;
+        } catch {}
+      }
+      try {
+        child.kill(sig);
+      } catch {}
+    };
+
     const cleanupChild = () => {
       if (processClosed) return;
       try {
-        child.kill('SIGTERM');
+        if (!child.stdin.destroyed) {
+          child.stdin.end();
+        }
       } catch {}
-      killTimer = setTimeout(() => {
-        try {
-          child.kill('SIGKILL');
-        } catch {}
-      }, 2000);
-      killTimer.unref?.();
+      signalChildGroup('SIGTERM');
+      if (!killTimer) {
+        killTimer = setTimeout(() => {
+          signalChildGroup('SIGKILL');
+        }, 2000);
+        killTimer.unref?.();
+      }
     };
 
     const finish = (err: Error | null, value?: CodexInExecutionTurnResult) => {
       if (settled) return;
       settled = true;
+      if (deadlineTimer) clearTimeout(deadlineTimer);
       signal.removeEventListener('abort', onAbort);
       for (const [, p] of pendingRpc) {
-        p.reject({ message: err?.message ?? 'closed' });
+        p.reject({ message: err?.message ?? 'closed', transportClosed: true });
       }
       pendingRpc.clear();
       cleanupChild();
@@ -348,38 +452,47 @@ export async function codexAppServerInExecutionTurn(
     };
 
     const onAbort = () => {
-      if (threadId && activeTurnId && !turnCompleted && !child.stdin.destroyed && child.stdin.writable) {
-        try {
-          const intFrame = JSON.stringify({
-            jsonrpc: '2.0',
-            id: nextRpcId++,
-            method: 'turn/interrupt',
-            params: { threadId, turnId: activeTurnId },
-          });
-          child.stdin.write(`${intFrame}\n`);
-        } catch {}
+      if (activeTurnId && !turnCompleted) {
+        sendInterruptBestEffort(activeTurnId);
       }
       finish(new Error('aborted'));
     };
     signal.addEventListener('abort', onAbort, { once: true });
 
+    if (timeoutMs !== undefined && Number.isFinite(timeoutMs) && timeoutMs > 0) {
+      deadlineTimer = setTimeout(() => {
+        if (activeTurnId && !turnCompleted) {
+          sendInterruptBestEffort(activeTurnId);
+        }
+        finish(new CodexTimeoutError(`no result within ${timeoutMs} ms`));
+      }, timeoutMs);
+      deadlineTimer.unref?.();
+    }
+
     child.stderr.resume();
     child.stdin.on('error', () => {});
     child.on('error', err => finish(err));
 
-    const sendRpc = (method: string, params: Record<string, unknown>): Promise<Record<string, unknown>> => {
+    const sendRpc = (
+      method: string,
+      params: Record<string, unknown>,
+      rpcOptions: { isSteer?: boolean } = {},
+    ): Promise<Record<string, unknown>> => {
       return new Promise((res, rej) => {
         if (settled || processClosed || child.stdin.destroyed || !child.stdin.writable) {
-          rej({ message: 'app-server stdin is closed' });
+          rej({ message: 'app-server stdin is closed', transportClosed: true });
           return;
         }
         const id = nextRpcId++;
+        if (rpcOptions.isSteer) {
+          steerRpcId = id;
+        }
         pendingRpc.set(id, { resolve: res, reject: rej });
         const payload = JSON.stringify({ jsonrpc: '2.0', id, method, params });
         child.stdin.write(`${payload}\n`, writeErr => {
           if (writeErr) {
             pendingRpc.delete(id);
-            rej({ message: writeErr.message });
+            rej({ message: writeErr.message, transportClosed: true });
           }
         });
       });
@@ -392,6 +505,7 @@ export async function codexAppServerInExecutionTurn(
     };
 
     const handleJsonLine = (line: string) => {
+      if (settled) return;
       const trimmed = line.trim();
       if (!trimmed) return;
       let msg: Record<string, unknown>;
@@ -454,18 +568,32 @@ export async function codexAppServerInExecutionTurn(
           return;
         }
         const item = params.item as Record<string, unknown> | undefined;
-        if (item && (item.type === 'agentMessage' || item.type === 'agent_message')) {
-          const msgText = typeof item.text === 'string' ? item.text : '';
-          const phase = typeof item.phase === 'string' ? item.phase : null;
-          if (msgText) {
-            allAgentMessages.push({ phase, text: msgText });
-            if (steerAccepted) {
-              postSteerAgentMessages.push({ phase, text: msgText });
-              if (!modelVisibleEmitted) {
-                modelVisibleEmitted = true;
-                emit('evidence.model_visible', 'codex app-server post-steer agentMessage');
+        if (item) {
+          const itemType = typeof item.type === 'string' ? item.type : '';
+          if (itemType === 'agentMessage' || itemType === 'agent_message') {
+            const msgText = typeof item.text === 'string' ? item.text : '';
+            const phase = typeof item.phase === 'string' ? item.phase : null;
+            if (msgText) {
+              allAgentMessages.push({ phase, text: msgText });
+              if (steerAccepted) {
+                postSteerAgentMessages.push({ phase, text: msgText });
+                if (!modelVisibleEmitted) {
+                  modelVisibleEmitted = true;
+                  emit('evidence.model_visible', 'codex app-server post-steer agentMessage');
+                }
               }
             }
+          } else if (
+            itemType === 'commandExecution' ||
+            itemType === 'command_execution' ||
+            itemType === 'mcpToolCall' ||
+            itemType === 'mcp_tool_call' ||
+            itemType === 'fileChange' ||
+            itemType === 'file_change' ||
+            itemType === 'webSearch' ||
+            itemType === 'web_search'
+          ) {
+            toolCallsCount += 1;
           }
         }
       } else if (method === 'thread/tokenUsage/updated') {
@@ -477,11 +605,11 @@ export async function codexAppServerInExecutionTurn(
         const total = (tokenUsage?.total ?? tokenUsage?.last) as Record<string, unknown> | undefined;
         if (total && typeof total === 'object') {
           latestUsage = {
-            input_tokens: Number(total.inputTokens ?? total.input_tokens ?? 0),
-            cached_input_tokens: Number(total.cachedInputTokens ?? total.cached_input_tokens ?? 0),
-            cache_write_input_tokens: Number(total.cacheWriteInputTokens ?? total.cache_write_input_tokens ?? 0),
-            output_tokens: Number(total.outputTokens ?? total.output_tokens ?? 0),
-            reasoning_output_tokens: Number(total.reasoningOutputTokens ?? total.reasoning_output_tokens ?? 0),
+            input_tokens: toFiniteTokenCount(total.inputTokens ?? total.input_tokens ?? 0),
+            cached_input_tokens: toFiniteTokenCount(total.cachedInputTokens ?? total.cached_input_tokens ?? 0),
+            cache_write_input_tokens: toFiniteTokenCount(total.cacheWriteInputTokens ?? total.cache_write_input_tokens ?? 0),
+            output_tokens: toFiniteTokenCount(total.outputTokens ?? total.output_tokens ?? 0),
+            reasoning_output_tokens: toFiniteTokenCount(total.reasoningOutputTokens ?? total.reasoning_output_tokens ?? 0),
           } as Usage;
         }
       } else if (method === 'turn/completed') {
@@ -494,11 +622,11 @@ export async function codexAppServerInExecutionTurn(
         if (turnObj?.usage && typeof turnObj.usage === 'object' && !latestUsage) {
           const u = turnObj.usage as Record<string, unknown>;
           latestUsage = {
-            input_tokens: Number(u.input_tokens ?? u.inputTokens ?? 0),
-            cached_input_tokens: Number(u.cached_input_tokens ?? u.cachedInputTokens ?? 0),
-            cache_write_input_tokens: Number(u.cache_write_input_tokens ?? u.cacheWriteInputTokens ?? 0),
-            output_tokens: Number(u.output_tokens ?? u.outputTokens ?? 0),
-            reasoning_output_tokens: Number(u.reasoning_output_tokens ?? u.reasoningOutputTokens ?? 0),
+            input_tokens: toFiniteTokenCount(u.input_tokens ?? u.inputTokens ?? 0),
+            cached_input_tokens: toFiniteTokenCount(u.cached_input_tokens ?? u.cachedInputTokens ?? 0),
+            cache_write_input_tokens: toFiniteTokenCount(u.cache_write_input_tokens ?? u.cacheWriteInputTokens ?? 0),
+            output_tokens: toFiniteTokenCount(u.output_tokens ?? u.outputTokens ?? 0),
+            reasoning_output_tokens: toFiniteTokenCount(u.reasoning_output_tokens ?? u.reasoningOutputTokens ?? 0),
           } as Usage;
         }
         turnCompleted = true;
@@ -507,31 +635,44 @@ export async function codexAppServerInExecutionTurn(
           const errMsg = typeof errObj?.message === 'string' ? errObj.message : 'Codex app-server turn failed';
           rejectTurnCompleted(new Error(redact(errMsg)));
         } else if (status === 'interrupted') {
-          rejectTurnCompleted(new Error('aborted'));
+          rejectTurnCompleted(new CodexInterruptedError('run cancelled'));
         } else {
           resolveTurnCompleted();
         }
       } else if (method === 'error') {
-        const errMsg = typeof params.message === 'string' ? params.message : 'Codex app-server error';
+        const notifTurnId = typeof params.turnId === 'string' ? params.turnId : '';
+        if (activeTurnId && notifTurnId && notifTurnId !== activeTurnId) {
+          return;
+        }
+        if (params.willRetry === true) {
+          return;
+        }
+        const errObj = params.error as Record<string, unknown> | undefined;
+        const errMsg =
+          typeof errObj?.message === 'string' && errObj.message
+            ? errObj.message
+            : typeof params.message === 'string' && params.message
+              ? params.message
+              : 'Codex app-server error';
         rejectTurnCompleted(new Error(redact(errMsg)));
       }
     };
 
     child.stdout.on('data', (chunk: Buffer) => {
+      if (settled) return;
       bytes += chunk.byteLength;
       if (bytes > maxOutputBytes) {
-        try {
-          child.kill('SIGKILL');
-        } catch {}
+        signalChildGroup('SIGKILL');
         finish(new CodexProtocolError('agent output exceeded the limit'));
         return;
       }
-      lineBuf += chunk.toString('utf8');
+      lineBuf += stdoutDecoder.write(chunk);
       let nlIdx = lineBuf.indexOf('\n');
       while (nlIdx !== -1) {
         const line = lineBuf.slice(0, nlIdx);
         lineBuf = lineBuf.slice(nlIdx + 1);
         handleJsonLine(line);
+        if (settled) return;
         nlIdx = lineBuf.indexOf('\n');
       }
     });
@@ -540,10 +681,19 @@ export async function codexAppServerInExecutionTurn(
       processClosed = true;
       if (killTimer) clearTimeout(killTimer);
       if (settled) return;
+      lineBuf += stdoutDecoder.end();
       if (lineBuf.trim()) {
         handleJsonLine(lineBuf);
         lineBuf = '';
       }
+      if (settled) return;
+      for (const [, p] of pendingRpc) {
+        p.reject({
+          message: `codex app-server exited before RPC response (code ${code ?? -1})`,
+          transportClosed: true,
+        });
+      }
+      pendingRpc.clear();
       if (!turnCompleted) {
         finish(new Error(`codex app-server exited before turn completion (code ${code ?? -1})`));
       }
@@ -584,7 +734,7 @@ export async function codexAppServerInExecutionTurn(
           throw new CodexProtocolError('codex app-server turn/start did not return a valid turn.id');
         }
         activeTurnId = turnObj.id;
-        if (!turnStartedEmitted) {
+        if (!turnStartedEmitted && !settled) {
           turnStartedEmitted = true;
           emit('codex.analysis.turn_started');
         }
@@ -618,22 +768,26 @@ export async function codexAppServerInExecutionTurn(
 
               try {
                 if (steeringMechanism === 'tool_output') {
-                  steerRpcId = nextRpcId;
-                  const toolRes = await sendRpc('turn/start', {
-                    threadId: threadId!,
-                    cwd: workspace,
-                    ...(model ? { model } : {}),
-                    effort,
-                    approvalPolicy: 'never',
-                    sandboxPolicy: { type: 'readOnly' },
-                    input: [],
-                    toolOutput: {
-                      name: 'perfdigest_evidence',
-                      namespace: 'mcp_perfdigest',
-                      output: evidencePayload,
-                      retain: true,
+                  const toolRes = await sendRpc(
+                    'turn/start',
+                    {
+                      threadId: threadId!,
+                      cwd: workspace,
+                      ...(model ? { model } : {}),
+                      effort,
+                      approvalPolicy: 'never',
+                      sandboxPolicy: { type: 'readOnly' },
+                      input: [],
+                      toolOutput: {
+                        name: 'perfdigest_evidence',
+                        namespace: 'mcp_perfdigest',
+                        output: evidencePayload,
+                        retain: true,
+                      },
                     },
-                  });
+                    { isSteer: true },
+                  );
+                  if (settled) return;
                   const returnedTurn = toolRes.turn as Record<string, unknown> | undefined;
                   const returnedId = typeof returnedTurn?.id === 'string' ? returnedTurn.id : '';
                   if (returnedId === activeTurnId) {
@@ -646,16 +800,8 @@ export async function codexAppServerInExecutionTurn(
                     }
                   } else {
                     // Turn had already finished right before toolOutput arrived; cancel the unintended new turn
-                    if (returnedId && threadId && !child.stdin.destroyed && child.stdin.writable) {
-                      try {
-                        const intFrame = JSON.stringify({
-                          jsonrpc: '2.0',
-                          id: nextRpcId++,
-                          method: 'turn/interrupt',
-                          params: { threadId, turnId: returnedId },
-                        });
-                        child.stdin.write(`${intFrame}\n`);
-                      } catch {}
+                    if (returnedId) {
+                      sendInterruptBestEffort(returnedId);
                     }
                     earlyAgentCompletion = true;
                     evidenceDelivered = false;
@@ -667,12 +813,16 @@ export async function codexAppServerInExecutionTurn(
                   }
                 } else {
                   const targetTurnId = overrideExpectedTurnId ?? activeTurnId!;
-                  steerRpcId = nextRpcId;
-                  const steerRes = await sendRpc('turn/steer', {
-                    threadId: threadId!,
-                    expectedTurnId: targetTurnId,
-                    input: [{ type: 'text', text: framedEvidence, text_elements: [] }],
-                  });
+                  const steerRes = await sendRpc(
+                    'turn/steer',
+                    {
+                      threadId: threadId!,
+                      expectedTurnId: targetTurnId,
+                      input: [{ type: 'text', text: framedEvidence, text_elements: [] }],
+                    },
+                    { isSteer: true },
+                  );
+                  if (settled) return;
                   const returnedId = typeof steerRes.turnId === 'string' ? steerRes.turnId : '';
                   if (returnedId !== activeTurnId) {
                     throw new CodexProtocolError(
@@ -688,6 +838,7 @@ export async function codexAppServerInExecutionTurn(
                   }
                 }
               } catch (rpcErr: unknown) {
+                if (settled) return;
                 if (rpcErr instanceof CodexProtocolError) {
                   finish(rpcErr);
                   rejectTurnCompleted(rpcErr);
@@ -697,17 +848,29 @@ export async function codexAppServerInExecutionTurn(
                   rpcErr && typeof rpcErr === 'object' && 'message' in rpcErr
                     ? String((rpcErr as { message?: unknown }).message)
                     : String(rpcErr);
-                if (!overrideExpectedTurnId && /no active turn to steer/i.test(errMessage)) {
+                const isTransportClosed = Boolean(
+                  rpcErr &&
+                    typeof rpcErr === 'object' &&
+                    'transportClosed' in rpcErr &&
+                    (rpcErr as { transportClosed?: boolean }).transportClosed,
+                );
+                if (
+                  !overrideExpectedTurnId &&
+                  !steerAccepted &&
+                  ((steeringMechanism !== 'tool_output' && /no active turn to steer/i.test(errMessage)) ||
+                    (isTransportClosed && turnCompleted))
+                ) {
                   earlyAgentCompletion = true;
                   evidenceDelivered = false;
                   deliveryCount = 0;
                   emit(
                     'codex.in_execution.completed_before_evidence',
-                    'Agent completed active turn simultaneously with turn/steer delivery',
+                    'Agent completed active turn simultaneously with steering delivery',
                   );
                   return;
                 }
-                const protoErr = new CodexProtocolError(`turn/steer rejected: ${errMessage}`);
+                const errPrefix = steeringMechanism === 'tool_output' ? 'toolOutput steer' : 'turn/steer';
+                const protoErr = new CodexProtocolError(`${errPrefix} rejected: ${errMessage}`);
                 finish(protoErr);
                 rejectTurnCompleted(protoErr);
               }
@@ -723,7 +886,28 @@ export async function codexAppServerInExecutionTurn(
 
         await turnCompletedPromise;
         if (steerInFlightPromise) {
-          await steerInFlightPromise;
+          let steerWaitTimer: NodeJS.Timeout | undefined;
+          let steerTimedOut = false;
+          await Promise.race([
+            steerInFlightPromise,
+            new Promise<void>(res => {
+              steerWaitTimer = setTimeout(() => {
+                steerTimedOut = true;
+                res();
+              }, 2000);
+              steerWaitTimer.unref?.();
+            }),
+          ]);
+          if (steerWaitTimer) clearTimeout(steerWaitTimer);
+          if (steerTimedOut && !settled && !steerAccepted && !earlyAgentCompletion) {
+            earlyAgentCompletion = true;
+            evidenceDelivered = false;
+            deliveryCount = 0;
+            emit(
+              'codex.in_execution.completed_before_evidence',
+              'Agent completed active turn before steering response arrived',
+            );
+          }
         }
         // Re-check if steerInFlightPromise rejected turnCompletedPromise
         if (settled) return;
@@ -771,6 +955,7 @@ export async function codexAppServerInExecutionTurn(
             text: redact(chosenText),
             usage: latestUsage,
             threadId,
+            toolCallsCount,
           },
           evidenceDeliveredInExecution: evidenceDelivered,
           evidenceConsumedInExecution: evidenceConsumed,
@@ -778,7 +963,18 @@ export async function codexAppServerInExecutionTurn(
           deliveryCount,
         });
       } catch (err: unknown) {
-        finish(err instanceof Error ? err : new Error(String(err)));
+        if (err instanceof Error) {
+          finish(err);
+        } else if (err && typeof err === 'object' && 'message' in err) {
+          const rpcObj = err as { message?: unknown; transportClosed?: boolean };
+          const msg =
+            typeof rpcObj.message === 'string' && rpcObj.message
+              ? rpcObj.message
+              : 'Codex app-server JSON-RPC error';
+          finish(rpcObj.transportClosed ? new Error(redact(msg)) : new CodexProtocolError(msg));
+        } else {
+          finish(new Error(String(err)));
+        }
       }
     })();
   });

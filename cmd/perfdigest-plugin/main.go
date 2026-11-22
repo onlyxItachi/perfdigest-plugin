@@ -21,8 +21,8 @@ import (
 const helpText = `PerfDigest Evidence — Codex-first MVP
 
   perfdigest-plugin init [--provider cloudflare|local|openai|offline --yes] [--env-file PATH] [--endpoint URL] [--decision-model clef-flash|clef|clef-omni] [--check-connection]
-  perfdigest-plugin demo [--agent none|codex|generic] [--agent-command PATH] [--agent-sessions] [--agent-in-execution-async] [--agent-delivery auto|in_execution|single_turn|two_turn] [--codex-steering-mechanism turn_steer|tool_output] [--strict-delivery-mode] [--routing offline|decisions] [--decision-model NAME] [--perf]
-  perfdigest-plugin run manifest.json [--workspace PATH] [--routing decisions|offline] [--agent codex|none|generic] [--agent-command PATH] [--agent-sessions] [--agent-in-execution-async] [--agent-delivery auto|in_execution|single_turn|two_turn] [--codex-steering-mechanism turn_steer|tool_output] [--strict-delivery-mode] [--decision-model NAME]
+  perfdigest-plugin demo [--agent none|codex|generic] [--agent-command PATH] [--agent-sessions] [--agent-in-execution-async] [--agent-delivery auto|in_execution|single_turn|two_turn] [--codex-steering-mechanism turn_steer|tool_output] [--strict-delivery-mode] [--routing offline|decisions] [--decision-model NAME] [--model NAME] [--effort minimal|low|medium|high|xhigh|max] [--perf]
+  perfdigest-plugin run manifest.json [--workspace PATH] [--routing decisions|offline] [--agent codex|none|generic] [--agent-command PATH] [--agent-sessions] [--agent-in-execution-async] [--agent-delivery auto|in_execution|single_turn|two_turn] [--codex-steering-mechanism turn_steer|tool_output] [--strict-delivery-mode] [--decision-model NAME] [--model NAME] [--effort minimal|low|medium|high|xhigh|max]
   perfdigest-plugin mcp [--workspace PATH]
 
 Unconfigured demo defaults: real local CPU measurements + verification, offline routing, no model calls.
@@ -50,9 +50,10 @@ type cliFlags struct {
 	codexSteeringMech     *string
 	strictDeliveryMode    bool
 	routing               *string
-	provider             *string
-	model                *string
-	perf                 bool
+	provider              *string
+	model                 *string
+	effort                *string
+	perf                  bool
 	endpoint             *string
 	envFile              *string
 	decisionModel        *string
@@ -109,6 +110,7 @@ func parseCLIArgs(args []string) (cliFlags, error) {
 		"--routing":                  true,
 		"--provider":           true,
 		"--model":              true,
+		"--effort":             true,
 		"--endpoint":           true,
 		"--env-file":           true,
 		"--decision-model":     true,
@@ -205,6 +207,8 @@ func parseCLIArgs(args []string) (cliFlags, error) {
 				f.provider = &val
 			case "--model":
 				f.model = &val
+			case "--effort":
+				f.effort = &val
 			case "--endpoint":
 				f.endpoint = &val
 			case "--env-file":
@@ -836,15 +840,22 @@ func runCLI() error {
 	if f.model != nil {
 		modelStr = *f.model
 	}
+	effortStr := ""
+	if f.effort != nil {
+		effortStr = *f.effort
+		if !slices.Contains([]string{"minimal", "low", "medium", "high", "xhigh", "max"}, effortStr) {
+			return errors.New("--effort must be minimal, low, medium, high, xhigh or max")
+		}
+	}
 	agentDelivery := "two_turn"
-	if f.agentDelivery != nil && *f.agentDelivery != "" {
+	if f.agentDelivery != nil {
 		agentDelivery = *f.agentDelivery
 	}
 	if agentDelivery != "two_turn" && agentDelivery != "single_turn" && agentDelivery != "in_execution" && agentDelivery != "auto" {
 		return errors.New("--agent-delivery must be auto, in_execution, two_turn or single_turn")
 	}
 	codexSteeringMech := ""
-	if f.codexSteeringMech != nil && *f.codexSteeringMech != "" {
+	if f.codexSteeringMech != nil {
 		if agent != "codex" {
 			return errors.New("--codex-steering-mechanism requires --agent codex")
 		}
@@ -863,6 +874,7 @@ func runCLI() error {
 		CodexSteeringMechanism: codexSteeringMech,
 		StrictDeliveryMode:     f.strictDeliveryMode,
 		Model:                  modelStr,
+		Effort:                 effortStr,
 		CloudflareModel:        cloudflareModel,
 		DecisionsMockURL:       decisionsMockURL,
 		AgentAdapter:           agentAdapter,

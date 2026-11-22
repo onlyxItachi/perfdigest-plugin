@@ -236,9 +236,10 @@ type InExecutionAgentSession interface {
 }
 
 type AgentTurn struct {
-	Text     string         `json:"text"`
-	Usage    map[string]any `json:"usage"`
-	ThreadID *string        `json:"threadId"`
+	Text           string         `json:"text"`
+	Usage          map[string]any `json:"usage"`
+	ThreadID       *string        `json:"threadId"`
+	ToolCallsCount *int           `json:"toolCallsCount,omitempty"`
 }
 
 type AgentErrorKind string
@@ -351,13 +352,7 @@ func (a *genericAdapterImpl) Capabilities() AgentCapabilities {
 	if a.opts.InExecutionAsync {
 		return GetRuntimeCapabilityProfile("generic-cli-in-execution", a.opts.Sessions)
 	}
-	return AgentCapabilities{
-		SameSessionContinuation: a.opts.Sessions,
-		NativeAsyncInput:        false,
-		Cancellation:            true,
-		UsageReporting:          true,
-		Sandbox:                 "agent-defined",
-	}
+	return GetRuntimeCapabilityProfile("generic-cli", a.opts.Sessions)
 }
 
 func (a *genericAdapterImpl) Start(_ context.Context, workspace string) (AgentSession, error) {
@@ -1069,13 +1064,7 @@ func (c *codexAdapterImpl) Capabilities() AgentCapabilities {
 	if c.opts.InExecutionAsync {
 		return GetRuntimeCapabilityProfile("codex-app-server", false)
 	}
-	return AgentCapabilities{
-		SameSessionContinuation: true,
-		NativeAsyncInput:        false,
-		Cancellation:            true,
-		UsageReporting:          true,
-		Sandbox:                 "read-only",
-	}
+	return GetRuntimeCapabilityProfile("codex", false)
 }
 
 func (c *codexAdapterImpl) Start(ctx context.Context, workspace string) (AgentSession, error) {
@@ -1145,6 +1134,7 @@ type codexSessionImpl struct {
 	model     string
 	effort    string
 	opts      CodexAdapterOptions
+	threadMu  sync.Mutex
 	threadID  *string
 }
 
@@ -1153,7 +1143,20 @@ type codexInExecSessionImpl struct {
 }
 
 func (s *codexSessionImpl) ID() *string {
-	return s.threadID
+	s.threadMu.Lock()
+	defer s.threadMu.Unlock()
+	if s.threadID == nil {
+		return nil
+	}
+	v := *s.threadID
+	return &v
+}
+
+func (s *codexSessionImpl) setThreadID(tid string) {
+	s.threadMu.Lock()
+	val := tid
+	s.threadID = &val
+	s.threadMu.Unlock()
 }
 
 func (s *codexSessionImpl) Turn(ctx context.Context, prompt string, phase string, emit EmitFunc) (AgentTurn, error) {
@@ -1183,8 +1186,8 @@ func (s *codexSessionImpl) Turn(ctx context.Context, prompt string, phase string
 	if s.model != "" {
 		args = append(args, "--model", s.model)
 	}
-	if s.threadID != nil && *s.threadID != "" {
-		args = append(args, "resume", *s.threadID)
+	if existingTID := s.ID(); existingTID != nil && *existingTID != "" {
+		args = append(args, "resume", *existingTID)
 	}
 
 	cmd := exec.CommandContext(ctxOrBg(ctx), s.binary, args...)
@@ -1205,6 +1208,7 @@ func (s *codexSessionImpl) Turn(ctx context.Context, prompt string, phase string
 	var text string
 	var usage map[string]any
 	completed := false
+	toolCallsCount := 0
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -1219,7 +1223,7 @@ func (s *codexSessionImpl) Turn(ctx context.Context, prompt string, phase string
 		switch evType {
 		case "thread.started":
 			if tid, ok := ev["thread_id"].(string); ok && tid != "" {
-				s.threadID = &tid
+				s.setThreadID(tid)
 			}
 		case "turn.started":
 			emit(fmt.Sprintf("codex.%s.turn_started", phase), "")
@@ -1236,9 +1240,14 @@ func (s *codexSessionImpl) Turn(ctx context.Context, prompt string, phase string
 			_ = cmd.Wait()
 			return AgentTurn{}, fmt.Errorf("%s", Redact(msg))
 		case "item.completed":
-			if item, ok := ev["item"].(map[string]any); ok && item["type"] == "agent_message" {
-				if t, ok := item["text"].(string); ok {
-					text = Redact(t)
+			if item, ok := ev["item"].(map[string]any); ok {
+				itype, _ := item["type"].(string)
+				if itype == "agent_message" {
+					if t, ok := item["text"].(string); ok {
+						text = Redact(t)
+					}
+				} else if itype == "command_execution" || itype == "mcp_tool_call" || itype == "file_change" || itype == "web_search" {
+					toolCallsCount++
 				}
 			}
 		case "turn.completed":
@@ -1254,9 +1263,10 @@ func (s *codexSessionImpl) Turn(ctx context.Context, prompt string, phase string
 	}
 	emit(fmt.Sprintf("codex.%s.completed", phase), "")
 	return AgentTurn{
-		Text:     text,
-		Usage:    usage,
-		ThreadID: s.threadID,
+		Text:           text,
+		Usage:          usage,
+		ThreadID:       s.ID(),
+		ToolCallsCount: &toolCallsCount,
 	}, nil
 }
 
@@ -1270,10 +1280,11 @@ func VerifyCodexEvidenceConsumption(responseText string, evidencePayload string)
 	var parsed map[string]any
 	if err := json.Unmarshal([]byte(evidencePayload), &parsed); err != nil {
 		snippet := strings.ToLower(strings.TrimSpace(evidencePayload))
-		if len(snippet) > 32 {
-			snippet = snippet[:32]
+		runes := []rune(snippet)
+		if len(runes) > 32 {
+			snippet = string(runes[:32])
 		}
-		return len(snippet) >= 3 && strings.Contains(lowerText, snippet)
+		return len([]rune(snippet)) >= 3 && strings.Contains(lowerText, snippet)
 	}
 
 	candidates := make(map[string]struct{})
@@ -1325,6 +1336,7 @@ func VerifyCodexEvidenceConsumption(responseText string, evidencePayload string)
 					if xo, ok := x.(map[string]any); ok {
 						addCandidate(xo["unit"], 3)
 						addCandidate(xo["secondaryUnit"], 3)
+						addCandidate(xo["secondaryReportId"], 3)
 					}
 				}
 			}
@@ -1339,6 +1351,16 @@ func VerifyCodexEvidenceConsumption(responseText string, evidencePayload string)
 		}
 		collectEntries(innerEv["evidence"])
 		collectEntries(innerEv["corroborating"])
+		if innerExts, ok := innerEv["extractions"].([]any); ok {
+			for _, x := range innerExts {
+				if xo, ok := x.(map[string]any); ok {
+					addCandidate(xo["unit"], 3)
+					addCandidate(xo["secondaryUnit"], 3)
+					addCandidate(xo["reportId"], 3)
+					addCandidate(xo["secondaryReportId"], 3)
+				}
+			}
+		}
 	} else {
 		collectEntries(parsed["evidence"])
 	}
@@ -1349,6 +1371,7 @@ func VerifyCodexEvidenceConsumption(responseText string, evidencePayload string)
 				addCandidate(xo["unit"], 3)
 				addCandidate(xo["secondaryUnit"], 3)
 				addCandidate(xo["reportId"], 3)
+				addCandidate(xo["secondaryReportId"], 3)
 			}
 		}
 	}
@@ -1370,7 +1393,19 @@ func VerifyCodexEvidenceConsumption(responseText string, evidencePayload string)
 	_, hasDecision := parsed["decision"]
 	_, hasVerification := parsed["verification"]
 	_, hasStatus := parsed["status"]
-	if hasDecision || hasVerification || hasStatus {
+	_, hasPipelineStatus := parsed["pipelineStatus"]
+	if hasDecision || hasVerification || hasStatus || hasPipelineStatus {
+		var verificationPassed *bool
+		if verObj, ok := parsed["verification"].(map[string]any); ok {
+			if p, ok := verObj["passed"].(bool); ok {
+				verificationPassed = &p
+			} else if ec, ok := verObj["exitCode"].(float64); ok {
+				timedOut, _ := verObj["timedOut"].(bool)
+				aborted, _ := verObj["aborted"].(bool)
+				p := ec == 0 && !timedOut && !aborted
+				verificationPassed = &p
+			}
+		}
 		abstainedPhrases := []string{
 			"abstain",
 			"needs_review",
@@ -1378,12 +1413,14 @@ func VerifyCodexEvidenceConsumption(responseText string, evidencePayload string)
 			"no report",
 			"no selected",
 			"unselected",
-			"verification passed",
-			"verification failed",
-			"verification: passed",
-			"verification: failed",
 			"exitcode",
 			"exit code",
+		}
+		if verificationPassed == nil || *verificationPassed {
+			abstainedPhrases = append(abstainedPhrases, "verification passed", "verification: passed")
+		}
+		if verificationPassed == nil || !*verificationPassed {
+			abstainedPhrases = append(abstainedPhrases, "verification failed", "verification: failed")
 		}
 		for _, phrase := range abstainedPhrases {
 			if strings.Contains(lowerText, phrase) {
@@ -1397,6 +1434,18 @@ func VerifyCodexEvidenceConsumption(responseText string, evidencePayload string)
 type codexAgentMsg struct {
 	phase string
 	text  string
+}
+
+type codexRpcErr struct {
+	msg             string
+	transportClosed bool
+}
+
+func (e *codexRpcErr) Error() string { return e.msg }
+
+type stdinWriteReq struct {
+	line string
+	done chan struct{}
 }
 
 func (s *codexInExecSessionImpl) TurnInExecution(
@@ -1414,6 +1463,10 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 
 	if ctx != nil && ctx.Err() != nil {
 		return InExecutionTurnResult{}, NewAgentError(AgentErrCancelled, phase, "run cancelled")
+	}
+
+	if !mcpServerNamePattern.MatchString(s.effort) {
+		return InExecutionTurnResult{}, NewAgentError(AgentErrProtocol, phase, fmt.Sprintf("Unsupported reasoning effort value: %s", s.effort))
 	}
 
 	timeoutMs := s.opts.TimeoutMs
@@ -1434,6 +1487,7 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 		"--listen", "stdio://",
 		"-c", `approval_policy="never"`,
 		"-c", `sandbox_mode="read-only"`,
+		"-c", `web_search="disabled"`,
 		"-c", fmt.Sprintf(`model_reasoning_effort="%s"`, s.effort),
 		"-c", "features.multi_agent=false",
 		"-c", "features.shell_snapshot=false",
@@ -1471,6 +1525,7 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 	var activeTurnID string
 	turnStartedEmitted := false
 	turnCompleted := false
+	terminated := false
 	steerAttempted := false
 	steerRpcID := -1
 	steerAccepted := false
@@ -1478,6 +1533,7 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 	evidenceDelivered := false
 	earlyAgentCompletion := false
 	deliveryCount := 0
+	toolCallsCount := 0
 	var evidencePayloadDelivered string
 	var latestUsage map[string]any
 	var allMsgs []codexAgentMsg
@@ -1487,7 +1543,23 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 	var turnFailErr error
 	turnInterrupted := false
 
+	closePendingRpcLocked := func() {
+		for k, ch := range pendingRpc {
+			close(ch)
+			delete(pendingRpc, k)
+		}
+	}
+
+	allocRpcID := func() int {
+		mu.Lock()
+		id := nextID
+		nextID++
+		mu.Unlock()
+		return id
+	}
+
 	turnCompletedCh := make(chan struct{})
+	readDone := make(chan struct{})
 	var turnCompletedOnce sync.Once
 	markTurnCompleted := func() {
 		turnCompletedOnce.Do(func() {
@@ -1495,7 +1567,7 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 		})
 	}
 
-	stdinWriteCh := make(chan string, 32)
+	stdinWriteCh := make(chan stdinWriteReq, 32)
 	stdinStopCh := make(chan struct{})
 	var stdinStopOnce sync.Once
 	stopStdin := func() {
@@ -1509,14 +1581,47 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 			select {
 			case <-stdinStopCh:
 				return
-			case line := <-stdinWriteCh:
-				_, _ = stdin.Write([]byte(line + "\n"))
+			case req := <-stdinWriteCh:
+				_, _ = stdin.Write([]byte(req.line + "\n"))
+				if req.done != nil {
+					close(req.done)
+				}
 			}
 		}
 	}()
 
+	sendInterruptBestEffort := func(tid string, targetTurnID string) {
+		if tid == "" || targetTurnID == "" {
+			return
+		}
+		intReq := map[string]any{
+			"jsonrpc": "2.0",
+			"id":      allocRpcID(),
+			"method":  "turn/interrupt",
+			"params":  map[string]any{"threadId": tid, "turnId": targetTurnID},
+		}
+		raw, err := json.Marshal(intReq)
+		if err != nil {
+			return
+		}
+		done := make(chan struct{})
+		select {
+		case stdinWriteCh <- stdinWriteReq{line: string(raw), done: done}:
+			select {
+			case <-done:
+			case <-time.After(15 * time.Millisecond):
+			case <-stdinStopCh:
+			}
+		default:
+		}
+	}
+
 	sendRpcWithTag := func(method string, params map[string]any, isSteer bool) (map[string]any, error) {
 		mu.Lock()
+		if terminated {
+			mu.Unlock()
+			return nil, &codexRpcErr{msg: "stdin closed", transportClosed: true}
+		}
 		id := nextID
 		nextID++
 		if isSteer {
@@ -1534,30 +1639,46 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 		}
 		raw, _ := json.Marshal(reqObj)
 		select {
-		case stdinWriteCh <- string(raw):
+		case stdinWriteCh <- stdinWriteReq{line: string(raw)}:
+		case <-readDone:
+			mu.Lock()
+			if ch, ok := pendingRpc[id]; ok {
+				delete(pendingRpc, id)
+				close(ch)
+			}
+			mu.Unlock()
+			return nil, &codexRpcErr{msg: fmt.Sprintf("stdout closed before sending %s", method), transportClosed: true}
 		case <-stdinStopCh:
-			return nil, fmt.Errorf("stdin closed")
+			mu.Lock()
+			if ch, ok := pendingRpc[id]; ok {
+				delete(pendingRpc, id)
+				close(ch)
+			}
+			mu.Unlock()
+			return nil, &codexRpcErr{msg: "stdin closed", transportClosed: true}
 		}
 
 		select {
 		case msg, ok := <-respCh:
 			if !ok || msg == nil {
-				return nil, fmt.Errorf("rpc closed waiting for %s", method)
+				return nil, &codexRpcErr{msg: fmt.Sprintf("rpc closed waiting for %s", method), transportClosed: true}
 			}
 			if errObj, hasErr := msg["error"].(map[string]any); hasErr && errObj != nil {
 				emsg, _ := errObj["message"].(string)
 				if emsg == "" {
 					emsg = "json-rpc error"
 				}
-				return nil, fmt.Errorf("%s", emsg)
+				return nil, &codexRpcErr{msg: emsg, transportClosed: false}
 			}
 			resObj, ok := msg["result"].(map[string]any)
 			if !ok {
-				return nil, fmt.Errorf("invalid result object for %s", method)
+				return nil, &codexRpcErr{msg: fmt.Sprintf("invalid result object for %s", method), transportClosed: false}
 			}
 			return resObj, nil
+		case <-readDone:
+			return nil, &codexRpcErr{msg: fmt.Sprintf("rpc closed waiting for %s", method), transportClosed: true}
 		case <-stdinStopCh:
-			return nil, fmt.Errorf("rpc aborted waiting for %s", method)
+			return nil, &codexRpcErr{msg: fmt.Sprintf("rpc aborted waiting for %s", method), transportClosed: true}
 		}
 	}
 
@@ -1575,12 +1696,18 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 		}
 		raw, _ := json.Marshal(reqObj)
 		select {
-		case stdinWriteCh <- string(raw):
+		case stdinWriteCh <- stdinWriteReq{line: string(raw)}:
 		default:
 		}
 	}
 
 	handleLine := func(line string) {
+		mu.Lock()
+		isTerm := terminated
+		mu.Unlock()
+		if isTerm {
+			return
+		}
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
 			return
@@ -1591,6 +1718,7 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 			if protoErr == nil {
 				protoErr = NewAgentError(AgentErrProtocol, phase, "codex app-server emitted malformed JSON line")
 			}
+			closePendingRpcLocked()
 			mu.Unlock()
 			markTurnCompleted()
 			return
@@ -1601,7 +1729,7 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 				id := int(idFloat)
 				mu.Lock()
 				shouldEmitSteerAccepted := false
-				if id == steerRpcID {
+				if !terminated && id == steerRpcID {
 					if resObj, ok := msg["result"].(map[string]any); ok && resObj != nil {
 						var retID string
 						if steeringMech == "tool_output" {
@@ -1644,8 +1772,10 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 		switch method {
 		case "turn/started":
 			mu.Lock()
-			shouldEmit := !turnStartedEmitted
-			turnStartedEmitted = true
+			shouldEmit := !terminated && !turnStartedEmitted
+			if !terminated {
+				turnStartedEmitted = true
+			}
 			mu.Unlock()
 			if shouldEmit {
 				emit("codex.analysis.turn_started", "")
@@ -1653,7 +1783,7 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 		case "item/completed":
 			notifTurnID, _ := params["turnId"].(string)
 			mu.Lock()
-			if activeTurnID != "" && notifTurnID != "" && notifTurnID != activeTurnID {
+			if terminated || (activeTurnID != "" && notifTurnID != "" && notifTurnID != activeTurnID) {
 				mu.Unlock()
 				return
 			}
@@ -1666,13 +1796,15 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 					ph, _ := item["phase"].(string)
 					if txt != "" {
 						mu.Lock()
-						allMsgs = append(allMsgs, codexAgentMsg{phase: ph, text: txt})
 						shouldEmitVis := false
-						if steerAccepted {
-							postSteerMsgs = append(postSteerMsgs, codexAgentMsg{phase: ph, text: txt})
-							if !modelVisibleEmitted {
-								modelVisibleEmitted = true
-								shouldEmitVis = true
+						if !terminated {
+							allMsgs = append(allMsgs, codexAgentMsg{phase: ph, text: txt})
+							if steerAccepted {
+								postSteerMsgs = append(postSteerMsgs, codexAgentMsg{phase: ph, text: txt})
+								if !modelVisibleEmitted {
+									modelVisibleEmitted = true
+									shouldEmitVis = true
+								}
 							}
 						}
 						mu.Unlock()
@@ -1680,12 +1812,18 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 							emit("evidence.model_visible", "codex app-server post-steer agentMessage")
 						}
 					}
+				} else if itype == "commandExecution" || itype == "command_execution" || itype == "mcpToolCall" || itype == "mcp_tool_call" || itype == "fileChange" || itype == "file_change" || itype == "webSearch" || itype == "web_search" {
+					mu.Lock()
+					if !terminated {
+						toolCallsCount++
+					}
+					mu.Unlock()
 				}
 			}
 		case "thread/tokenUsage/updated":
 			notifTurnID, _ := params["turnId"].(string)
 			mu.Lock()
-			if activeTurnID != "" && notifTurnID != "" && notifTurnID != activeTurnID {
+			if terminated || (activeTurnID != "" && notifTurnID != "" && notifTurnID != activeTurnID) {
 				mu.Unlock()
 				return
 			}
@@ -1717,7 +1855,7 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 			turnObj, _ := params["turn"].(map[string]any)
 			completedID, _ := turnObj["id"].(string)
 			mu.Lock()
-			if activeTurnID != "" && completedID != "" && completedID != activeTurnID {
+			if terminated || (activeTurnID != "" && completedID != "" && completedID != activeTurnID) {
 				mu.Unlock()
 				return
 			}
@@ -1745,7 +1883,23 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 			mu.Unlock()
 			markTurnCompleted()
 		case "error":
-			emsg, _ := params["message"].(string)
+			notifTurnID, _ := params["turnId"].(string)
+			mu.Lock()
+			if terminated || (activeTurnID != "" && notifTurnID != "" && notifTurnID != activeTurnID) {
+				mu.Unlock()
+				return
+			}
+			mu.Unlock()
+			if willRetry, ok := params["willRetry"].(bool); ok && willRetry {
+				return
+			}
+			emsg := ""
+			if errObj, ok := params["error"].(map[string]any); ok {
+				emsg, _ = errObj["message"].(string)
+			}
+			if emsg == "" {
+				emsg, _ = params["message"].(string)
+			}
 			if emsg == "" {
 				emsg = "Codex app-server error"
 			}
@@ -1758,9 +1912,14 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 		}
 	}
 
-	readDone := make(chan struct{})
 	go func() {
-		defer close(readDone)
+		defer func() {
+			mu.Lock()
+			closePendingRpcLocked()
+			mu.Unlock()
+			close(readDone)
+			markTurnCompleted()
+		}()
 		buf := make([]byte, 4096)
 		var lineBuf string
 		totalBytes := 0
@@ -1771,6 +1930,7 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 				if totalBytes > maxOutputBytes {
 					mu.Lock()
 					exceededLimit = true
+					closePendingRpcLocked()
 					mu.Unlock()
 					if cmd.Process != nil {
 						terminateProcessGroup(cmd, true)
@@ -1793,6 +1953,9 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 				if strings.TrimSpace(lineBuf) != "" {
 					handleLine(lineBuf)
 				}
+				mu.Lock()
+				closePendingRpcLocked()
+				mu.Unlock()
 				markTurnCompleted()
 				return
 			}
@@ -1805,43 +1968,33 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 		waitCh <- cmd.Wait()
 	}()
 
+	var terminateOnce sync.Once
 	terminate := func() {
-		mu.Lock()
-		tid := threadID
-		aid := activeTurnID
-		done := turnCompleted
-		for k, ch := range pendingRpc {
-			close(ch)
-			delete(pendingRpc, k)
-		}
-		mu.Unlock()
+		terminateOnce.Do(func() {
+			mu.Lock()
+			terminated = true
+			tid := threadID
+			aid := activeTurnID
+			done := turnCompleted
+			closePendingRpcLocked()
+			mu.Unlock()
 
-		if tid != "" && aid != "" && !done {
-			intReq := map[string]any{
-				"jsonrpc": "2.0",
-				"id":      999,
-				"method":  "turn/interrupt",
-				"params":  map[string]any{"threadId": tid, "turnId": aid},
+			if tid != "" && aid != "" && !done {
+				sendInterruptBestEffort(tid, aid)
 			}
-			if raw, err := json.Marshal(intReq); err == nil {
-				select {
-				case stdinWriteCh <- string(raw):
-				default:
+			stopStdin()
+			if cmd.Process == nil {
+				return
+			}
+			terminateProcessGroup(cmd, false)
+			killTimer := time.AfterFunc(2*time.Second, func() {
+				if cmd.Process != nil {
+					terminateProcessGroup(cmd, true)
 				}
-			}
-		}
-		stopStdin()
-		if cmd.Process == nil {
-			return
-		}
-		terminateProcessGroup(cmd, false)
-		killTimer := time.AfterFunc(2*time.Second, func() {
-			if cmd.Process != nil {
-				terminateProcessGroup(cmd, true)
-			}
+			})
+			<-waitCh
+			killTimer.Stop()
 		})
-		<-waitCh
-		killTimer.Stop()
 	}
 
 	type flowOutcome struct {
@@ -1882,8 +2035,8 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 		}
 		mu.Lock()
 		threadID = tid
-		s.threadID = &tid
 		mu.Unlock()
+		s.setThreadID(tid)
 
 		turnParams := map[string]any{
 			"threadId":       tid,
@@ -1911,8 +2064,10 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 		}
 		mu.Lock()
 		activeTurnID = aid
-		shouldEmitStart := !turnStartedEmitted
-		turnStartedEmitted = true
+		shouldEmitStart := !terminated && !turnStartedEmitted
+		if !terminated {
+			turnStartedEmitted = true
+		}
 		mu.Unlock()
 		if shouldEmitStart {
 			emit("codex.analysis.turn_started", "")
@@ -1928,7 +2083,7 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 				return
 			}
 			mu.Lock()
-			if steerAttempted {
+			if terminated || steerAttempted {
 				mu.Unlock()
 				steerDoneCh <- nil
 				return
@@ -1975,6 +2130,28 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 				}
 				toolRes, rpcErr := sendRpcWithTag("turn/start", toolParams, true)
 				if rpcErr != nil {
+					isTransportClosed := false
+					if ce, ok := rpcErr.(*codexRpcErr); ok {
+						isTransportClosed = ce.transportClosed
+					}
+					mu.Lock()
+					isTerm := terminated
+					isDone := turnCompleted
+					accepted := steerAccepted
+					if !isTerm && isTransportClosed && isDone && !accepted && s.opts.OverrideExpectedTurnID == "" {
+						earlyAgentCompletion = true
+						evidenceDelivered = false
+						deliveryCount = 0
+						mu.Unlock()
+						emit("codex.in_execution.completed_before_evidence", "Agent completed active turn simultaneously with toolOutput delivery")
+						steerDoneCh <- nil
+						return
+					}
+					mu.Unlock()
+					if isTerm {
+						steerDoneCh <- nil
+						return
+					}
 					pErr := NewAgentError(AgentErrProtocol, phase, fmt.Sprintf("toolOutput steer rejected: %s", rpcErr.Error()))
 					steerDoneCh <- pErr
 					markTurnCompleted()
@@ -1984,36 +2161,33 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 				retID, _ := retTurn["id"].(string)
 				if retID == aid {
 					mu.Lock()
+					isTerm := terminated
 					alreadyAccepted := steerAccepted
-					steerAccepted = true
-					evidenceDelivered = true
-					deliveryCount = 1
+					if !isTerm {
+						steerAccepted = true
+						evidenceDelivered = true
+						deliveryCount = 1
+					}
 					mu.Unlock()
-					if !alreadyAccepted {
+					if !isTerm && !alreadyAccepted {
 						emit("evidence.delivered", fmt.Sprintf("Mid-turn steering (%s) sent to active codex app-server turn", steeringMech))
 						emit("evidence.accepted_by_runtime", "codex app-server toolOutput joined active turn")
 					}
 				} else {
 					if retID != "" && tid != "" {
-						intReq := map[string]any{
-							"jsonrpc": "2.0",
-							"id":      998,
-							"method":  "turn/interrupt",
-							"params":  map[string]any{"threadId": tid, "turnId": retID},
-						}
-						if raw, err := json.Marshal(intReq); err == nil {
-							select {
-							case stdinWriteCh <- string(raw):
-							default:
-							}
-						}
+						sendInterruptBestEffort(tid, retID)
 					}
 					mu.Lock()
-					earlyAgentCompletion = true
-					evidenceDelivered = false
-					deliveryCount = 0
+					isTerm := terminated
+					if !isTerm {
+						earlyAgentCompletion = true
+						evidenceDelivered = false
+						deliveryCount = 0
+					}
 					mu.Unlock()
-					emit("codex.in_execution.completed_before_evidence", "Active turn completed before toolOutput joined; recorded as early completion")
+					if !isTerm {
+						emit("codex.in_execution.completed_before_evidence", "Active turn completed before toolOutput joined; recorded as early completion")
+					}
 				}
 				steerDoneCh <- nil
 				return
@@ -2031,13 +2205,26 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 				},
 			}, true)
 			if rpcErr != nil {
-				if s.opts.OverrideExpectedTurnID == "" && strings.Contains(strings.ToLower(rpcErr.Error()), "no active turn to steer") {
-					mu.Lock()
+				isTransportClosed := false
+				if ce, ok := rpcErr.(*codexRpcErr); ok {
+					isTransportClosed = ce.transportClosed
+				}
+				mu.Lock()
+				isTerm := terminated
+				isDone := turnCompleted
+				accepted := steerAccepted
+				if !isTerm && !accepted && s.opts.OverrideExpectedTurnID == "" &&
+					(strings.Contains(strings.ToLower(rpcErr.Error()), "no active turn to steer") || (isTransportClosed && isDone)) {
 					earlyAgentCompletion = true
 					evidenceDelivered = false
 					deliveryCount = 0
 					mu.Unlock()
 					emit("codex.in_execution.completed_before_evidence", "Agent completed active turn simultaneously with turn/steer delivery")
+					steerDoneCh <- nil
+					return
+				}
+				mu.Unlock()
+				if isTerm {
 					steerDoneCh <- nil
 					return
 				}
@@ -2054,12 +2241,15 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 				return
 			}
 			mu.Lock()
+			isTerm := terminated
 			alreadyAccepted := steerAccepted
-			steerAccepted = true
-			evidenceDelivered = true
-			deliveryCount = 1
+			if !isTerm {
+				steerAccepted = true
+				evidenceDelivered = true
+				deliveryCount = 1
+			}
 			mu.Unlock()
-			if !alreadyAccepted {
+			if !isTerm && !alreadyAccepted {
 				emit("evidence.delivered", fmt.Sprintf("Mid-turn steering (%s) sent to active codex app-server turn", steeringMech))
 				emit("evidence.accepted_by_runtime", "codex app-server turn/steer accepted for active turn")
 			}
@@ -2077,6 +2267,11 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 
 		// If steer was already attempted, wait briefly for steer RPC to settle
 		mu.Lock()
+		if terminated {
+			mu.Unlock()
+			flowCh <- flowOutcome{}
+			return
+		}
 		attempted := steerAttempted
 		if !attempted {
 			steerAttempted = true
@@ -2093,6 +2288,17 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 					return
 				}
 			case <-time.After(2 * time.Second):
+				mu.Lock()
+				shouldEmitLate := !terminated && !steerAccepted && !earlyAgentCompletion
+				if shouldEmitLate {
+					earlyAgentCompletion = true
+					evidenceDelivered = false
+					deliveryCount = 0
+				}
+				mu.Unlock()
+				if shouldEmitLate {
+					emit("codex.in_execution.completed_before_evidence", "Agent completed active turn before steering response arrived")
+				}
 			}
 		} else {
 			emit("codex.in_execution.completed_before_evidence", "Agent solved and completed active turn before background evidence arrived")
@@ -2139,6 +2345,7 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 	evDelivered := evidenceDelivered
 	earlyComp := earlyAgentCompletion
 	delivCount := deliveryCount
+	tCallsCount := toolCallsCount
 	evPayload := evidencePayloadDelivered
 	uMap := latestUsage
 	tid := threadID
@@ -2202,9 +2409,10 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 	}
 	return InExecutionTurnResult{
 		Turn: AgentTurn{
-			Text:     Redact(chosenText),
-			Usage:    uMap,
-			ThreadID: tidPtr,
+			Text:           Redact(chosenText),
+			Usage:          uMap,
+			ThreadID:       tidPtr,
+			ToolCallsCount: &tCallsCount,
 		},
 		EvidenceDeliveredInExecution: evDelivered,
 		EvidenceConsumedInExecution:  evConsumed,

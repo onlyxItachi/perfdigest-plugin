@@ -5,7 +5,7 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import {
   codexAdapter,
@@ -948,6 +948,7 @@ test('Scenario 10: Malicious prompt-injection evidence text is wrapped in <UNTRU
     const spawnEntry = rpcEntries.find(e => e.type === 'app_server_spawn') as { args?: string[] } | undefined;
     assert.ok(spawnEntry?.args?.includes('approval_policy="never"'));
     assert.ok(spawnEntry?.args?.includes('sandbox_mode="read-only"'));
+    assert.ok(spawnEntry?.args?.includes('web_search="disabled"'));
     assert.ok(spawnEntry?.args?.includes('mcp_servers.inherited_mcp_server={command="false",enabled=false}'));
 
     const threadStart = rpcEntries.find(
@@ -1197,8 +1198,12 @@ test('Scenario 13: Go & TypeScript parity across mid-turn steer consumed, ignore
   }
 });
 
-test('Scenario 14: Live authenticated codex app-server 0.165.0 E2E smoke test with gpt-6-luna', async (t) => {
-  const realCodexBinary = '/home/hamza-usta/.local/bin/codex';
+test('Scenario 14: Live authenticated codex app-server 0.165.0 E2E smoke test with gpt-6-luna (opt-in)', async (t) => {
+  if (process.env.PERFDIGEST_RUN_LIVE_CODEX !== '1') {
+    t.skip('Set PERFDIGEST_RUN_LIVE_CODEX=1 to run live Codex app-server E2E smoke test');
+    return;
+  }
+  const realCodexBinary = process.env.PERFDIGEST_CODEX_PATH ?? 'codex';
   try {
     const { stdout, stderr } = await execFileAsync(realCodexBinary, ['login', 'status'], { timeout: 10_000 });
     if (!/logged in using chatgpt/i.test(stdout + stderr)) {
@@ -1379,6 +1384,466 @@ test('Scenario 15: Regression hardening for word-boundary evidence consumption, 
       (steerPrompt.match(/<\/UNTRUSTED_EVIDENCE_DATA>/gi) ?? []).length,
       1,
       'Steered text must contain only the single outer closing </UNTRUSTED_EVIDENCE_DATA> delimiter',
+    );
+  } finally {
+    if (priorCodexPath === undefined) delete process.env.PERFDIGEST_CODEX_PATH;
+    else process.env.PERFDIGEST_CODEX_PATH = priorCodexPath;
+    await rm(ws, { recursive: true, force: true });
+  }
+});
+
+test('Scenario 16: Remediation regressions (capabilities, consumption verifier, interrupted/close races, toolCallsCount, timeoutMs, CLI parity, harness honesty)', async () => {
+  // 16a: Non-in-exec codexAdapter returns full runtime capability profile
+  const sdkCodex = codexAdapter({ inExecutionAsync: false });
+  assert.deepEqual(sdkCodex.capabilities, getRuntimeCapabilityProfile('codex'));
+
+  // 16b: verifyCodexEvidenceConsumption handles verbose evidence.extractions + secondaryReportId and rejects contradictory verification claims
+  const verboseExtractionsPayload = JSON.stringify({
+    evidence: {
+      decision: { selectedId: null },
+      evidence: [],
+      extractions: [{ unit: 'matmul_tiled_fp16', secondaryReportId: 'baseline-gpu-rep' }],
+    },
+    verification: { exitCode: 0, timedOut: false, aborted: false },
+    pipelineStatus: 'complete',
+  });
+  assert.equal(verifyCodexEvidenceConsumption('Compared against baseline-gpu-rep.', verboseExtractionsPayload), true);
+  assert.equal(verifyCodexEvidenceConsumption('Primary kernel is matmul_tiled_fp16.', verboseExtractionsPayload), true);
+
+  const failedVerifyAbstainPayload = JSON.stringify({
+    schema: 'perfdigest.agent-evidence.v1',
+    status: 'failed',
+    decision: { selectedId: null, confidence: 0.3, reason: 'low_confidence' },
+    selected: [],
+    verification: { passed: false, exitCode: 2, elapsedMs: 12 },
+  });
+  assert.equal(
+    verifyCodexEvidenceConsumption('Everything looks fine and verification passed.', failedVerifyAbstainPayload),
+    false,
+    'Contradictory "verification passed" must not match when verification.passed is false',
+  );
+  assert.equal(
+    verifyCodexEvidenceConsumption('Verification failed with exit code 2.', failedVerifyAbstainPayload),
+    true,
+  );
+  const passedVerifyAbstainPayload = JSON.stringify({
+    schema: 'perfdigest.agent-evidence.v1',
+    status: 'needs_review',
+    decision: { selectedId: null, confidence: 0.3, reason: 'low_confidence' },
+    selected: [],
+    verification: { passed: true, exitCode: 0, elapsedMs: 5 },
+  });
+  assert.equal(
+    verifyCodexEvidenceConsumption('Verification failed unexpectedly.', passedVerifyAbstainPayload),
+    false,
+    'Contradictory "verification failed" must not match when verification.passed is true',
+  );
+
+  // 16c: Edge-case mock codex binary testing:
+  //   - toolCallsCount + multi-byte UTF-8 split across stdout chunks
+  //   - server-initiated turn/completed status="interrupted" -> AgentError kind="cancelled"
+  //   - child closing immediately after turn/completed while turn/steer is in flight -> earlyAgentCompletion without hang
+  //   - direct codexAppServerInExecutionTurn timeoutMs enforcement
+  const ws = await makeWorkspace('codex-steer-s16-');
+  const priorCodexPath = process.env.PERFDIGEST_CODEX_PATH;
+  try {
+    await writeFile(join(ws, 'trace.json'), JSON.stringify({ traceEvents: [{ name: 'hot_kernel_reduce', dur: 48200 }] }));
+    const mcpResponder = await createLocalMcpResponder(ws, { delayMs: 15 });
+
+    const edgeModeFile = join(ws, 'edge-mode.txt');
+    const edgeMockPath = join(ws, 'mock-codex-edge.mjs');
+    await writeFile(
+      edgeMockPath,
+      `#!/usr/bin/env node
+import fs from 'node:fs';
+import readline from 'node:readline';
+const args = process.argv.slice(2);
+if (args[0] === 'login') { process.stdout.write('Logged in using ChatGPT\\n'); process.exit(0); }
+if (args[0] === 'mcp') { process.stdout.write('[]\\n'); process.exit(0); }
+const mode = fs.readFileSync(${JSON.stringify(edgeModeFile)}, 'utf8').trim();
+const send = (o) => process.stdout.write(JSON.stringify(o) + '\\n');
+const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
+rl.on('line', (line) => {
+  if (!line.trim()) return;
+  const msg = JSON.parse(line);
+  if (msg.method === 'initialize') { send({ jsonrpc: '2.0', id: msg.id, result: { capabilities: {} } }); return; }
+  if (msg.method === 'thread/start') { send({ jsonrpc: '2.0', id: msg.id, result: { thread: { id: 'thr-edge' } } }); return; }
+  if (msg.method === 'turn/start') {
+    send({ jsonrpc: '2.0', id: msg.id, result: { turn: { id: 'turn-edge', status: 'inProgress' } } });
+    send({ jsonrpc: '2.0', method: 'turn/started', params: { threadId: 'thr-edge', turn: { id: 'turn-edge', status: 'inProgress' } } });
+    if (mode === 'server_interrupted') {
+      setTimeout(() => {
+        send({ jsonrpc: '2.0', method: 'turn/completed', params: { threadId: 'thr-edge', turn: { id: 'turn-edge', status: 'interrupted' } } });
+      }, 20);
+      return;
+    }
+    if (mode === 'close_on_steer') {
+      // Complete turn right after turn/start and exit when steer arrives without replying
+      setTimeout(() => {
+        send({ jsonrpc: '2.0', method: 'item/completed', params: { threadId: 'thr-edge', turnId: 'turn-edge', item: { id: 'm1', type: 'agentMessage', phase: 'final_answer', text: 'Finished before steer reply.' } } });
+        send({ jsonrpc: '2.0', method: 'turn/completed', params: { threadId: 'thr-edge', turn: { id: 'turn-edge', status: 'completed' } } });
+      }, 40);
+      return;
+    }
+    if (mode === 'hang') {
+      setTimeout(() => {}, 30000);
+      return;
+    }
+    // Emit two tool calls before steer
+    send({ jsonrpc: '2.0', method: 'item/completed', params: { threadId: 'thr-edge', turnId: 'turn-edge', item: { id: 't1', type: 'commandExecution' } } });
+    send({ jsonrpc: '2.0', method: 'item/completed', params: { threadId: 'thr-edge', turnId: 'turn-edge', item: { id: 't2', type: 'mcpToolCall' } } });
+    return;
+  }
+  if (msg.method === 'turn/steer') {
+    if (mode === 'close_on_steer') {
+      // Exit immediately after turn/completed without sending a turn/steer JSON-RPC reply
+      setTimeout(() => process.exit(0), 60);
+      return;
+    }
+    send({ jsonrpc: '2.0', id: msg.id, result: { turnId: 'turn-edge' } });
+    const utf8Frame = Buffer.from(JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'item/completed',
+      params: {
+        threadId: 'thr-edge',
+        turnId: 'turn-edge',
+        item: {
+          id: 'm-utf8',
+          type: 'agentMessage',
+          phase: 'final_answer',
+          text: 'Steered cpu-trace hot_kernel_reduce latency: 48200 µs (Δ≈12%).'
+        }
+      }
+    }) + '\\n', 'utf8');
+    // Split directly across the multi-byte UTF-8 sequence for 'µ' (0xC2 0xB5)
+    const muIdx = utf8Frame.indexOf(0xc2);
+    process.stdout.write(utf8Frame.subarray(0, muIdx + 1));
+    setTimeout(() => {
+      process.stdout.write(utf8Frame.subarray(muIdx + 1));
+      send({ jsonrpc: '2.0', method: 'turn/completed', params: { threadId: 'thr-edge', turn: { id: 'turn-edge', status: 'completed' } } });
+    }, 10);
+  }
+});
+`,
+      { mode: 0o755 },
+    );
+    await chmod(edgeMockPath, 0o755);
+    process.env.PERFDIGEST_CODEX_PATH = edgeMockPath;
+
+    const manifest: Manifest = manifestSchema.parse({
+      version: 1,
+      issue: 'Edge regression check',
+      captures: [],
+      reports: [{ id: 'cpu-trace', path: 'trace.json', format: 'chrome-trace', description: 'CPU trace' }],
+      verification: { command: process.execPath, args: ['-e', 'process.exit(0)'] },
+    });
+
+    // 1. UTF-8 chunk split + toolCallsCount === 2
+    await writeFile(edgeModeFile, 'utf8_tools');
+    const utf8Res = await investigate({
+      workspace: ws,
+      manifest,
+      routing: 'cloudflare',
+      agent: 'codex',
+      agentDelivery: 'in_execution',
+      decisionProvider: makeAcceptedProvider(5),
+      mcpSessionOptions: { command: process.execPath, args: [mcpResponder] },
+    });
+    assert.equal(utf8Res.status, 'complete');
+    assert.equal(utf8Res.review?.toolCallsCount, 2);
+    assert.ok(utf8Res.review?.text.includes('48200 µs (Δ≈12%)'), `UTF-8 chunk boundary corrupted: ${utf8Res.review?.text}`);
+
+    // 2. Server-initiated status="interrupted" -> AgentError kind="cancelled"
+    await writeFile(edgeModeFile, 'server_interrupted');
+    const intRes = await investigate({
+      workspace: ws,
+      manifest,
+      routing: 'cloudflare',
+      agent: 'codex',
+      agentDelivery: 'in_execution',
+      decisionProvider: makeAcceptedProvider(80),
+      mcpSessionOptions: { command: process.execPath, args: [mcpResponder] },
+    });
+    assert.equal(intRes.status, 'failed');
+    assert.equal(intRes.agentError?.kind, 'cancelled');
+    assert.equal(intRes.agentError?.phase, 'in_execution');
+
+    // 3. Child closes after turn/completed while turn/steer is in flight -> no 120s deadlock, earlyAgentCompletion=true
+    await writeFile(edgeModeFile, 'close_on_steer');
+    const tClose = Date.now();
+    const closeRes = await investigate({
+      workspace: ws,
+      manifest,
+      routing: 'cloudflare',
+      agent: 'codex',
+      agentDelivery: 'in_execution',
+      decisionProvider: makeAcceptedProvider(5),
+      mcpSessionOptions: { command: process.execPath, args: [mcpResponder] },
+    });
+    assert.ok(Date.now() - tClose < 4000, 'close_on_steer must resolve promptly without 120s hang');
+    assert.equal(closeRes.status, 'complete');
+    assert.equal(closeRes.telemetry.earlyAgentCompletion, true);
+    assert.equal(closeRes.telemetry.evidenceDelivery, null);
+
+    // 4. Direct codexAppServerInExecutionTurn timeoutMs enforcement
+    await writeFile(edgeModeFile, 'hang');
+    const tDirect = Date.now();
+    await assert.rejects(
+      codexAppServerInExecutionTurn({
+        workspace: ws,
+        prompt: 'Direct timeout test',
+        supplyEvidence: async () => new Promise(() => {}),
+        signal: new AbortController().signal,
+        emit: () => {},
+        timeoutMs: 120,
+      }),
+      /no result within 120 ms/,
+    );
+    assert.ok(Date.now() - tDirect < 3000, 'Direct codexAppServerInExecutionTurn timeoutMs must trigger promptly');
+
+    // 16d: CLI flag parity (--effort and empty-string rejection) across TS CLI and Go binary
+    const tsCliPath = join(repoRoot, '.test-build', 'src', 'cli.js');
+    const manifestPath = join(ws, 'manifest.json');
+    await writeFile(manifestPath, JSON.stringify(manifest));
+    for (const [label, cmd, baseArgs] of [
+      ['TS CLI', process.execPath, [tsCliPath]],
+      ['Go CLI', goBinary, []],
+    ] as const) {
+      await assert.rejects(
+        execFileAsync(cmd, [...baseArgs, 'run', manifestPath, '--workspace', ws, '--routing', 'offline', '--agent', 'none', '--effort', 'bogus']),
+        /--effort must be minimal, low, medium, high, xhigh or max/,
+        `${label} must reject invalid --effort`,
+      );
+      await assert.rejects(
+        execFileAsync(cmd, [...baseArgs, 'run', manifestPath, '--workspace', ws, '--routing', 'offline', '--agent', 'codex', '--codex-steering-mechanism', '']),
+        /--codex-steering-mechanism must be turn_steer or tool_output/,
+        `${label} must reject empty --codex-steering-mechanism`,
+      );
+      await assert.rejects(
+        execFileAsync(cmd, [...baseArgs, 'run', manifestPath, '--workspace', ws, '--routing', 'offline', '--agent', 'none', '--agent-delivery', '']),
+        /--agent-delivery must be auto, in_execution, two_turn or single_turn/,
+        `${label} must reject empty --agent-delivery`,
+      );
+    }
+
+    // 16e: Evaluation harness methodological honesty checks (gradeStudyResponse Check 4 + contract_fixture run)
+    const evalModuleUrl = pathToFileURL(join(repoRoot, 'scripts', 'evaluate-live-steering.mjs')).href;
+    const { gradeStudyResponse, STUDIES, runLiveSteeringEvaluation } = (await import(evalModuleUrl)) as {
+      gradeStudyResponse: (text: string, study: unknown, patchApplied?: boolean) => { checksPassed: number };
+      STUDIES: unknown[];
+      runLiveSteeringEvaluation: (opts: Record<string, unknown>) => Promise<{
+        validation: { valid: boolean };
+        receiptPath: string;
+        cellsCsvPath: string;
+      }>;
+    };
+    const falsePosGrade = gradeStudyResponse(
+      'We must focus on this issue because using buffers causes status issues.',
+      STUDIES[0],
+      false,
+    );
+    assert.equal(
+      falsePosGrade.checksPassed,
+      1,
+      'Check 4 must NOT match substring "us" inside words like "because", "using", "must", "focus", "status"',
+    );
+
+    const evalOutDir = join(ws, 'live-eval-check');
+    const evalRes = await runLiveSteeringEvaluation({
+      repoRoot,
+      outDir: evalOutDir,
+      studyIds: ['cuda_opt_loop'],
+      modelIds: ['gpt-6-luna'],
+    });
+    assert.equal(evalRes.validation.valid, true);
+    const receipt = JSON.parse(await readFile(evalRes.receiptPath, 'utf8')) as { limitations: string[] };
+    const limJoined = receipt.limitations.join('\n').toLowerCase();
+    assert.match(limJoined, /protocol-level steering feasibility/);
+    assert.match(limJoined, /not proof of superior/);
+    assert.match(limJoined, /<200 b/);
+    assert.match(limJoined, /simulated mcp responder/);
+    assert.match(limJoined, /mock loopback decision/);
+    assert.match(limJoined, /\/bin\/true/);
+    assert.match(limJoined, /5-check/);
+
+    const cellsText = await readFile(evalRes.cellsCsvPath, 'utf8');
+    const lines = cellsText.trim().split('\n');
+    const headers = lines[0]!.split(',');
+    const colIdx = (c: string) => headers.indexOf(c);
+    const rows = lines.slice(1).map(l => l.split(','));
+    const singleTurnRow = rows.find(r => r[colIdx('model_id')] === 'gpt-6-luna-single-turn');
+    assert.ok(singleTurnRow, 'Expected single_turn row');
+    assert.equal(singleTurnRow[colIdx('native_tools_enabled')], 'false', 'single_turn SDK arm has shell_tool=false');
+    assert.equal(Number(singleTurnRow[colIdx('parallel_overlap_ms')]), 0, 'single_turn must report 0 overlap');
+    const inExecRow = rows.find(r => r[colIdx('model_id')] === 'gpt-6-luna' && r[colIdx('arm')] === 'evidence');
+    assert.ok(inExecRow, 'Expected in_execution row');
+    assert.equal(inExecRow[colIdx('native_tools_enabled')], 'true');
+  } finally {
+    if (priorCodexPath === undefined) delete process.env.PERFDIGEST_CODEX_PATH;
+    else process.env.PERFDIGEST_CODEX_PATH = priorCodexPath;
+    await rm(ws, { recursive: true, force: true });
+  }
+});
+
+test('Scenario 17: ErrorNotification (willRetry, turnId filtering, params.error.message) and handshake JSON-RPC error formatting', async () => {
+  const ws = await makeWorkspace('codex-steer-s17-');
+  const priorCodexPath = process.env.PERFDIGEST_CODEX_PATH;
+  try {
+    await writeFile(join(ws, 'trace.json'), JSON.stringify({ traceEvents: [{ name: 'hot_kernel_reduce', dur: 48200 }] }));
+    const mcpResponder = await createLocalMcpResponder(ws, { delayMs: 15 });
+    const modeFile = join(ws, 's17-mode.txt');
+    const mockPath = join(ws, 'mock-codex-s17.mjs');
+
+    await writeFile(
+      mockPath,
+      `#!/usr/bin/env node
+import fs from 'node:fs';
+import readline from 'node:readline';
+const args = process.argv.slice(2);
+if (args[0] === 'login') { process.stdout.write('Logged in using ChatGPT\\n'); process.exit(0); }
+if (args[0] === 'mcp') { process.stdout.write('[]\\n'); process.exit(0); }
+const mode = fs.readFileSync(${JSON.stringify(modeFile)}, 'utf8').trim();
+const send = (o) => process.stdout.write(JSON.stringify(o) + '\\n');
+const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
+rl.on('line', (line) => {
+  if (!line.trim()) return;
+  const msg = JSON.parse(line);
+  if (msg.method === 'initialize') { send({ jsonrpc: '2.0', id: msg.id, result: { capabilities: {} } }); return; }
+  if (msg.method === 'thread/start') {
+    if (mode === 'handshake_rpc_error') {
+      send({ jsonrpc: '2.0', id: msg.id, error: { code: -32600, message: 'unsupported model xyz' } });
+      return;
+    }
+    send({ jsonrpc: '2.0', id: msg.id, result: { thread: { id: 'thr-s17' } } });
+    return;
+  }
+  if (msg.method === 'turn/start') {
+    send({ jsonrpc: '2.0', id: msg.id, result: { turn: { id: 'turn-s17', status: 'inProgress' } } });
+    send({ jsonrpc: '2.0', method: 'turn/started', params: { threadId: 'thr-s17', turn: { id: 'turn-s17', status: 'inProgress' } } });
+    if (mode === 'retry_and_other_turn') {
+      // Transient retryable error for active turn + non-retryable error for an unrelated turnId -> both must be ignored
+      send({
+        jsonrpc: '2.0',
+        method: 'error',
+        params: {
+          threadId: 'thr-s17',
+          turnId: 'turn-s17',
+          willRetry: true,
+          error: { message: 'transient stream reconnect' }
+        }
+      });
+      send({
+        jsonrpc: '2.0',
+        method: 'error',
+        params: {
+          threadId: 'thr-s17',
+          turnId: 'turn-unrelated',
+          willRetry: false,
+          error: { message: 'other turn error should be ignored' }
+        }
+      });
+    } else if (mode === 'fatal_error_notif') {
+      setTimeout(() => {
+        send({
+          jsonrpc: '2.0',
+          method: 'error',
+          params: {
+            threadId: 'thr-s17',
+            turnId: 'turn-s17',
+            willRetry: false,
+            error: { message: 'stream disconnected permanently (Bearer sk-secret-err-token-1234567890abcdef)' }
+          }
+        });
+      }, 20);
+    }
+    return;
+  }
+  if (msg.method === 'turn/steer') {
+    send({ jsonrpc: '2.0', id: msg.id, result: { turnId: 'turn-s17' } });
+    if (mode === 'retry_and_other_turn') {
+      send({
+        jsonrpc: '2.0',
+        method: 'item/completed',
+        params: {
+          threadId: 'thr-s17',
+          turnId: 'turn-s17',
+          item: {
+            id: 'msg-s17',
+            type: 'agentMessage',
+            phase: 'final_answer',
+            text: 'Recovered after retry: cpu-trace hot_kernel_reduce verified.'
+          }
+        }
+      });
+      send({ jsonrpc: '2.0', method: 'turn/completed', params: { threadId: 'thr-s17', turn: { id: 'turn-s17', status: 'completed' } } });
+    }
+  }
+});
+`,
+      { mode: 0o755 },
+    );
+    await chmod(mockPath, 0o755);
+    process.env.PERFDIGEST_CODEX_PATH = mockPath;
+
+    const manifest: Manifest = manifestSchema.parse({
+      version: 1,
+      issue: 'ErrorNotification and handshake RPC error handling',
+      captures: [],
+      reports: [{ id: 'cpu-trace', path: 'trace.json', format: 'chrome-trace', description: 'CPU trace' }],
+      verification: { command: process.execPath, args: ['-e', 'process.exit(0)'] },
+    });
+
+    // 1. willRetry: true + mismatched turnId must NOT fail the turn
+    await writeFile(modeFile, 'retry_and_other_turn');
+    const retryRes = await investigate({
+      workspace: ws,
+      manifest,
+      routing: 'cloudflare',
+      agent: 'codex',
+      agentDelivery: 'in_execution',
+      decisionProvider: makeAcceptedProvider(5),
+      mcpSessionOptions: { command: process.execPath, args: [mcpResponder] },
+    });
+    assert.equal(retryRes.status, 'complete', `Expected complete after retryable error, got error=${retryRes.error}`);
+    assert.equal(retryRes.telemetry.evidenceConsumedInExecution, true);
+
+    // 2. willRetry: false on active turn fails with redacted params.error.message (not generic fallback)
+    await writeFile(modeFile, 'fatal_error_notif');
+    const fatalRes = await investigate({
+      workspace: ws,
+      manifest,
+      routing: 'cloudflare',
+      agent: 'codex',
+      agentDelivery: 'in_execution',
+      decisionProvider: makeAcceptedProvider(80),
+      mcpSessionOptions: { command: process.execPath, args: [mcpResponder] },
+    });
+    assert.equal(fatalRes.status, 'failed');
+    assert.equal(fatalRes.agentError?.kind, 'failed');
+    assert.match(fatalRes.agentError?.message ?? '', /stream disconnected permanently/);
+    assert.ok(
+      !(fatalRes.agentError?.message ?? '').includes('sk-secret-err-token-1234567890abcdef'),
+      'Secret inside ErrorNotification.error.message must be redacted',
+    );
+
+    // 3. Handshake JSON-RPC error reply preserves message and maps to AgentError kind="protocol" (not "[object Object]")
+    await writeFile(modeFile, 'handshake_rpc_error');
+    const hsRes = await investigate({
+      workspace: ws,
+      manifest,
+      routing: 'cloudflare',
+      agent: 'codex',
+      agentDelivery: 'in_execution',
+      decisionProvider: makeAcceptedProvider(5),
+      mcpSessionOptions: { command: process.execPath, args: [mcpResponder] },
+    });
+    assert.equal(hsRes.status, 'failed');
+    assert.equal(hsRes.agentError?.kind, 'protocol');
+    assert.equal(hsRes.agentError?.phase, 'in_execution');
+    assert.match(hsRes.agentError?.message ?? '', /unsupported model xyz/);
+    assert.ok(
+      !(hsRes.agentError?.message ?? '').includes('[object Object]'),
+      'Handshake JSON-RPC error must not stringify as [object Object]',
     );
   } finally {
     if (priorCodexPath === undefined) delete process.env.PERFDIGEST_CODEX_PATH;

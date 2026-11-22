@@ -2,6 +2,7 @@
 import { parseArgs } from 'node:util';
 import { readFile, realpath } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import type { ModelReasoningEffort } from '@openai/codex-sdk';
 import { manifestSchema, type AgentDeliveryMode, type RoutingMode } from './config.js';
 import { investigate } from './run.js';
 import { demoManifest } from './demo.js';
@@ -14,8 +15,8 @@ import { genericCliAdapter } from './agents.js';
 const help = `PerfDigest Evidence — Codex-first MVP
 
   perfdigest-plugin init [--provider cloudflare|local|openai|offline --yes] [--env-file PATH] [--endpoint URL] [--decision-model clef-flash|clef|clef-omni] [--check-connection]
-  perfdigest-plugin demo [--agent none|codex|generic] [--agent-command PATH] [--agent-sessions] [--agent-in-execution-async] [--agent-delivery auto|in_execution|single_turn|two_turn] [--codex-steering-mechanism turn_steer|tool_output] [--strict-delivery-mode] [--routing offline|decisions] [--decision-model NAME] [--perf]
-  perfdigest-plugin run manifest.json [--workspace PATH] [--routing decisions|offline] [--agent codex|none|generic] [--agent-command PATH] [--agent-sessions] [--agent-in-execution-async] [--agent-delivery auto|in_execution|single_turn|two_turn] [--codex-steering-mechanism turn_steer|tool_output] [--strict-delivery-mode] [--decision-model NAME]
+  perfdigest-plugin demo [--agent none|codex|generic] [--agent-command PATH] [--agent-sessions] [--agent-in-execution-async] [--agent-delivery auto|in_execution|single_turn|two_turn] [--codex-steering-mechanism turn_steer|tool_output] [--strict-delivery-mode] [--routing offline|decisions] [--decision-model NAME] [--model NAME] [--effort minimal|low|medium|high|xhigh|max] [--perf]
+  perfdigest-plugin run manifest.json [--workspace PATH] [--routing decisions|offline] [--agent codex|none|generic] [--agent-command PATH] [--agent-sessions] [--agent-in-execution-async] [--agent-delivery auto|in_execution|single_turn|two_turn] [--codex-steering-mechanism turn_steer|tool_output] [--strict-delivery-mode] [--decision-model NAME] [--model NAME] [--effort minimal|low|medium|high|xhigh|max]
   perfdigest-plugin mcp [--workspace PATH]
 
 Unconfigured demo defaults: real local CPU measurements + verification, offline routing, no model calls.
@@ -39,7 +40,7 @@ async function main() {
     'agent-in-execution-async': { type: 'boolean' },
     'agent-delivery': { type: 'string' }, 'strict-delivery-mode': { type: 'boolean' }, 'compact-evidence': { type: 'boolean' },
     'codex-steering-mechanism': { type: 'string' },
-    routing: { type: 'string' }, provider: { type: 'string' }, model: { type: 'string' }, perf: { type: 'boolean' },
+    routing: { type: 'string' }, provider: { type: 'string' }, model: { type: 'string' }, effort: { type: 'string' }, perf: { type: 'boolean' },
     endpoint: { type: 'string' }, 'env-file': { type: 'string' }, 'decision-model': { type: 'string' }, yes: { type: 'boolean' }, 'check-connection': { type: 'boolean' },
   } });
   if (values.help || !positionals[0]) { console.log(help); return; }
@@ -101,6 +102,12 @@ async function main() {
     throw new Error('--codex-steering-mechanism must be turn_steer or tool_output');
   }
   const codexSteeringMechanism = codexSteeringRaw as 'turn_steer' | 'tool_output' | undefined;
+  const effortRaw = values.effort;
+  const validEfforts = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
+  if (effortRaw !== undefined && !validEfforts.includes(effortRaw as (typeof validEfforts)[number])) {
+    throw new Error('--effort must be minimal, low, medium, high, xhigh or max');
+  }
+  const effort = effortRaw as ModelReasoningEffort | undefined;
   const agentAdapter = agent === 'generic'
     ? genericCliAdapter({
         command: values['agent-command']!,
@@ -123,6 +130,7 @@ async function main() {
       ...(values['strict-delivery-mode'] !== undefined ? { strictDeliveryMode: values['strict-delivery-mode'] } : {}),
       ...(values['compact-evidence'] !== undefined ? { compactEvidence: values['compact-evidence'] } : {}),
       ...(values.model ? { model: values.model } : {}),
+      ...(effort !== undefined ? { effort } : {}),
       onEvent: (event, detail) => process.stderr.write(`${event}${detail ? `: ${redact(detail)}` : ''}\n`),
     });
     console.log(JSON.stringify({ status: result.status, decisionOutcome: result.decisionOutcome, agent, routing,

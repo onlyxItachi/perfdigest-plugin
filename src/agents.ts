@@ -3,7 +3,9 @@ import type { ModelReasoningEffort, Thread, Usage } from '@openai/codex-sdk';
 import {
   codexAppServerInExecutionTurn,
   codexAppServerPreflight,
+  CodexInterruptedError,
   CodexProtocolError,
+  CodexTimeoutError,
   codexThread,
   codexTurn,
   type CodexSteeringMechanism,
@@ -379,6 +381,7 @@ export interface AgentTurn {
   text: string;
   usage: Usage | null;
   threadId: string | null;
+  toolCallsCount?: number;
 }
 
 export interface InExecutionTurnResult {
@@ -439,15 +442,7 @@ export function codexAdapter(options: CodexAdapterOptions = {}): AgentAdapter {
   const inExecutionAsync = options.inExecutionAsync ?? false;
   const timeoutMs = options.timeoutMs ?? 120_000;
   const maxOutputBytes = options.maxOutputBytes ?? 4_194_304;
-  const capabilities: AgentCapabilities = inExecutionAsync
-    ? getRuntimeCapabilityProfile('codex-app-server')
-    : {
-        sameSessionContinuation: true,
-        nativeAsyncInput: false,
-        cancellation: true,
-        usageReporting: true,
-        sandbox: 'read-only',
-      };
+  const capabilities: AgentCapabilities = getRuntimeCapabilityProfile('codex', { inExecutionAsync });
 
   return {
     name: 'codex',
@@ -519,8 +514,12 @@ export function codexAdapter(options: CodexAdapterOptions = {}): AgentAdapter {
             maxOutputBytes,
           })
             .catch((error: unknown) => {
-              if (timedOut) throw new AgentError('timed_out', phase, `no result within ${timeoutMs} ms`);
-              if (signal.aborted) throw new AgentError('cancelled', phase, 'run cancelled');
+              if (timedOut || error instanceof CodexTimeoutError) {
+                throw new AgentError('timed_out', phase, `no result within ${timeoutMs} ms`);
+              }
+              if (signal.aborted || error instanceof CodexInterruptedError) {
+                throw new AgentError('cancelled', phase, 'run cancelled');
+              }
               if (hasSupplyError) throw supplyError;
               if (error instanceof AgentError) throw new AgentError(error.kind, phase, error.message);
               if (error instanceof CodexProtocolError) throw new AgentError('protocol', phase, error.message);
@@ -583,13 +582,7 @@ export function genericCliAdapter(options: GenericCliAgentOptions): AgentAdapter
   const inExecutionAsync = options.inExecutionAsync ?? false;
   const capabilities: AgentCapabilities = inExecutionAsync
     ? getRuntimeCapabilityProfile('generic-cli-in-execution', { sessions })
-    : {
-        sameSessionContinuation: sessions,
-        nativeAsyncInput: false,
-        cancellation: true,
-        usageReporting: true,
-        sandbox: 'agent-defined',
-      };
+    : getRuntimeCapabilityProfile('generic-cli', { sessions });
 
   return {
     name: 'generic-cli', eventPrefix: 'agent',

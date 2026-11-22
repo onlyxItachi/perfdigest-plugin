@@ -378,6 +378,17 @@ func TestCodexAdapterCapabilitiesAndNegotiation(t *testing.T) {
 	if sdkCaps.NativeAsyncInput {
 		t.Fatalf("expected SDK-mode codexAdapter to have NativeAsyncInput=false")
 	}
+	if sdkCaps.InExecutionAsyncInput != "unsupported" || sdkCaps.InExecutionToolDelivery != "supported" || sdkCaps.UsageReportingSemantics != "incremental_per_turn" {
+		t.Fatalf("expected SDK-mode codexAdapter to return full codex capability profile, got %+v", sdkCaps)
+	}
+	genAdapter, err := GenericCliAdapter(GenericCliAgentOptions{Command: "/bin/true", Sessions: true})
+	if err != nil {
+		t.Fatalf("GenericCliAdapter failed: %v", err)
+	}
+	genCaps := genAdapter.Capabilities()
+	if genCaps.InExecutionAsyncInput != "unsupported" || genCaps.InExecutionToolDelivery != "unsupported" || genCaps.UsageReportingSemantics != "incremental_per_turn" {
+		t.Fatalf("expected non-in-exec GenericCliAdapter to return full generic-cli profile, got %+v", genCaps)
+	}
 }
 
 func TestCodexTurnInExecutionMidTurnSteerAndToolOutput(t *testing.T) {
@@ -769,5 +780,400 @@ func TestInvestigateRejectsInvalidCodexSteeringMechanism(t *testing.T) {
 	}
 	if !strings.Contains(res.AgentError.Message, "codexSteeringMechanism must be turn_steer or tool_output") {
 		t.Fatalf("unexpected AgentError message: %s", res.AgentError.Message)
+	}
+}
+
+func TestCodexRemediationRegressions(t *testing.T) {
+	// 1. VerifyCodexEvidenceConsumption: verbose extractions + secondaryReportId + contradictory verification guard + UTF-8 rune fallback
+	verbosePayload := `{"evidence":{"decision":{"selectedId":null},"evidence":[],"extractions":[{"unit":"matmul_tiled_fp16","secondaryReportId":"baseline-gpu-rep"}]},"verification":{"exitCode":0,"timedOut":false,"aborted":false},"pipelineStatus":"complete"}`
+	if !VerifyCodexEvidenceConsumption("Compared against baseline-gpu-rep.", verbosePayload) {
+		t.Fatalf("expected secondaryReportId in verbose evidence.extractions to match")
+	}
+	if !VerifyCodexEvidenceConsumption("Bottleneck is matmul_tiled_fp16.", verbosePayload) {
+		t.Fatalf("expected unit in verbose evidence.extractions to match")
+	}
+	failedVerAbstain := `{"schema":"perfdigest.agent-evidence.v1","status":"failed","decision":{"selectedId":null},"selected":[],"verification":{"passed":false,"exitCode":2}}`
+	if VerifyCodexEvidenceConsumption("Everything looks fine and verification passed.", failedVerAbstain) {
+		t.Fatalf("contradictory 'verification passed' must not match when verification.passed is false")
+	}
+	if !VerifyCodexEvidenceConsumption("Verification failed with exit code 2.", failedVerAbstain) {
+		t.Fatalf("matching 'verification failed' should return true when verification.passed is false")
+	}
+	passedVerAbstain := `{"schema":"perfdigest.agent-evidence.v1","status":"needs_review","decision":{"selectedId":null},"selected":[],"verification":{"passed":true,"exitCode":0}}`
+	if VerifyCodexEvidenceConsumption("Verification failed unexpectedly.", passedVerAbstain) {
+		t.Fatalf("contradictory 'verification failed' must not match when verification.passed is true")
+	}
+	utf8NonJson := "μs_Δ_α_β_γ_δ_ε_ζ_η_θ_ι_κ_λ_μ_ν_ξ_ο_π_ρ_σ_τ_υ_φ_χ_ψ_ω_extra_tail"
+	if !VerifyCodexEvidenceConsumption("Observed prefix "+string([]rune(utf8NonJson)[:32])+" in output.", utf8NonJson) {
+		t.Fatalf("expected multi-byte UTF-8 non-JSON fallback rune slicing to match cleanly")
+	}
+
+	// 2. Go two_turn respects CompactEvidence=true (parity with TS src/run.ts:357)
+	ws := t.TempDir()
+	if err := os.WriteFile(filepath.Join(ws, "trace.json"), []byte(`{"traceEvents":[{"name":"hot_kernel_reduce","dur":48200}]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	mcpScript := filepath.Join(ws, "mcp.mjs")
+	if err := os.WriteFile(mcpScript, []byte(`#!/usr/bin/env node
+import readline from 'node:readline';
+const rl = readline.createInterface({ input: process.stdin });
+rl.on('line', (line) => {
+  if (!line.trim()) return;
+  const req = JSON.parse(line);
+  if (req.method === 'initialize') {
+    process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: req.id, result: { protocolVersion: '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'm', version: '1' } } }) + '\n');
+  } else if (req.method === 'tools/call') {
+    const d = { format: 'chrome-trace', raw_ref: req.params.arguments.report_ref, total_units: 1, returned: 1, units: [{ index: 0, name: 'hot_kernel_reduce', duration_us: 48200 }] };
+    process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: req.id, result: { content: [{ type: 'text', text: JSON.stringify(d) }], structuredContent: d } }) + '\n');
+  }
+});
+`), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	reviewPromptLog := filepath.Join(ws, "review-prompt.txt")
+	agentScript := filepath.Join(ws, "two-turn-agent.mjs")
+	if err := os.WriteFile(agentScript, []byte(`#!/usr/bin/env node
+import fs from 'node:fs';
+const req = JSON.parse(fs.readFileSync(0, 'utf8').trim());
+if (req.phase === 'review') fs.writeFileSync(`+"`"+reviewPromptLog+"`"+`, req.prompt, 'utf8');
+console.log(JSON.stringify({ type: 'started' }));
+console.log(JSON.stringify({ type: 'result', sessionId: 'sess-compact-1', text: 'ok:' + req.phase, usage: { input_tokens: 10, output_tokens: 5 } }));
+`), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	nodeBin, err := Executable("node", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	genAdapter, err := GenericCliAdapter(GenericCliAgentOptions{Command: nodeBin, Args: []string{agentScript}, Sessions: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	compactTrue := true
+	twoTurnRes, err := Investigate(context.Background(), RunOptions{
+		Workspace:         ws,
+		Manifest:          Manifest{Version: 1, Issue: "Compact two_turn parity", Reports: []ReportSpec{{ID: "cpu-trace", Path: "trace.json", Format: "chrome-trace", Description: "trace"}}, Verification: CommandSpec{Command: "/bin/true"}},
+		Routing:           "offline",
+		Agent:             "generic",
+		AgentDelivery:     "two_turn",
+		AgentAdapter:      genAdapter,
+		CompactEvidence:   &compactTrue,
+		McpSessionOptions: &SessionOptions{Command: nodeBin, Args: []string{mcpScript}},
+	})
+	if err != nil {
+		t.Fatalf("Investigate two_turn compact failed: %v", err)
+	}
+	if twoTurnRes.Status != "complete" {
+		t.Fatalf("expected complete, got %s (err=%v)", twoTurnRes.Status, twoTurnRes.Error)
+	}
+	reviewPromptBytes, err := os.ReadFile(reviewPromptLog)
+	if err != nil {
+		t.Fatalf("failed reading review prompt log: %v", err)
+	}
+	if !strings.Contains(string(reviewPromptBytes), `"schema":"perfdigest.agent-evidence.v1"`) {
+		t.Fatalf("expected two_turn with CompactEvidence=true to deliver compact schema, got: %s", string(reviewPromptBytes))
+	}
+
+	// 3. Early crash / malformed JSON during initialize fails fast (<2s, no 120s deadlock!)
+	crashKindFile := filepath.Join(ws, "crash-kind.txt")
+	crashMock := filepath.Join(ws, "mock-codex-crash.mjs")
+	if err := os.WriteFile(crashMock, []byte(`#!/usr/bin/env node
+import fs from 'node:fs';
+const args = process.argv.slice(2);
+if (args[0] === 'login') { console.log('Logged in using ChatGPT'); process.exit(0); }
+if (args[0] === 'mcp') { console.log('[]'); process.exit(0); }
+const kind = fs.readFileSync(`+"`"+crashKindFile+"`"+`, 'utf8').trim();
+if (kind === 'malformed') {
+  process.stdout.write('NOT-VALID-JSON\n');
+  setTimeout(() => {}, 5000);
+} else {
+  process.exit(1);
+}
+`), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PERFDIGEST_CODEX_PATH", crashMock)
+
+	for _, kind := range []string{"exit", "malformed"} {
+		if err := os.WriteFile(crashKindFile, []byte(kind), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		adapter := CodexAdapterWithOptions(CodexAdapterOptions{InExecutionAsync: true, TimeoutMs: 10_000})
+		sess, err := adapter.Start(context.Background(), ws)
+		if err != nil {
+			t.Fatalf("Start (%s) failed: %v", kind, err)
+		}
+		t0 := time.Now()
+		_, err = sess.(InExecutionAgentSession).TurnInExecution(
+			context.Background(),
+			"Crash test",
+			func() (string, error) { return `{"status":"complete"}`, nil },
+			nil,
+		)
+		elapsed := time.Since(t0)
+		if elapsed > 3*time.Second {
+			t.Fatalf("crash kind=%s stalled (%v > 3s) instead of failing fast", kind, elapsed)
+		}
+		if err == nil {
+			t.Fatalf("expected error for crash kind=%s", kind)
+		}
+		if ae, ok := err.(*AgentError); !ok || ae.Kind == AgentErrTimedOut {
+			t.Fatalf("expected non-timeout AgentError for crash kind=%s, got %v", kind, err)
+		}
+	}
+
+	// 4. Observed ToolCallsCount + close_on_steer early completion + concurrent s.ID() race safety
+	edgeModeFile := filepath.Join(ws, "go-edge-mode.txt")
+	edgeMock := filepath.Join(ws, "mock-codex-edge.mjs")
+	if err := os.WriteFile(edgeMock, []byte(`#!/usr/bin/env node
+import fs from 'node:fs';
+import readline from 'node:readline';
+const args = process.argv.slice(2);
+if (args[0] === 'login') { console.log('Logged in using ChatGPT'); process.exit(0); }
+if (args[0] === 'mcp') { console.log('[]'); process.exit(0); }
+const mode = fs.readFileSync(`+"`"+edgeModeFile+"`"+`, 'utf8').trim();
+const send = (o) => process.stdout.write(JSON.stringify(o) + '\n');
+const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
+rl.on('line', (line) => {
+  if (!line.trim()) return;
+  const msg = JSON.parse(line);
+  if (msg.method === 'initialize') { send({ jsonrpc: '2.0', id: msg.id, result: { capabilities: {} } }); return; }
+  if (msg.method === 'thread/start') { send({ jsonrpc: '2.0', id: msg.id, result: { thread: { id: 'thr-go-edge' } } }); return; }
+  if (msg.method === 'turn/start') {
+    send({ jsonrpc: '2.0', id: msg.id, result: { turn: { id: 'turn-go-edge', status: 'inProgress' } } });
+    send({ jsonrpc: '2.0', method: 'turn/started', params: { threadId: 'thr-go-edge', turn: { id: 'turn-go-edge', status: 'inProgress' } } });
+    if (mode === 'close_on_steer') {
+      setTimeout(() => {
+        send({ jsonrpc: '2.0', method: 'item/completed', params: { threadId: 'thr-go-edge', turnId: 'turn-go-edge', item: { id: 'm1', type: 'agentMessage', phase: 'final_answer', text: 'Done before steer reply.' } } });
+        send({ jsonrpc: '2.0', method: 'turn/completed', params: { threadId: 'thr-go-edge', turn: { id: 'turn-go-edge', status: 'completed' } } });
+      }, 30);
+      return;
+    }
+    send({ jsonrpc: '2.0', method: 'item/completed', params: { threadId: 'thr-go-edge', turnId: 'turn-go-edge', item: { id: 'tc1', type: 'commandExecution' } } });
+    send({ jsonrpc: '2.0', method: 'item/completed', params: { threadId: 'thr-go-edge', turnId: 'turn-go-edge', item: { id: 'tc2', type: 'mcpToolCall' } } });
+    return;
+  }
+  if (msg.method === 'turn/steer') {
+    if (mode === 'close_on_steer') {
+      setTimeout(() => process.exit(0), 50);
+      return;
+    }
+    send({ jsonrpc: '2.0', id: msg.id, result: { turnId: 'turn-go-edge' } });
+    send({ jsonrpc: '2.0', method: 'item/completed', params: { threadId: 'thr-go-edge', turnId: 'turn-go-edge', item: { id: 'm2', type: 'agentMessage', phase: 'final_answer', text: 'Steered cpu-trace hot_kernel_reduce confirmed.' } } });
+    send({ jsonrpc: '2.0', method: 'turn/completed', params: { threadId: 'thr-go-edge', turn: { id: 'turn-go-edge', status: 'completed' } } });
+  }
+});
+`), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PERFDIGEST_CODEX_PATH", edgeMock)
+	if err := os.WriteFile(edgeModeFile, []byte("tools"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	edgeAdapter := CodexAdapterWithOptions(CodexAdapterOptions{InExecutionAsync: true})
+	edgeSess, err := edgeAdapter.Start(context.Background(), ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stopPoll := make(chan struct{})
+	pollDone := make(chan struct{})
+	go func() {
+		defer close(pollDone)
+		for {
+			select {
+			case <-stopPoll:
+				return
+			default:
+				_ = edgeSess.ID()
+				time.Sleep(1 * time.Millisecond)
+			}
+		}
+	}()
+	toolsRes, err := edgeSess.(InExecutionAgentSession).TurnInExecution(
+		context.Background(),
+		"Count tool calls",
+		func() (string, error) {
+			time.Sleep(15 * time.Millisecond)
+			return `{"schema":"perfdigest.agent-evidence.v1","status":"complete","selected":[{"id":"cpu-trace","digest":{"units":[{"name":"hot_kernel_reduce"}]}}]}`, nil
+		},
+		nil,
+	)
+	close(stopPoll)
+	<-pollDone
+	if err != nil {
+		t.Fatalf("edge tools TurnInExecution failed: %v", err)
+	}
+	if toolsRes.Turn.ToolCallsCount == nil || *toolsRes.Turn.ToolCallsCount != 2 {
+		t.Fatalf("expected ToolCallsCount == 2, got %v", toolsRes.Turn.ToolCallsCount)
+	}
+
+	if err := os.WriteFile(edgeModeFile, []byte("close_on_steer"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	edgeSess2, err := edgeAdapter.Start(context.Background(), ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tClose := time.Now()
+	closeRes, err := edgeSess2.(InExecutionAgentSession).TurnInExecution(
+		context.Background(),
+		"Close during steer",
+		func() (string, error) {
+			time.Sleep(10 * time.Millisecond)
+			return `{"schema":"perfdigest.agent-evidence.v1","status":"complete"}`, nil
+		},
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("close_on_steer failed: %v", err)
+	}
+	if time.Since(tClose) > 3*time.Second {
+		t.Fatalf("close_on_steer took too long (%v)", time.Since(tClose))
+	}
+	if !closeRes.EarlyAgentCompletion || closeRes.EvidenceDeliveredInExecution {
+		t.Fatalf("expected EarlyAgentCompletion=true and EvidenceDeliveredInExecution=false, got %+v", closeRes)
+	}
+}
+
+func TestCodexTurnInExecutionErrorNotificationsAndWebSearchDisabled(t *testing.T) {
+	ws := t.TempDir()
+	modeFile := filepath.Join(ws, "err-notif-mode.txt")
+	argsLog := filepath.Join(ws, "spawn-args.txt")
+	mockBin := filepath.Join(ws, "mock-codex-errnotif.mjs")
+	if err := os.WriteFile(mockBin, []byte(`#!/usr/bin/env node
+import fs from 'node:fs';
+import readline from 'node:readline';
+const args = process.argv.slice(2);
+if (args[0] === 'login') { console.log('Logged in using ChatGPT'); process.exit(0); }
+if (args[0] === 'mcp') { console.log('[]'); process.exit(0); }
+fs.writeFileSync(`+"`"+argsLog+"`"+`, JSON.stringify(args), 'utf8');
+const mode = fs.readFileSync(`+"`"+modeFile+"`"+`, 'utf8').trim();
+const send = (o) => process.stdout.write(JSON.stringify(o) + '\n');
+const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
+rl.on('line', (line) => {
+  if (!line.trim()) return;
+  const msg = JSON.parse(line);
+  if (msg.method === 'initialize') { send({ jsonrpc: '2.0', id: msg.id, result: { capabilities: {} } }); return; }
+  if (msg.method === 'thread/start') { send({ jsonrpc: '2.0', id: msg.id, result: { thread: { id: 'thr-errnotif' } } }); return; }
+  if (msg.method === 'turn/start') {
+    send({ jsonrpc: '2.0', id: msg.id, result: { turn: { id: 'turn-errnotif', status: 'inProgress' } } });
+    send({ jsonrpc: '2.0', method: 'turn/started', params: { threadId: 'thr-errnotif', turn: { id: 'turn-errnotif', status: 'inProgress' } } });
+    if (mode === 'retry_and_other_turn') {
+      send({
+        jsonrpc: '2.0',
+        method: 'error',
+        params: {
+          threadId: 'thr-errnotif',
+          turnId: 'turn-errnotif',
+          willRetry: true,
+          error: { message: 'transient stream reconnect' }
+        }
+      });
+      send({
+        jsonrpc: '2.0',
+        method: 'error',
+        params: {
+          threadId: 'thr-errnotif',
+          turnId: 'turn-other',
+          willRetry: false,
+          error: { message: 'other turn error should be ignored' }
+        }
+      });
+    } else if (mode === 'fatal') {
+      setTimeout(() => {
+        send({
+          jsonrpc: '2.0',
+          method: 'error',
+          params: {
+            threadId: 'thr-errnotif',
+            turnId: 'turn-errnotif',
+            willRetry: false,
+            error: { message: 'stream disconnected permanently' }
+          }
+        });
+      }, 15);
+    }
+    return;
+  }
+  if (msg.method === 'turn/steer') {
+    send({ jsonrpc: '2.0', id: msg.id, result: { turnId: 'turn-errnotif' } });
+    if (mode === 'retry_and_other_turn') {
+      send({
+        jsonrpc: '2.0',
+        method: 'item/completed',
+        params: {
+          threadId: 'thr-errnotif',
+          turnId: 'turn-errnotif',
+          item: { id: 'm1', type: 'agentMessage', phase: 'final_answer', text: 'Recovered: cpu-trace hot_kernel_reduce confirmed.' }
+        }
+      });
+      send({ jsonrpc: '2.0', method: 'turn/completed', params: { threadId: 'thr-errnotif', turn: { id: 'turn-errnotif', status: 'completed' } } });
+    }
+  }
+});
+`), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PERFDIGEST_CODEX_PATH", mockBin)
+	adapter := CodexAdapterWithOptions(CodexAdapterOptions{InExecutionAsync: true})
+
+	// 1. willRetry: true + mismatched turnId must not fail turn; verify web_search="disabled" flag passed
+	if err := os.WriteFile(modeFile, []byte("retry_and_other_turn"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	sess1, err := adapter.Start(context.Background(), ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res1, err := sess1.(InExecutionAgentSession).TurnInExecution(
+		context.Background(),
+		"Retryable error test",
+		func() (string, error) {
+			time.Sleep(15 * time.Millisecond)
+			return `{"schema":"perfdigest.agent-evidence.v1","status":"complete","selected":[{"id":"cpu-trace","digest":{"units":[{"name":"hot_kernel_reduce"}]}}]}`, nil
+		},
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("expected willRetry:true and mismatched turnId errors to be ignored, got err=%v", err)
+	}
+	if !res1.EvidenceConsumedInExecution {
+		t.Fatalf("expected EvidenceConsumedInExecution=true after recovery")
+	}
+	spawnArgsBytes, err := os.ReadFile(argsLog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(spawnArgsBytes), `web_search=\"disabled\"`) {
+		t.Fatalf("expected web_search=\"disabled\" in app-server args, got %s", string(spawnArgsBytes))
+	}
+
+	// 2. willRetry: false on active turn fails with params.error.message (not generic fallback)
+	if err := os.WriteFile(modeFile, []byte("fatal"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	sess2, err := adapter.Start(context.Background(), ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = sess2.(InExecutionAgentSession).TurnInExecution(
+		context.Background(),
+		"Fatal error notification test",
+		func() (string, error) {
+			time.Sleep(100 * time.Millisecond)
+			return `{"status":"complete"}`, nil
+		},
+		nil,
+	)
+	if err == nil {
+		t.Fatalf("expected fatal ErrorNotification to fail the turn")
+	}
+	ae, ok := err.(*AgentError)
+	if !ok || ae.Kind != AgentErrFailed {
+		t.Fatalf("expected AgentError kind=failed, got %T (%v)", err, err)
+	}
+	if !strings.Contains(ae.Msg, "stream disconnected permanently") {
+		t.Fatalf("expected params.error.message to be preserved, got %q", ae.Msg)
 	}
 }
