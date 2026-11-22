@@ -913,5 +913,374 @@ export const benchmarkSourceTraceSchema = z.union([
   }).strict(),
 ]);
 
+export const hpcCriterionCategorySchema = z.enum(['A', 'B', 'C', 'D', 'E']);
+
+export const hpcDeliveryStrategySchema = z.enum([
+  'in_execution',
+  'in_execution_tool_delivery',
+  'single_turn',
+  'two_turn',
+  'skill_background_worker',
+]);
+
+export const hpcCanonicalEvidenceDeliverySchema = z.enum([
+  'in_execution_async_input',
+  'in_execution_tool_delivery',
+  'single_turn_with_evidence',
+  'same_session_next_turn',
+  'skill_background_worker',
+  'none',
+]);
+
+export const hpcEvaluationModeSchema = z.enum([
+  'read_only_diagnosis',
+  'autonomous_patch_and_verify',
+]);
+
+export const hpcPrimaryArmSchema = z.enum(['raw', 'mcp_digest', 'evidence']);
+
+export const hpcOracleCheckSchema = z.object({
+  field: nonEmpty,
+  operator: z.enum([
+    'within_tolerance_pct',
+    'in_range',
+    'contains_all',
+    'equals',
+    'null_not_zero',
+    'exit_code_equals',
+    'non_empty_array',
+  ]),
+  expected: z.unknown(),
+  unit: nonEmpty.optional(),
+  tolerancePct: z.number().min(0).max(100).optional(),
+  verifierId: nonEmpty.optional(),
+}).strict().superRefine((val, ctx) => {
+  switch (val.operator) {
+    case 'in_range': {
+      if (
+        !Array.isArray(val.expected) ||
+        val.expected.length !== 2 ||
+        typeof val.expected[0] !== 'number' ||
+        typeof val.expected[1] !== 'number' ||
+        !Number.isFinite(val.expected[0]) ||
+        !Number.isFinite(val.expected[1]) ||
+        val.expected[0] > val.expected[1]
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['expected'],
+          message: 'in_range requires expected to be a finite numeric [min, max] tuple with min <= max',
+        });
+      }
+      break;
+    }
+    case 'within_tolerance_pct': {
+      if (typeof val.expected !== 'number' || !Number.isFinite(val.expected)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['expected'],
+          message: 'within_tolerance_pct requires expected to be a finite number',
+        });
+      }
+      if (typeof val.tolerancePct !== 'number' || !Number.isFinite(val.tolerancePct)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['tolerancePct'],
+          message: 'within_tolerance_pct requires numeric tolerancePct in [0, 100]',
+        });
+      }
+      break;
+    }
+    case 'contains_all': {
+      if (
+        !Array.isArray(val.expected) ||
+        val.expected.length === 0 ||
+        !val.expected.every((item) => typeof item === 'string' && item.trim().length > 0)
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['expected'],
+          message: 'contains_all requires expected to be a non-empty array of non-empty strings',
+        });
+      }
+      break;
+    }
+    case 'null_not_zero': {
+      if (val.expected !== null) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['expected'],
+          message: 'null_not_zero requires expected === null',
+        });
+      }
+      break;
+    }
+    case 'exit_code_equals': {
+      if (
+        typeof val.expected !== 'number' ||
+        !Number.isInteger(val.expected) ||
+        val.expected < 0 ||
+        val.expected > 255
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['expected'],
+          message: 'exit_code_equals requires expected to be an integer exit code in [0, 255]',
+        });
+      }
+      if (!val.verifierId) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['verifierId'],
+          message: 'exit_code_equals requires verifierId referencing a declared task verifier',
+        });
+      }
+      break;
+    }
+    case 'equals': {
+      if (val.expected === undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['expected'],
+          message: 'equals requires an explicit expected value',
+        });
+      }
+      break;
+    }
+    case 'non_empty_array': {
+      if (val.expected !== true) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['expected'],
+          message: 'non_empty_array requires expected === true',
+        });
+      }
+      break;
+    }
+  }
+});
+
+export const hpcBlindJudgeRubricSchema = z.object({
+  targetFields: z.array(nonEmpty).min(1),
+  passCondition: nonEmpty,
+  failCondition: nonEmpty,
+  evidenceRequired: nonEmpty,
+}).strict();
+
+export const hpcAutomatedCriterionSchema = z.object({
+  id: z.string().regex(/^T[1-3]-(?:0[1-9]|1[0-9]|2[0-5])$/),
+  category: hpcCriterionCategorySchema,
+  title: nonEmpty,
+  description: nonEmpty,
+  gradingMode: z.literal('deterministic_automated'),
+  automated: z.literal(true),
+  applicableModes: z.array(hpcEvaluationModeSchema).min(1),
+  evaluationType: z.enum([
+    'numeric_tolerance',
+    'symbol_match',
+    'invariant_check',
+    'verifier_exit',
+  ]),
+  oracleCheck: hpcOracleCheckSchema,
+}).strict();
+
+export const hpcBlindJudgeCriterionSchema = z.object({
+  id: z.string().regex(/^T[1-3]-(?:0[1-9]|1[0-9]|2[0-5])$/),
+  category: hpcCriterionCategorySchema,
+  title: nonEmpty,
+  description: nonEmpty,
+  gradingMode: z.literal('blind_rubric_judge'),
+  automated: z.literal(false),
+  applicableModes: z.array(hpcEvaluationModeSchema).min(1),
+  evaluationType: z.enum([
+    'mechanistic_judgment',
+    'invariant_judgment',
+    'scope_honesty_judgment',
+    'remediation_design_judgment',
+  ]),
+  judgeRubric: hpcBlindJudgeRubricSchema,
+}).strict();
+
+export const hpcConfirmedCriterionSchema = z.discriminatedUnion('gradingMode', [
+  hpcAutomatedCriterionSchema,
+  hpcBlindJudgeCriterionSchema,
+]);
+
+export const hpcReservedCriterionSchema = z.object({
+  id: z.string().regex(/^T4-(?:0[1-9]|1[0-9]|2[0-5])$/),
+  category: hpcCriterionCategorySchema,
+  status: z.literal('reserved_unselected'),
+  description: nonEmpty,
+}).strict();
+
+export const hpcArtifactRequirementSchema = z.object({
+  artifactId: nonEmpty,
+  role: z.enum(['primary', 'secondary']),
+  perfdigestFormat: nonEmpty,
+  status: z.enum(['on_disk', 'capture_required']),
+  relativeLocation: nonEmpty,
+  captureCommand: nonEmpty,
+  notes: nonEmpty.optional(),
+}).strict();
+
+export const hpcVerifierSchema = z.object({
+  id: nonEmpty,
+  description: nonEmpty,
+  command: nonEmpty,
+  expectedExitCode: z.int().min(0).max(255),
+  appliesInModes: z.array(hpcEvaluationModeSchema).min(1),
+  targetTree: z.enum(['clean_pre_fix_snapshot', 'arm_patched_workspace']),
+  checks: z.array(nonEmpty).min(1),
+}).strict();
+
+export const hpcConfirmedTaskSchema = z.object({
+  studyId: nonEmpty,
+  slot: z.int().min(1).max(3),
+  status: z.literal('confirmed'),
+  selectedByUser: z.literal(true),
+  runnableWhenArtifactsCaptured: z.boolean(),
+  supportedEvaluationModes: z.array(hpcEvaluationModeSchema).min(1),
+  defaultEvaluationMode: hpcEvaluationModeSchema,
+  title: nonEmpty,
+  domain: nonEmpty,
+  repository: z.object({
+    slug: nonEmpty,
+    upstreamIssueOrPr: nonEmpty,
+    preFixRef: nonEmpty,
+    preFixSha: z.string().regex(/^[a-f0-9]{40}$/),
+    fixRefOrDisposition: nonEmpty,
+    fixSha: z.string().regex(/^[a-f0-9]{40}$/).nullable(),
+  }).strict(),
+  snapshotStrategy: z.object({
+    baseCommand: nonEmpty,
+    excludedLeakPaths: z.array(nonEmpty).min(1),
+    cleanEnvRequirements: z.array(nonEmpty).min(1),
+  }).strict(),
+  agentPrompt: z.object({
+    promptVersion: nonEmpty,
+    taskBrief: nonEmpty,
+    workspaceInstructions: nonEmpty,
+    requiredOutputFields: z.array(nonEmpty).min(1),
+    outputSchema: z.record(z.string(), nonEmpty),
+    neutralMetricKeys: z.array(nonEmpty).min(1),
+    forbiddenHintsCheck: z.literal(true),
+  }).strict(),
+  artifactRequirements: z.array(hpcArtifactRequirementSchema).min(1),
+  verifiers: z.array(hpcVerifierSchema).min(1),
+  graderGroundTruth: z.object({
+    summary: nonEmpty,
+    rootCauses: z.array(nonEmpty).min(1),
+    quantitativeReferences: z.record(z.string(), z.unknown()),
+    secondaryCaveats: z.array(nonEmpty).min(1),
+    forbiddenPromptSubstrings: z.array(nonEmpty).min(1),
+  }).strict(),
+  criteria: z.array(hpcConfirmedCriterionSchema).length(25),
+}).strict();
+
+export const hpcUnselectedTaskSchema = z.object({
+  studyId: z.literal('task_4_unselected'),
+  slot: z.literal(4),
+  status: z.literal('unselected'),
+  selectedByUser: z.literal(false),
+  runnable: z.literal(false),
+  title: nonEmpty,
+  selectionNote: nonEmpty,
+  admissionGates: z.array(nonEmpty).min(5),
+  criteria: z.array(hpcReservedCriterionSchema).length(25),
+}).strict();
+
+export const hpcEvalTaskSchema = z.discriminatedUnion('status', [
+  hpcConfirmedTaskSchema,
+  hpcUnselectedTaskSchema,
+]);
+
+export const hpcEvalContractSchema = z.object({
+  schema: z.literal('perfdigest.hpc-eval-contract.v1'),
+  contractVersion: z.string().regex(/^\d+\.\d+\.\d+$/),
+  title: nonEmpty,
+  description: nonEmpty,
+  primaryArms: z.tuple([
+    z.literal('raw'),
+    z.literal('mcp_digest'),
+    z.literal('evidence'),
+  ]),
+  deliveryStrategies: z.tuple([
+    z.literal('in_execution'),
+    z.literal('in_execution_tool_delivery'),
+    z.literal('single_turn'),
+    z.literal('two_turn'),
+    z.literal('skill_background_worker'),
+  ]),
+  evidenceDeliveryVocabulary: z.object({
+    in_execution: z.literal('in_execution_async_input'),
+    in_execution_tool_delivery: z.literal('in_execution_tool_delivery'),
+    single_turn: z.literal('single_turn_with_evidence'),
+    two_turn: z.literal('same_session_next_turn'),
+    skill_background_worker: z.literal('skill_background_worker'),
+    none: z.literal('none'),
+  }).strict(),
+  evaluationModes: z.object({
+    read_only_diagnosis: z.object({
+      writeAccessAllowed: z.literal(false),
+      symmetricAcrossAllArms: z.literal(true),
+      verifierTargetTree: z.literal('clean_pre_fix_snapshot'),
+      evidenceIntegrationPaths: z.array(nonEmpty).min(1),
+      description: nonEmpty,
+    }).strict(),
+    autonomous_patch_and_verify: z.object({
+      writeAccessAllowed: z.literal(true),
+      symmetricAcrossAllArms: z.literal(true),
+      verifierTargetTree: z.literal('arm_patched_workspace'),
+      evidenceIntegrationPaths: z.array(nonEmpty).min(1),
+      description: nonEmpty,
+    }).strict(),
+  }).strict(),
+  criteriaBudget: z.object({
+    totalCriteria: z.literal(100),
+    criteriaPerTask: z.literal(25),
+    totalTaskSlots: z.literal(4),
+    confirmedTasks: z.literal(3),
+    unselectedTasks: z.literal(1),
+    groundedCriteria: z.literal(75),
+    reservedCriteria: z.literal(25),
+    categoriesPerTask: z.literal(5),
+    criteriaPerCategory: z.literal(5),
+  }).strict(),
+  categoryTaxonomy: z.object({
+    A: nonEmpty,
+    B: nonEmpty,
+    C: nonEmpty,
+    D: nonEmpty,
+    E: nonEmpty,
+  }).strict(),
+  perfdigestMcpCompatibility: z.object({
+    recommendedVersion: nonEmpty,
+    testedVersions: z.array(nonEmpty).min(1),
+    tools: z.array(nonEmpty).min(7),
+    supportedFormats: z.array(nonEmpty).min(14),
+    unsupportedFormatsObserved: z.array(z.object({
+      format: nonEmpty,
+      reason: nonEmpty,
+      mitigation: nonEmpty,
+    }).strict()).min(1),
+  }).strict(),
+  fairnessAndIntegrityInvariants: z.object({
+    zeroOracleLeakage: z.literal(true),
+    nativeToolsEnabledInRaw: z.literal(true),
+    symmetricWritePolicyAcrossArms: z.literal(true),
+    preserveFailedTimedOutAbstained: z.literal(true),
+    nullNotZeroMetricHonesty: z.literal(true),
+    independentNonTrivialVerifier: z.literal(true),
+    noLocalUserPaths: z.literal(true),
+  }).strict(),
+  tasks: z.array(hpcEvalTaskSchema).length(4),
+  openDecisions: z.array(z.object({
+    id: nonEmpty,
+    topic: nonEmpty,
+    summary: nonEmpty,
+    blockingLiveRun: z.boolean(),
+  }).strict()).min(1),
+}).strict();
+
 
 
