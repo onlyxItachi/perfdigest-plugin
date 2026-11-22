@@ -217,10 +217,37 @@ The evidence MCP provides three tools:
 | Tool | Behavior |
 | --- | --- |
 | `launch_evidence_prefetch` | Return a job ID immediately; digest existing reports asynchronously. Offline unless setup selects another default. |
-| `get_evidence_job` | Poll with at most 5 seconds of waiting; consume the terminal result once. |
+| `get_evidence_job` | Poll or await with up to 60 seconds of waiting (`waitMs` `0..60000`); consume the terminal result once. |
 | `cancel_evidence_job` | Abort collection and release the job slot. |
 
-Jobs have a 90-second deadline, expire after five minutes, and are limited to 32 retained jobs. This MCP surface does not expose arbitrary capture commands. The bundled Python MCP also supplies lazy metric expansion and comparison. Plugin MCP Decisions mode needs a key in its **own server process**; do not export the key into the parent Codex session. Use the standalone runner for the documented separate-auth full workflow.
+Jobs have a 90-second deadline, expire after five minutes, and are limited to 32 retained jobs. This MCP surface does not expose arbitrary capture commands. The bundled Python MCP (`perfdigest`) also supplies direct interactive tools (`summarize_report`, `list_kernels`, `get_metrics`, `expand`, `compare_metrics`, `platform_capabilities`, `suggest_profile_command`). Plugin MCP Decisions mode needs a key in its **own server process**; do not export the key into the parent Codex session. Use the standalone runner or the Skill-controlled background worker for the documented separate-auth full workflow.
+
+## Skill-controlled background Evidence worker (`perfdigest-plugin evidence`)
+
+For agents with shell access that want full manifest capture, SHA-256 provenance, independent verification, and auditable disk receipts concurrently with source analysis, `perfdigest-plugin evidence` shares the exact same underlying Evidence contracts (`perfdigest.agent-evidence.v1`, `run.json`, abstention policy, and `0600` private permissions):
+
+```bash
+# Foreground blocking worker (ideal for harness-managed background runners such as agy async tasks or Claude interactive Bash run_in_background)
+perfdigest-plugin evidence run manifest.json --workspace /path/to/project --provider offline --json
+
+# Detached OS-native worker lifecycle (ideal for explicit tool-boundary polling/waiting)
+perfdigest-plugin evidence start manifest.json --workspace /path/to/project --provider offline
+perfdigest-plugin evidence status <jobId> --workspace /path/to/project
+perfdigest-plugin evidence wait <jobId> --workspace /path/to/project --timeout-ms 30000
+perfdigest-plugin evidence collect <jobId> --workspace /path/to/project [--full]
+perfdigest-plugin evidence cancel <jobId> --workspace /path/to/project
+```
+
+| Subcommand | Behavior & Exit Code |
+| --- | --- |
+| `evidence run` | Runs `investigate(..., agent: "none")`, atomically writes `.perfdigest/runs/<jobId>/{run.json,evidence.v1.json,ready.json}` (`0600`, `ready.json` renamed last with `evidence.v1.json` SHA-256), prints one bounded JSON object with `deliveryMode: "skill_background_worker"` and `packet`, and exits `0` iff `status === "complete"`. |
+| `evidence start` | Validates manifest and provider preflight synchronously, creates `.perfdigest/jobs/<jobId>/state.json` (`0600`), spawns a detached session-leader worker (`childEnvironment()`, no shell, no secrets on `argv`; private `envFile` loads strictly inside the worker), prints `{ jobId, pid, status: "running", statusPath, readyPath, runDir }`, and exits `0`. |
+| `evidence status` | Non-blocking read of `state.json` + `ready.json` + OS PID liveness/ownership check (`running`, `complete`, `needs_review`, `failed`, `cancelled`, or `crashed`); exits `0` for valid jobs. |
+| `evidence wait` | Waits locally up to `--timeout-ms` (`0..300000`, default `30000`) for `ready.json` or worker exit, returning status + SHA-256-verified `packet` when ready; exits `0` iff `status === "complete"`. |
+| `evidence collect` | Idempotently verifies `ready.json` SHA-256 against `evidence.v1.json` (failing closed on mismatch, cancellation, missing readiness, or symlink escape) and prints the verified packet (plus full `run.json` with `--full`); exits `0` when verified collection succeeds. |
+| `evidence cancel` | Verifies PID and job ownership before signaling the worker process group (`SIGTERM`, then `SIGKILL` after 2s) and atomically recording `cancelled` in `state.json`. |
+
+See [docs/EVIDENCE_DELIVERY.md](EVIDENCE_DELIVERY.md#44-skill-controlled-os-native-background-worker-skill_background_worker) for the empirically verified harness background-notification matrix.
 
 ## Development and CI
 

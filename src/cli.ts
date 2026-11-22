@@ -11,6 +11,16 @@ import { DecisionsError } from './decisions.js';
 import { createDecisionProvider, providerName } from './providers.js';
 import { initConfiguration, loadConfiguration, applyConfigurationEnvironment } from './setup.js';
 import { genericCliAdapter } from './agents.js';
+import {
+  cancelEvidenceWorker,
+  collectEvidenceWorker,
+  getEvidenceWorkerStatus,
+  redactWorkerText,
+  runDetachedEvidenceWorker,
+  runEvidenceWorker,
+  startEvidenceWorker,
+  waitEvidenceWorker,
+} from './evidence-worker.js';
 
 const help = `PerfDigest Evidence — Codex-first MVP
 
@@ -18,6 +28,12 @@ const help = `PerfDigest Evidence — Codex-first MVP
   perfdigest-plugin demo [--agent none|codex|generic] [--agent-command PATH] [--agent-sessions] [--agent-in-execution-async] [--agent-delivery auto|in_execution|single_turn|two_turn] [--codex-steering-mechanism turn_steer|tool_output] [--strict-delivery-mode] [--routing offline|decisions] [--decision-model NAME] [--model NAME] [--effort minimal|low|medium|high|xhigh|max] [--perf]
   perfdigest-plugin run manifest.json [--workspace PATH] [--routing decisions|offline] [--agent codex|none|generic] [--agent-command PATH] [--agent-sessions] [--agent-in-execution-async] [--agent-delivery auto|in_execution|single_turn|two_turn] [--codex-steering-mechanism turn_steer|tool_output] [--strict-delivery-mode] [--decision-model NAME] [--model NAME] [--effort minimal|low|medium|high|xhigh|max]
   perfdigest-plugin mcp [--workspace PATH]
+  perfdigest-plugin evidence run manifest.json [--workspace PATH] [--provider cloudflare|local|openai|offline] [--decision-model NAME] [--compact-evidence] [--include-corroborating] [--json]
+  perfdigest-plugin evidence start manifest.json [--workspace PATH] [--provider cloudflare|local|openai|offline] [--decision-model NAME] [--compact-evidence] [--include-corroborating]
+  perfdigest-plugin evidence status <jobId> [--workspace PATH]
+  perfdigest-plugin evidence wait <jobId> [--workspace PATH] [--timeout-ms 30000]
+  perfdigest-plugin evidence collect <jobId> [--workspace PATH] [--full]
+  perfdigest-plugin evidence cancel <jobId> [--workspace PATH]
 
 Unconfigured demo defaults: real local CPU measurements + verification, offline routing, no model calls.
 Unconfigured run defaults: existing Codex ChatGPT login + live Decisions (PERFDIGEST_DECISIONS_API_KEY).
@@ -42,6 +58,10 @@ async function main() {
     'codex-steering-mechanism': { type: 'string' },
     routing: { type: 'string' }, provider: { type: 'string' }, model: { type: 'string' }, effort: { type: 'string' }, perf: { type: 'boolean' },
     endpoint: { type: 'string' }, 'env-file': { type: 'string' }, 'decision-model': { type: 'string' }, yes: { type: 'boolean' }, 'check-connection': { type: 'boolean' },
+    'include-corroborating': { type: 'boolean' }, json: { type: 'boolean' }, full: { type: 'boolean' },
+    'timeout-ms': { type: 'string' }, 'job-id': { type: 'string' },
+    'decisions-mock-url': { type: 'string' }, 'mcp-command': { type: 'string' },
+    'mcp-arg': { type: 'string', multiple: true }, 'reuse-mcp-session': { type: 'string' },
   } });
   if (values.help || !positionals[0]) { console.log(help); return; }
   const workspace = await realpath(values.workspace ?? process.cwd());
@@ -58,7 +78,69 @@ async function main() {
   if (values.yes !== undefined || values.endpoint !== undefined || values['env-file'] !== undefined || values['check-connection'] !== undefined) {
     throw new Error('--yes, --endpoint, --env-file and --check-connection belong to init; configure the workspace first');
   }
-  if (!['demo', 'run', 'mcp'].includes(command)) throw new Error('Unknown command; use --help');
+  if (!['demo', 'run', 'mcp', 'evidence'].includes(command)) throw new Error('Unknown command; use --help');
+  if (command === 'evidence') {
+    const sub = positionals[1];
+    if (!sub) throw new Error('evidence requires a subcommand: run, start, status, wait, collect or cancel');
+    if (sub === '_worker') {
+      const jobId = values['job-id'] ?? positionals[2];
+      if (!jobId) throw new Error('evidence _worker requires --job-id <id>');
+      const abort = new AbortController();
+      const onSignal = () => abort.abort(new Error('Interrupted'));
+      process.once('SIGINT', onSignal); process.once('SIGTERM', onSignal);
+      try {
+        await runDetachedEvidenceWorker({ workspace, jobId, signal: abort.signal });
+      } finally {
+        process.off('SIGINT', onSignal); process.off('SIGTERM', onSignal);
+      }
+      return;
+    }
+    if (sub === 'status' || sub === 'wait' || sub === 'collect' || sub === 'cancel') {
+      const jobId = positionals[2] ?? values['job-id'];
+      if (!jobId) throw new Error(`evidence ${sub} requires a jobId`);
+      if (sub === 'status') {
+        const out = await getEvidenceWorkerStatus({ workspace, jobId });
+        console.log(redactWorkerText(JSON.stringify(out, null, 2)));
+        return;
+      }
+      if (sub === 'wait') {
+        let timeoutMs: number | undefined;
+        if (values['timeout-ms'] !== undefined) {
+          if (!/^\d+$/.test(values['timeout-ms'])) {
+            throw new Error('--timeout-ms must be an integer between 0 and 300000');
+          }
+          timeoutMs = Number(values['timeout-ms']);
+        }
+        const abort = new AbortController();
+        const onSignal = () => abort.abort(new Error('Interrupted'));
+        process.once('SIGINT', onSignal); process.once('SIGTERM', onSignal);
+        try {
+          const out = await waitEvidenceWorker({
+            workspace,
+            jobId,
+            ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+            signal: abort.signal,
+          });
+          console.log(redactWorkerText(JSON.stringify(out, null, 2)));
+          if (out.status !== 'complete') process.exitCode = 1;
+        } finally {
+          process.off('SIGINT', onSignal); process.off('SIGTERM', onSignal);
+        }
+        return;
+      }
+      if (sub === 'collect') {
+        const out = await collectEvidenceWorker({ workspace, jobId, full: values.full ?? false });
+        console.log(redactWorkerText(JSON.stringify(out, null, 2)));
+        return;
+      }
+      const out = await cancelEvidenceWorker({ workspace, jobId });
+      console.log(redactWorkerText(JSON.stringify(out, null, 2)));
+      return;
+    }
+    if (sub !== 'run' && sub !== 'start') {
+      throw new Error(`Unknown evidence subcommand: ${sub}`);
+    }
+  }
   const configured = await loadConfiguration(workspace);
   const accepted = ['offline', 'cloudflare', 'local', 'openai', 'decisions', 'clef-local', 'clef-cloudflare', 'openai-luna'];
   const selected = values.provider ?? values.routing ?? configured?.provider ?? (command === 'run' ? 'decisions' : 'offline');
@@ -74,6 +156,59 @@ async function main() {
   if (command === 'mcp') {
     const { serve } = await import('./server.js');
     await serve(workspace, routing, modelOption); return;
+  }
+  if (command === 'evidence') {
+    const sub = positionals[1]!;
+    const mcpSessionOptions = values['mcp-command'] || (values['mcp-arg'] && values['mcp-arg'].length > 0)
+      ? {
+          ...(values['mcp-command'] ? { command: values['mcp-command'] } : {}),
+          ...(values['mcp-arg'] ? { args: values['mcp-arg'] } : {}),
+        }
+      : undefined;
+    const reuseMcpSession = values['reuse-mcp-session'] !== undefined
+      ? values['reuse-mcp-session'] === 'true' || values['reuse-mcp-session'] === '1'
+      : undefined;
+    const manifestArg = positionals[2];
+    if (!manifestArg) throw new Error(`evidence ${sub} requires a manifest path`);
+    const manifest = manifestSchema.parse(JSON.parse(await readFile(resolve(manifestArg), 'utf8')));
+    if (sub === 'start') {
+      const out = await startEvidenceWorker({
+        workspace,
+        manifest,
+        routing,
+        ...modelOption,
+        compactEvidence: values['compact-evidence'] ?? true,
+        includeCorroborating: values['include-corroborating'] ?? false,
+        ...(values['decisions-mock-url'] !== undefined ? { decisionsMockURL: values['decisions-mock-url'] } : {}),
+        ...(mcpSessionOptions !== undefined ? { mcpSessionOptions } : {}),
+        ...(reuseMcpSession !== undefined ? { reuseMcpSession } : {}),
+      });
+      console.log(redactWorkerText(JSON.stringify(out, null, 2)));
+      return;
+    }
+    const abort = new AbortController();
+    const onSignal = () => abort.abort(new Error('Interrupted'));
+    process.once('SIGINT', onSignal); process.once('SIGTERM', onSignal);
+    try {
+      const out = await runEvidenceWorker({
+        workspace,
+        manifest,
+        routing,
+        ...modelOption,
+        compactEvidence: values['compact-evidence'] ?? true,
+        includeCorroborating: values['include-corroborating'] ?? false,
+        ...(values['decisions-mock-url'] !== undefined ? { decisionsMockURL: values['decisions-mock-url'] } : {}),
+        ...(mcpSessionOptions !== undefined ? { mcpSessionOptions } : {}),
+        ...(reuseMcpSession !== undefined ? { reuseMcpSession } : {}),
+        signal: abort.signal,
+        onEvent: (event, detail) => process.stderr.write(`${event}${detail ? `: ${redactWorkerText(detail)}` : ''}\n`),
+      });
+      console.log(redactWorkerText(JSON.stringify(out, null, 2)));
+      if (out.status !== 'complete') process.exitCode = 1;
+    } finally {
+      process.off('SIGINT', onSignal); process.off('SIGTERM', onSignal);
+    }
+    return;
   }
   const agent = values.agent ?? (command === 'demo' ? 'none' : 'codex');
   if (agent !== 'none' && agent !== 'codex' && agent !== 'generic') throw new Error('--agent must be none, codex or generic');

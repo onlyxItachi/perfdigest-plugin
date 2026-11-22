@@ -24,7 +24,11 @@ export function redact(text: string, source: NodeJS.ProcessEnv = process.env): s
       result = result.replaceAll(value, '[REDACTED]');
     }
   }
-  return result.replace(/\bsk-[A-Za-z0-9_-]{16,}\b/g, '[REDACTED]');
+  return result
+    .replace(/\bsk-[A-Za-z0-9_-]{16,}\b/g, '[REDACTED]')
+    .replace(/\bghp_[A-Za-z0-9]{20,}\b/g, '[REDACTED]')
+    .replace(/\bAKIA[0-9A-Z]{16}\b/g, '[REDACTED]')
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}\b/gi, 'Bearer [REDACTED]');
 }
 
 export function executable(name: string, env: NodeJS.ProcessEnv = process.env): string {

@@ -159,30 +159,106 @@ func WriteJSON(path string, data any) error {
 	return WritePrivateFile(path, []byte(redacted))
 }
 
+// AssertSafeDirectoryChain creates or validates each directory segment under root with 0700 permissions,
+// rejecting symlinks, non-directories, and invalid path segments.
+func AssertSafeDirectoryChain(root string, segments ...string) (string, error) {
+	current, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", err
+	}
+	for _, seg := range segments {
+		if seg == "" || seg == "." || seg == ".." || strings.ContainsAny(seg, `/\`) || strings.ContainsRune(seg, 0) {
+			return "", fmt.Errorf("Invalid directory segment: %s", seg)
+		}
+		current = filepath.Join(current, seg)
+		if info, lerr := os.Lstat(current); lerr == nil {
+			if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+				return "", fmt.Errorf("Refusing non-directory or symlink path inside .perfdigest: %s", seg)
+			}
+		} else if os.IsNotExist(lerr) {
+			if mkerr := os.Mkdir(current, 0o700); mkerr != nil && !os.IsExist(mkerr) {
+				return "", mkerr
+			}
+		} else {
+			return "", lerr
+		}
+		_ = os.Chmod(current, 0o700)
+	}
+	return current, nil
+}
+
+// CreateExclusiveDirectory validates/creates parentSegments safely and atomically creates leaf
+// with 0700 permissions, failing with os.ErrExist if leaf already exists.
+func CreateExclusiveDirectory(root string, leaf string, parentSegments ...string) (string, error) {
+	if leaf == "" || leaf == "." || leaf == ".." || strings.ContainsAny(leaf, `/\`) || strings.ContainsRune(leaf, 0) {
+		return "", fmt.Errorf("Invalid directory segment: %s", leaf)
+	}
+	parent, err := AssertSafeDirectoryChain(root, parentSegments...)
+	if err != nil {
+		return "", err
+	}
+	target := filepath.Join(parent, leaf)
+	if err := os.Mkdir(target, 0o700); err != nil {
+		return "", err
+	}
+	_ = os.Chmod(target, 0o700)
+	return target, nil
+}
+
+// AssertContainedRegularFile verifies candidatePath is a regular non-symlink file inside workspaceRoot.
+func AssertContainedRegularFile(workspaceRoot, candidatePath string) (string, error) {
+	root, err := filepath.EvalSymlinks(workspaceRoot)
+	if err != nil {
+		return "", err
+	}
+	abs := candidatePath
+	if !filepath.IsAbs(abs) {
+		abs = filepath.Join(root, abs)
+	}
+	abs = filepath.Clean(abs)
+	linfo, err := os.Lstat(abs)
+	if err != nil {
+		return "", err
+	}
+	if linfo.Mode()&os.ModeSymlink != 0 || !linfo.Mode().IsRegular() {
+		return "", fmt.Errorf("Artifact path must be a regular non-symlink file")
+	}
+	resolved, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		return "", err
+	}
+	rel, err := filepath.Rel(root, resolved)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+		return "", fmt.Errorf("Artifact path must stay inside the workspace")
+	}
+	return resolved, nil
+}
+
+// EnsureRunDirectory validates and creates a pre-allocated direct child of .perfdigest/runs inside workspace.
+func EnsureRunDirectory(workspace, runDirectory string) (string, error) {
+	root, err := filepath.EvalSymlinks(workspace)
+	if err != nil {
+		return "", err
+	}
+	runsRoot, err := AssertSafeDirectoryChain(root, ".perfdigest", "runs")
+	if err != nil {
+		return "", err
+	}
+	candidate := runDirectory
+	if !filepath.IsAbs(candidate) {
+		candidate = filepath.Join(root, candidate)
+	}
+	candidate = filepath.Clean(candidate)
+	rel, err := filepath.Rel(runsRoot, candidate)
+	if err != nil || rel == "" || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) || strings.ContainsAny(rel, `/\`) {
+		return "", fmt.Errorf("runDirectory must be a direct child of .perfdigest/runs inside the workspace")
+	}
+	return AssertSafeDirectoryChain(root, ".perfdigest", "runs", rel)
+}
+
 // NewRunDirectory creates .perfdigest/runs/<ISO-timestamp>-<uuid8> with 0700 permissions,
 // rejecting symlinked .perfdigest directories.
 func NewRunDirectory(workspace string) (string, error) {
-	pdDir := filepath.Join(workspace, ".perfdigest")
-	if info, err := os.Lstat(pdDir); err == nil {
-		if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
-			return "", fmt.Errorf("The .perfdigest configuration directory must not be a symlink.")
-		}
-	} else if !os.IsNotExist(err) {
-		return "", err
-	}
-	runsDir := filepath.Join(pdDir, "runs")
-	if info, err := os.Lstat(runsDir); err == nil {
-		if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
-			return "", fmt.Errorf("The .perfdigest/runs directory must not be a symlink.")
-		}
-	}
 	ts := strings.ReplaceAll(time.Now().UTC().Format("2006-01-02T15:04:05.000Z"), ":", "-")
-	dir := filepath.Join(runsDir, fmt.Sprintf("%s-%s", ts, randomHex(4)))
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", err
-	}
-	_ = os.Chmod(pdDir, 0o700)
-	_ = os.Chmod(runsDir, 0o700)
-	_ = os.Chmod(dir, 0o700)
-	return dir, nil
+	return AssertSafeDirectoryChain(workspace, ".perfdigest", "runs", fmt.Sprintf("%s-%s", ts, randomHex(4)))
 }

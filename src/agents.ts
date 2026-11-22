@@ -173,7 +173,8 @@ export type EvidenceDelivery =
   | 'fresh_session_with_context'
   | 'single_turn_with_evidence'
   | 'in_execution_async_input'
-  | 'in_execution_tool_delivery';
+  | 'in_execution_tool_delivery'
+  | 'skill_background_worker';
 
 export interface NegotiatedDeliveryPlan {
   requestedMode: AgentDeliveryMode;
