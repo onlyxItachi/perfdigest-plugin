@@ -564,7 +564,7 @@ for await (const line of rl) {
                 ? spanMs('agent.analysis.turn_started', 'agent.analysis.completed')
                 : spanMs('agent.review.started', 'agent.review.completed');
 
-            const overlapMs =
+            const rawOverlapMs =
               res.telemetry.evidenceModelOverlapMs !== null &&
               res.telemetry.evidenceModelOverlapMs !== undefined
                 ? round2(res.telemetry.evidenceModelOverlapMs)
@@ -573,6 +573,14 @@ for await (const line of rl) {
               agentWallMs !== null && workerWallMs !== null && verWallMs !== null
                 ? round2(agentWallMs + workerWallMs + verWallMs)
                 : null;
+            const minOverlapForE2e =
+              stageSumWallMs !== null ? Math.max(0, round2(stageSumWallMs - e2eWallMs)) : 0;
+            const overlapMs =
+              rawOverlapMs !== null && stageSumWallMs !== null
+                ? res.telemetry.effectiveDeliveryMode === 'single_turn'
+                  ? 0
+                  : round2(Math.max(rawOverlapMs, minOverlapForE2e))
+                : rawOverlapMs;
             const criticalPathWallMs =
               stageSumWallMs !== null && overlapMs !== null
                 ? round2(stageSumWallMs - overlapMs)

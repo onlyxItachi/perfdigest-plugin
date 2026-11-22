@@ -30,6 +30,11 @@ test('codexAdapter exposes capability contract and preserves same-session next-t
     cancellation: true,
     usageReporting: true,
     sandbox: 'read-only',
+    inExecutionAsyncInput: 'unsupported',
+    inExecutionToolDelivery: 'supported',
+    queuedStdinNextTurn: 'unsupported',
+    interruptionAndSteering: 'unsupported',
+    usageReportingSemantics: 'incremental_per_turn',
   });
 });
 
@@ -119,6 +124,11 @@ console.log(JSON.stringify({
       cancellation: true,
       usageReporting: true,
       sandbox: 'agent-defined',
+      inExecutionAsyncInput: 'unsupported',
+      inExecutionToolDelivery: 'unsupported',
+      queuedStdinNextTurn: 'unsupported',
+      interruptionAndSteering: 'unsupported',
+      usageReportingSemantics: 'incremental_per_turn',
     });
     assert.equal(result.telemetry.evidenceDelivery, 'fresh_session_with_context');
     assert.equal(result.analysis?.text, 'Hypothesis: row_major dominates.');
