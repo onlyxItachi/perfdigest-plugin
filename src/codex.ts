@@ -365,6 +365,7 @@ export async function codexAppServerInExecutionTurn(
     let turnStartedEmitted = false;
     let turnCompleted = false;
     let steerAttempted = false;
+    let turnStartRpcId: number | null = null;
     let steerRpcId: number | null = null;
     let steerAccepted = false;
     let modelVisibleEmitted = false;
@@ -476,7 +477,7 @@ export async function codexAppServerInExecutionTurn(
     const sendRpc = (
       method: string,
       params: Record<string, unknown>,
-      rpcOptions: { isSteer?: boolean } = {},
+      rpcOptions: { isSteer?: boolean; isTurnStart?: boolean } = {},
     ): Promise<Record<string, unknown>> => {
       return new Promise((res, rej) => {
         if (settled || processClosed || child.stdin.destroyed || !child.stdin.writable) {
@@ -486,6 +487,9 @@ export async function codexAppServerInExecutionTurn(
         const id = nextRpcId++;
         if (rpcOptions.isSteer) {
           steerRpcId = id;
+        }
+        if (rpcOptions.isTurnStart) {
+          turnStartRpcId = id;
         }
         pendingRpc.set(id, { resolve: res, reject: rej });
         const payload = JSON.stringify({ jsonrpc: '2.0', id, method, params });
@@ -517,12 +521,20 @@ export async function codexAppServerInExecutionTurn(
       }
 
       if (typeof msg.id === 'number' && (msg.result !== undefined || msg.error !== undefined)) {
+        if (msg.id === turnStartRpcId && msg.result && typeof msg.result === 'object') {
+          const resObj = msg.result as Record<string, unknown>;
+          const returnedTurn = resObj.turn as Record<string, unknown> | undefined;
+          const returnedId = typeof returnedTurn?.id === 'string' ? returnedTurn.id : '';
+          if (returnedId) {
+            activeTurnId = returnedId;
+          }
+        }
         if (msg.id === steerRpcId && msg.result && typeof msg.result === 'object') {
           const resObj = msg.result as Record<string, unknown>;
           if (steeringMechanism === 'tool_output') {
             const returnedTurn = resObj.turn as Record<string, unknown> | undefined;
             const returnedId = typeof returnedTurn?.id === 'string' ? returnedTurn.id : '';
-            if (returnedId === activeTurnId && !steerAccepted) {
+            if (activeTurnId && returnedId === activeTurnId && !steerAccepted) {
               steerAccepted = true;
               evidenceDelivered = true;
               deliveryCount = 1;
@@ -531,7 +543,7 @@ export async function codexAppServerInExecutionTurn(
             }
           } else {
             const returnedId = typeof resObj.turnId === 'string' ? resObj.turnId : '';
-            if (returnedId === activeTurnId && !steerAccepted) {
+            if (activeTurnId && returnedId === activeTurnId && !steerAccepted) {
               steerAccepted = true;
               evidenceDelivered = true;
               deliveryCount = 1;
@@ -558,6 +570,14 @@ export async function codexAppServerInExecutionTurn(
       const params = (msg.params && typeof msg.params === 'object' ? msg.params : {}) as Record<string, unknown>;
 
       if (method === 'turn/started') {
+        if (!activeTurnId && turnStartRpcId !== null) {
+          const startedTurn = params.turn as Record<string, unknown> | undefined;
+          const startedThreadId = typeof params.threadId === 'string' ? params.threadId : '';
+          const startedId = typeof startedTurn?.id === 'string' ? startedTurn.id : '';
+          if (startedId && (!startedThreadId || !threadId || startedThreadId === threadId)) {
+            activeTurnId = startedId;
+          }
+        }
         if (!turnStartedEmitted) {
           turnStartedEmitted = true;
           emit('codex.analysis.turn_started');
@@ -720,15 +740,19 @@ export async function codexAppServerInExecutionTurn(
         }
         threadId = threadObj.id;
 
-        const turnRes = await sendRpc('turn/start', {
-          threadId,
-          cwd: workspace,
-          ...(model ? { model } : {}),
-          effort,
-          approvalPolicy: 'never',
-          sandboxPolicy: { type: 'readOnly' },
-          input: [{ type: 'text', text: prompt, text_elements: [] }],
-        });
+        const turnRes = await sendRpc(
+          'turn/start',
+          {
+            threadId,
+            cwd: workspace,
+            ...(model ? { model } : {}),
+            effort,
+            approvalPolicy: 'never',
+            sandboxPolicy: { type: 'readOnly' },
+            input: [{ type: 'text', text: prompt, text_elements: [] }],
+          },
+          { isTurnStart: true },
+        );
         const turnObj = turnRes.turn as Record<string, unknown> | undefined;
         if (!turnObj || typeof turnObj.id !== 'string' || !turnObj.id) {
           throw new CodexProtocolError('codex app-server turn/start did not return a valid turn.id');

@@ -1057,30 +1057,40 @@ rl.on('line', (line) => {
   if (msg.method === 'initialize') { send({ jsonrpc: '2.0', id: msg.id, result: { capabilities: {} } }); return; }
   if (msg.method === 'thread/start') { send({ jsonrpc: '2.0', id: msg.id, result: { thread: { id: 'thr-errnotif' } } }); return; }
   if (msg.method === 'turn/start') {
+    if (mode === 'retry_and_other_turn') {
+      // Emit turn/start response + notifications in a single stdout write to deterministically
+      // exercise same-chunk synchronous turnStartRpcID capture in the stdout reader.
+      process.stdout.write(
+        [
+          { jsonrpc: '2.0', id: msg.id, result: { turn: { id: 'turn-errnotif', status: 'inProgress' } } },
+          { jsonrpc: '2.0', method: 'turn/started', params: { threadId: 'thr-errnotif', turn: { id: 'turn-errnotif', status: 'inProgress' } } },
+          {
+            jsonrpc: '2.0',
+            method: 'error',
+            params: {
+              threadId: 'thr-errnotif',
+              turnId: 'turn-errnotif',
+              willRetry: true,
+              error: { message: 'transient stream reconnect' }
+            }
+          },
+          {
+            jsonrpc: '2.0',
+            method: 'error',
+            params: {
+              threadId: 'thr-errnotif',
+              turnId: 'turn-other',
+              willRetry: false,
+              error: { message: 'other turn error should be ignored' }
+            }
+          }
+        ].map((o) => JSON.stringify(o)).join('\n') + '\n'
+      );
+      return;
+    }
     send({ jsonrpc: '2.0', id: msg.id, result: { turn: { id: 'turn-errnotif', status: 'inProgress' } } });
     send({ jsonrpc: '2.0', method: 'turn/started', params: { threadId: 'thr-errnotif', turn: { id: 'turn-errnotif', status: 'inProgress' } } });
-    if (mode === 'retry_and_other_turn') {
-      send({
-        jsonrpc: '2.0',
-        method: 'error',
-        params: {
-          threadId: 'thr-errnotif',
-          turnId: 'turn-errnotif',
-          willRetry: true,
-          error: { message: 'transient stream reconnect' }
-        }
-      });
-      send({
-        jsonrpc: '2.0',
-        method: 'error',
-        params: {
-          threadId: 'thr-errnotif',
-          turnId: 'turn-other',
-          willRetry: false,
-          error: { message: 'other turn error should be ignored' }
-        }
-      });
-    } else if (mode === 'fatal') {
+    if (mode === 'fatal') {
       setTimeout(() => {
         send({
           jsonrpc: '2.0',

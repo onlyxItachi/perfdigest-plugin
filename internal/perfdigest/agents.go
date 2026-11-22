@@ -1527,6 +1527,7 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 	turnCompleted := false
 	terminated := false
 	steerAttempted := false
+	turnStartRpcID := -1
 	steerRpcID := -1
 	steerAccepted := false
 	modelVisibleEmitted := false
@@ -1616,7 +1617,7 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 		}
 	}
 
-	sendRpcWithTag := func(method string, params map[string]any, isSteer bool) (map[string]any, error) {
+	sendRpcWithTag := func(method string, params map[string]any, tag string) (map[string]any, error) {
 		mu.Lock()
 		if terminated {
 			mu.Unlock()
@@ -1624,8 +1625,10 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 		}
 		id := nextID
 		nextID++
-		if isSteer {
+		if tag == "steer" {
 			steerRpcID = id
+		} else if tag == "turn_start" {
+			turnStartRpcID = id
 		}
 		respCh := make(chan map[string]any, 1)
 		pendingRpc[id] = respCh
@@ -1683,7 +1686,7 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 	}
 
 	sendRpc := func(method string, params map[string]any) (map[string]any, error) {
-		return sendRpcWithTag(method, params, false)
+		return sendRpcWithTag(method, params, "")
 	}
 
 	sendNotif := func(method string, params map[string]any) {
@@ -1729,6 +1732,15 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 				id := int(idFloat)
 				mu.Lock()
 				shouldEmitSteerAccepted := false
+				if !terminated && id == turnStartRpcID {
+					if resObj, ok := msg["result"].(map[string]any); ok && resObj != nil {
+						if retTurn, ok := resObj["turn"].(map[string]any); ok && retTurn != nil {
+							if retID, ok := retTurn["id"].(string); ok && retID != "" {
+								activeTurnID = retID
+							}
+						}
+					}
+				}
 				if !terminated && id == steerRpcID {
 					if resObj, ok := msg["result"].(map[string]any); ok && resObj != nil {
 						var retID string
@@ -1771,7 +1783,14 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 
 		switch method {
 		case "turn/started":
+			startedThreadID, _ := params["threadId"].(string)
+			startedTurn, _ := params["turn"].(map[string]any)
+			startedTurnID, _ := startedTurn["id"].(string)
 			mu.Lock()
+			if !terminated && activeTurnID == "" && turnStartRpcID != -1 && startedTurnID != "" &&
+				(startedThreadID == "" || threadID == "" || startedThreadID == threadID) {
+				activeTurnID = startedTurnID
+			}
 			shouldEmit := !terminated && !turnStartedEmitted
 			if !terminated {
 				turnStartedEmitted = true
@@ -2051,7 +2070,7 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 		if s.model != "" {
 			turnParams["model"] = s.model
 		}
-		turnRes, err := sendRpc("turn/start", turnParams)
+		turnRes, err := sendRpcWithTag("turn/start", turnParams, "turn_start")
 		if err != nil {
 			flowCh <- flowOutcome{err: NewAgentError(AgentErrProtocol, phase, err.Error())}
 			return
@@ -2128,7 +2147,7 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 				if s.model != "" {
 					toolParams["model"] = s.model
 				}
-				toolRes, rpcErr := sendRpcWithTag("turn/start", toolParams, true)
+				toolRes, rpcErr := sendRpcWithTag("turn/start", toolParams, "steer")
 				if rpcErr != nil {
 					isTransportClosed := false
 					if ce, ok := rpcErr.(*codexRpcErr); ok {
@@ -2203,7 +2222,7 @@ func (s *codexInExecSessionImpl) TurnInExecution(
 				"input": []map[string]any{
 					{"type": "text", "text": framedEvidence, "text_elements": []any{}},
 				},
-			}, true)
+			}, "steer")
 			if rpcErr != nil {
 				isTransportClosed := false
 				if ce, ok := rpcErr.(*codexRpcErr); ok {

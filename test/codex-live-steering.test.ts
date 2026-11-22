@@ -1718,31 +1718,40 @@ rl.on('line', (line) => {
     return;
   }
   if (msg.method === 'turn/start') {
+    if (mode === 'retry_and_other_turn') {
+      // Emit turn/start response + turn/started + retryable error + unrelated-turn fatal error
+      // in a single stdout write to deterministically exercise same-chunk turnStartRpcId capture.
+      process.stdout.write(
+        [
+          { jsonrpc: '2.0', id: msg.id, result: { turn: { id: 'turn-s17', status: 'inProgress' } } },
+          { jsonrpc: '2.0', method: 'turn/started', params: { threadId: 'thr-s17', turn: { id: 'turn-s17', status: 'inProgress' } } },
+          {
+            jsonrpc: '2.0',
+            method: 'error',
+            params: {
+              threadId: 'thr-s17',
+              turnId: 'turn-s17',
+              willRetry: true,
+              error: { message: 'transient stream reconnect' }
+            }
+          },
+          {
+            jsonrpc: '2.0',
+            method: 'error',
+            params: {
+              threadId: 'thr-s17',
+              turnId: 'turn-unrelated',
+              willRetry: false,
+              error: { message: 'other turn error should be ignored' }
+            }
+          }
+        ].map((o) => JSON.stringify(o)).join('\\n') + '\\n'
+      );
+      return;
+    }
     send({ jsonrpc: '2.0', id: msg.id, result: { turn: { id: 'turn-s17', status: 'inProgress' } } });
     send({ jsonrpc: '2.0', method: 'turn/started', params: { threadId: 'thr-s17', turn: { id: 'turn-s17', status: 'inProgress' } } });
-    if (mode === 'retry_and_other_turn') {
-      // Transient retryable error for active turn + non-retryable error for an unrelated turnId -> both must be ignored
-      send({
-        jsonrpc: '2.0',
-        method: 'error',
-        params: {
-          threadId: 'thr-s17',
-          turnId: 'turn-s17',
-          willRetry: true,
-          error: { message: 'transient stream reconnect' }
-        }
-      });
-      send({
-        jsonrpc: '2.0',
-        method: 'error',
-        params: {
-          threadId: 'thr-s17',
-          turnId: 'turn-unrelated',
-          willRetry: false,
-          error: { message: 'other turn error should be ignored' }
-        }
-      });
-    } else if (mode === 'fatal_error_notif') {
+    if (mode === 'fatal_error_notif') {
       setTimeout(() => {
         send({
           jsonrpc: '2.0',

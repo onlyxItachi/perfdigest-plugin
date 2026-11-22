@@ -909,6 +909,8 @@ async function runRawBaselineCodexAppServer({ workspace, study, model, effort, t
     let settled = false;
     let processClosed = false;
     let nextId = 1;
+    let threadId = null;
+    let turnStartRpcId = null;
     let activeTurnId = null;
     let lineBuf = '';
     const stdoutDecoder = new StringDecoder('utf8');
@@ -957,13 +959,16 @@ async function runRawBaselineCodexAppServer({ workspace, study, model, effort, t
     }, timeoutMs);
     timer.unref?.();
 
-    const sendRpc = (method, params) =>
+    const sendRpc = (method, params, rpcOptions = {}) =>
       new Promise((res, rej) => {
         if (settled || processClosed || child.stdin.destroyed || !child.stdin.writable) {
           rej(new Error('raw baseline stdin closed'));
           return;
         }
         const id = nextId++;
+        if (rpcOptions.isTurnStart) {
+          turnStartRpcId = id;
+        }
         pending.set(id, { res, rej });
         child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`, (writeErr) => {
           if (writeErr) {
@@ -984,6 +989,12 @@ async function runRawBaselineCodexAppServer({ workspace, study, model, effort, t
         return;
       }
       if (typeof msg.id === 'number' && (msg.result !== undefined || msg.error !== undefined)) {
+        if (msg.id === turnStartRpcId && msg.result && typeof msg.result === 'object') {
+          const returnedId = typeof msg.result?.turn?.id === 'string' ? msg.result.turn.id : '';
+          if (returnedId) {
+            activeTurnId = returnedId;
+          }
+        }
         const entry = pending.get(msg.id);
         if (entry) {
           pending.delete(msg.id);
@@ -994,9 +1005,18 @@ async function runRawBaselineCodexAppServer({ workspace, study, model, effort, t
       }
       const method = msg.method || '';
       const params = msg.params || {};
-      if (method === 'turn/started' && !turnStartedRecorded) {
-        turnStartedRecorded = true;
-        recordEv('codex.analysis.turn_started');
+      if (method === 'turn/started') {
+        if (!activeTurnId && turnStartRpcId !== null) {
+          const startedThreadId = typeof params.threadId === 'string' ? params.threadId : '';
+          const startedId = typeof params.turn?.id === 'string' ? params.turn.id : '';
+          if (startedId && (!startedThreadId || !threadId || startedThreadId === threadId)) {
+            activeTurnId = startedId;
+          }
+        }
+        if (!turnStartedRecorded) {
+          turnStartedRecorded = true;
+          recordEv('codex.analysis.turn_started');
+        }
       } else if (method === 'item/completed') {
         const notifTurnId = typeof params.turnId === 'string' ? params.turnId : '';
         if (activeTurnId && notifTurnId && notifTurnId !== activeTurnId) {
@@ -1118,16 +1138,20 @@ async function runRawBaselineCodexAppServer({ workspace, study, model, effort, t
           sandbox: 'read-only',
           ephemeral: true,
         });
-        const threadId = threadRes.thread?.id;
-        const turnRes = await sendRpc('turn/start', {
-          threadId,
-          cwd: workspace,
-          model,
-          effort,
-          approvalPolicy: 'never',
-          sandboxPolicy: { type: 'readOnly' },
-          input: [{ type: 'text', text: prompt, text_elements: [] }],
-        });
+        threadId = threadRes.thread?.id ?? null;
+        const turnRes = await sendRpc(
+          'turn/start',
+          {
+            threadId,
+            cwd: workspace,
+            model,
+            effort,
+            approvalPolicy: 'never',
+            sandboxPolicy: { type: 'readOnly' },
+            input: [{ type: 'text', text: prompt, text_elements: [] }],
+          },
+          { isTurnStart: true },
+        );
         if (typeof turnRes?.turn?.id === 'string' && turnRes.turn.id) {
           activeTurnId = turnRes.turn.id;
         }
