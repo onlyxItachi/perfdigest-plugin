@@ -1,0 +1,2010 @@
+{
+  "schema": "perfdigest.hpc-eval-contract.v1",
+  "contractVersion": "1.1.0",
+  "title": "Production-Representative HPC Evaluation Contract (100 Criteria Across 4 Task Slots)",
+  "description": "Machine-readable evaluation contract for onlyxItachi/perfdigest-plugin preserving 3 primary comparison arms (raw, mcp_digest, evidence), 5 separately stratified delivery strategies mapped to canonical EvidenceDelivery names, symmetric workspace write policies (read_only_diagnosis vs autonomous_patch_and_verify), answer-neutral agent output schemas, explicit automated vs blind-rubric-judge criteria, 3 confirmed real HPC workloads (75 grounded criteria), and 1 explicitly unselected Task 4 slot (25 reserved criteria).",
+  "primaryArms": [
+    "raw",
+    "mcp_digest",
+    "evidence"
+  ],
+  "deliveryStrategies": [
+    "in_execution",
+    "in_execution_tool_delivery",
+    "single_turn",
+    "two_turn",
+    "skill_background_worker"
+  ],
+  "evidenceDeliveryVocabulary": {
+    "in_execution": "in_execution_async_input",
+    "in_execution_tool_delivery": "in_execution_tool_delivery",
+    "single_turn": "single_turn_with_evidence",
+    "two_turn": "same_session_next_turn",
+    "skill_background_worker": "skill_background_worker",
+    "none": "none"
+  },
+  "evaluationModes": {
+    "read_only_diagnosis": {
+      "writeAccessAllowed": false,
+      "symmetricAcrossAllArms": true,
+      "verifierTargetTree": "clean_pre_fix_snapshot",
+      "evidenceIntegrationPaths": [
+        "in_execution_async_input",
+        "in_execution_tool_delivery",
+        "single_turn_with_evidence",
+        "same_session_next_turn",
+        "skill_background_worker"
+      ],
+      "description": "All 3 arms (raw, mcp_digest, evidence) run strictly read-only against the clean pre-fix snapshot without editing files. Only read-only reproducer/baseline verifiers and diagnosis/design criteria apply; patch-dependent implementation verifiers are excluded from cross-arm scoring in this mode."
+    },
+    "autonomous_patch_and_verify": {
+      "writeAccessAllowed": true,
+      "symmetricAcrossAllArms": true,
+      "verifierTargetTree": "arm_patched_workspace",
+      "evidenceIntegrationPaths": [
+        "in_execution_tool_delivery",
+        "skill_background_worker"
+      ],
+      "description": "All 3 arms (raw, mcp_digest, evidence) receive identical isolated writable copies of the clean pre-fix snapshot and symmetric shell/edit tools. Evidence arms retrieve verified Evidence via MCP pull (in_execution_tool_delivery) or the Skill-controlled OS-native background worker (skill_background_worker) rather than the read-only investigate() prompt wrapper. The external harness runs post-fix verifiers against each arm's patched workspace."
+    }
+  },
+  "criteriaBudget": {
+    "totalCriteria": 100,
+    "criteriaPerTask": 25,
+    "totalTaskSlots": 4,
+    "confirmedTasks": 3,
+    "unselectedTasks": 1,
+    "groundedCriteria": 75,
+    "reservedCriteria": 25,
+    "categoriesPerTask": 5,
+    "criteriaPerCategory": 5
+  },
+  "categoryTaxonomy": {
+    "A": "Quantitative & Profiler Evidence Grounding (exact metrics, hotspots, null != 0 honesty)",
+    "B": "Root-Cause Localization & Mechanistic Accuracy (exact files, symbols, call paths, ABI/memory/math causes)",
+    "C": "Correctness, Boundary & Invariant Preservation (edge cases, dtype/overflow/support/ownership/registry invariants)",
+    "D": "Scope Honesty, Falsification & Non-Overclaiming (rejecting shortcuts/false causes, separating measured vs unproven)",
+    "E": "Remediation Design & Independent Verification (concrete fix/disposition + external non-trivial verifier checks)"
+  },
+  "perfdigestMcpCompatibility": {
+    "recommendedVersion": "1.2.0",
+    "testedVersions": [
+      "1.2.0",
+      "1.3.0"
+    ],
+    "tools": [
+      "summarize_report",
+      "list_kernels",
+      "get_metrics",
+      "compare_metrics",
+      "expand",
+      "platform_capabilities",
+      "suggest_profile_command"
+    ],
+    "supportedFormats": [
+      "ncu-rep",
+      "ncu-csv",
+      "rocprof-csv",
+      "perf-stat-json",
+      "perf-report",
+      "metal-trace",
+      "chrome-trace",
+      "torch-trace",
+      "ptxas-verbose",
+      "clang-time-trace",
+      "cmake-profile",
+      "ninja-log",
+      "cargo-json",
+      "criterion",
+      "gha-log",
+      "git-numstat"
+    ],
+    "unsupportedFormatsObserved": [
+      {
+        "format": "python-cprofile",
+        "reason": "perfdigest-mcp v1.2.0/v1.3.0 registers 14 backends and does not include a Python cProfile/pstats adapter.",
+        "mitigation": "Capture genuine Linux perf (perf-stat-json + perf-report) and cargo-json artifacts for Python+Rust workloads instead of relying on cProfile."
+      },
+      {
+        "format": "custom-ingest-verdict-json",
+        "reason": "Domain-specific benchmark harness JSON schemas (e.g., GAFIME perf_14 cost-verdict.json) are verification oracles rather than generic profiler formats.",
+        "mitigation": "Use perf_14_public_ingest.py + perf_14_ingest_budget.py as independent external verifiers while feeding genuine linux_perf + cargo-json reports into PerfDigest MCP."
+      }
+    ]
+  },
+  "fairnessAndIntegrityInvariants": {
+    "zeroOracleLeakage": true,
+    "nativeToolsEnabledInRaw": true,
+    "symmetricWritePolicyAcrossArms": true,
+    "preserveFailedTimedOutAbstained": true,
+    "nullNotZeroMetricHonesty": true,
+    "independentNonTrivialVerifier": true,
+    "noLocalUserPaths": true
+  },
+  "tasks": [
+    {
+      "studyId": "gafime_rc3_ingestion",
+      "slot": 1,
+      "status": "confirmed",
+      "selectedByUser": true,
+      "runnableWhenArtifactsCaptured": true,
+      "supportedEvaluationModes": [
+        "read_only_diagnosis",
+        "autonomous_patch_and_verify"
+      ],
+      "defaultEvaluationMode": "autonomous_patch_and_verify",
+      "title": "GAFIME RC3 Public File Ingestion Latency & RSS Amplification",
+      "domain": "python_rust_arrow_ingestion_cpu_memory",
+      "repository": {
+        "slug": "onlyxItachi/GAFIME",
+        "upstreamIssueOrPr": "PR #111 (fix/rc3-native-file-ingest) / tag v1.0.0-rc.3",
+        "preFixRef": "main-pre-pr111 (parent of PR #111; RC2 baseline tag v1.0.0-rc.2)",
+        "preFixSha": "c85178fe705ed71ac65d6c59203ce5dd76524239",
+        "fixRefOrDisposition": "PR #111 merged (2edd4df) -> tag v1.0.0-rc.3",
+        "fixSha": "b510b4dd9af4c47602846b9a58702ed005fe67e4"
+      },
+      "snapshotStrategy": {
+        "baseCommand": "git -C <REPO_ROOT> archive --format=tar c85178fe705ed71ac65d6c59203ce5dd76524239 | tar -x -C <SNAPSHOT_DIR>",
+        "excludedLeakPaths": [
+          ".git",
+          "crates/gafime-py/src/acquisition.rs",
+          "docs/rc3-ingestion-hardening.md",
+          "docs/ingestion-rss-policy.md",
+          "docs/evidence/rc3-ingestion-baseline.md",
+          "docs/evidence/rc3-polars-rss-comparison.md",
+          "docs/core-benchmark-calibration.md",
+          "docs/evidence/rt-firsthit-sm89-65536x8192-final.ncu-rep",
+          "tests/python/test_v1_native_ingestion.py",
+          "tests/release_measure/perf_14_public_ingest.py",
+          "tests/release_measure/perf_14_ingest_budget.py"
+        ],
+        "cleanEnvRequirements": [
+          "Isolated virtual environment with pre-fix GAFIME wheel installed from <SNAPSHOT_DIR>",
+          "Unset allocator/thread overrides (MALLOC_ARENA_MAX, POLARS_MAX_THREADS, LD_PRELOAD, PYTHONPATH)",
+          "Fresh isolated child processes for every wall-time and /proc/self/status VmHWM measurement"
+        ]
+      },
+      "agentPrompt": {
+        "promptVersion": "gafime-ingest-prompt.v2",
+        "taskBrief": "Users report severe wall-time latency and peak-RSS memory amplification when running configured public file workflows via GAFIME dataload() on 100k x 20 and 100k x 100 CSV, Parquet, and IPC datasets compared to direct contiguous array analysis. Investigate the workspace in <SNAPSHOT_DIR> and the profiler/build artifacts in <ARTIFACT_DIR>. Identify the exact execution and memory bottlenecks, separate runtime/parser versus native memory contributions accurately, preserve all numerical, precision, and ownership contracts, and follow the run's declared workspace policy (diagnosis-only in read_only_diagnosis mode; implement and verify a patch in autonomous_patch_and_verify mode).",
+        "workspaceInstructions": "Use your available tools autonomously within the run's declared workspace policy (read-only vs writable). Inspect <SNAPSHOT_DIR> and staged artifacts in <ARTIFACT_DIR>. Report only directly observed metrics; set unobserved metrics to null rather than 0. Emit a single JSON object adhering strictly to outputSchema and populate measured_metrics using the declared neutralMetricKeys.",
+        "requiredOutputFields": [
+          "measured_metrics",
+          "top_profiler_units",
+          "localized_files",
+          "localized_symbols",
+          "cited_commits_and_refs",
+          "root_cause_summary",
+          "invariants_and_boundaries",
+          "scope_limitations",
+          "remediation_proposal",
+          "patch_applied",
+          "verification_notes"
+        ],
+        "outputSchema": {
+          "measured_metrics": "JSON object mapping each requested neutralMetricKey to its measured numeric value, or null if absent in the profiler export.",
+          "top_profiler_units": "Array of hottest unit or function names observed in profiler/build reports.",
+          "localized_files": "Array of workspace-relative source file paths implicated in the root cause or fix boundary.",
+          "localized_symbols": "Array of exact function, method, kernel, or protocol symbol names localized during investigation.",
+          "cited_commits_and_refs": "Array of relevant commit hashes, build targets, or configuration identifiers directly observed in the workspace.",
+          "root_cause_summary": "Concise technical explanation of the causal mechanism behind the observed bottleneck or failure.",
+          "invariants_and_boundaries": "Array of concrete correctness, precision, ownership, ABI, or safety invariants that must hold.",
+          "scope_limitations": "Array of explicit measurement bounds, falsified hypotheses, and claims that remain unproven.",
+          "remediation_proposal": "Actionable remediation or upstream disposition plan grounded in workspace evidence.",
+          "patch_applied": "Boolean indicating whether source edits were applied under autonomous_patch_and_verify mode (false in read_only_diagnosis).",
+          "verification_notes": "Concise summary of any verification commands run and their observed outcomes."
+        },
+        "neutralMetricKeys": [
+          "cpu_hotspot_pct",
+          "wall_slowdown_ratio",
+          "peak_rss_excess_mib",
+          "perf_report_duration_us"
+        ],
+        "forbiddenHintsCheck": true
+      },
+      "artifactRequirements": [
+        {
+          "artifactId": "rc2-dataload-perf-stat",
+          "role": "primary",
+          "perfdigestFormat": "perf-stat-json",
+          "status": "capture_required",
+          "relativeLocation": "<ARTIFACT_DIR>/rc2_dataload_100kx100.perf-stat.json",
+          "captureCommand": "LC_ALL=C perf stat -j -o <ARTIFACT_DIR>/rc2_dataload_100kx100.perf-stat.json -- <VENV_PYTHON> <ARTIFACT_DIR>/bench_ingest_driver.py --shape 100000x100 --format parquet --route dataload",
+          "notes": "Requires fresh capture on pre-fix snapshot c85178fe because existing disk artifact is cProfile (unsupported by perfdigest-mcp)."
+        },
+        {
+          "artifactId": "rc2-direct-perf-stat",
+          "role": "primary",
+          "perfdigestFormat": "perf-stat-json",
+          "status": "capture_required",
+          "relativeLocation": "<ARTIFACT_DIR>/rc2_direct_100kx100.perf-stat.json",
+          "captureCommand": "LC_ALL=C perf stat -j -o <ARTIFACT_DIR>/rc2_direct_100kx100.perf-stat.json -- <VENV_PYTHON> <ARTIFACT_DIR>/bench_ingest_driver.py --shape 100000x100 --format parquet --route direct"
+        },
+        {
+          "artifactId": "rc2-dataload-perf-report",
+          "role": "primary",
+          "perfdigestFormat": "perf-report",
+          "status": "capture_required",
+          "relativeLocation": "<ARTIFACT_DIR>/rc2_dataload_100kx100.perf-report.txt",
+          "captureCommand": "perf record -F 999 -g -o <BUILD_DIR>/rc2_dataload.perf.data -- <VENV_PYTHON> <ARTIFACT_DIR>/bench_ingest_driver.py --shape 100000x100 --format parquet --route dataload && perf report -i <BUILD_DIR>/rc2_dataload.perf.data --stdio --no-children --percent-limit 0.5 > <ARTIFACT_DIR>/rc2_dataload_100kx100.perf-report.txt"
+        },
+        {
+          "artifactId": "gafime-py-cargo-diag",
+          "role": "secondary",
+          "perfdigestFormat": "cargo-json",
+          "status": "capture_required",
+          "relativeLocation": "<ARTIFACT_DIR>/gafime_py.cargo-diag.json",
+          "captureCommand": "cargo check --manifest-path <SNAPSHOT_DIR>/crates/gafime-py/Cargo.toml --message-format=json > <ARTIFACT_DIR>/gafime_py.cargo-diag.json"
+        }
+      ],
+      "verifiers": [
+        {
+          "id": "rust_acquisition_tests",
+          "description": "Runs Rust PyO3 Arrow C Stream acquisition, single-transfer capsule FFI release, and checked_f32 overflow unit tests against the arm's patched workspace.",
+          "command": "cargo test --manifest-path <ARM_WORKSPACE>/crates/gafime-py/Cargo.toml acquisition",
+          "expectedExitCode": 0,
+          "appliesInModes": [
+            "autonomous_patch_and_verify"
+          ],
+          "targetTree": "arm_patched_workspace",
+          "checks": [
+            "Arrow C Stream single-transfer ownership and release on success/error",
+            "Pre-narrowing finite f32::MAX overflow rejection",
+            "Multi-batch and misaligned chunk stream alignment"
+          ]
+        },
+        {
+          "id": "python_native_ingestion_suite",
+          "description": "Runs Python native ingestion contract, precision, literal column projection, and direct-vs-file bit parity suite against the arm's patched workspace.",
+          "command": "<VENV_PYTHON> -m pytest <VERIFIER_DIR>/test_v1_native_ingestion.py <VERIFIER_DIR>/test_v1_ingest_contracts.py -q",
+          "expectedExitCode": 0,
+          "appliesInModes": [
+            "autonomous_patch_and_verify"
+          ],
+          "targetTree": "arm_patched_workspace",
+          "checks": [
+            "Bit-identical interaction-result digests between direct and file routes",
+            "fp64 never stages through f32; fp32/mixed reject finite values > f32::MAX",
+            "Literal column-name projection and fail-closed unsupported backend errors"
+          ]
+        },
+        {
+          "id": "fresh_process_ingest_budget_gate",
+          "description": "Runs 18-cell fresh-process wall-time and independent-parser-v1 capped RSS budget gate across 100kx20 & 100kx100 x CSV/Parquet/IPC x fp32/mixed/fp64 against the arm's patched workspace.",
+          "command": "<VENV_PYTHON> <VERIFIER_DIR>/perf_14_ingest_budget.py --budget <VERIFIER_DIR>/ingest_cost_budget.json --public-report <ARTIFACT_DIR>/public_report.json --parser-report <ARTIFACT_DIR>/parser_report.json --variant candidate --output <ARTIFACT_DIR>/cost-verdict.json",
+          "expectedExitCode": 0,
+          "appliesInModes": [
+            "autonomous_patch_and_verify"
+          ],
+          "targetTree": "arm_patched_workspace",
+          "checks": [
+            "All 18 cells pass median_dataload_ns <= 250ms + 4 * median_direct_ns",
+            "All 18 cells pass independent-parser-v1 RSS model (P <= B+A and public_peak <= max(B,P)+A)",
+            "RC2 negative control continues failing all 18 cells under the identical budget"
+          ]
+        }
+      ],
+      "graderGroundTruth": {
+        "summary": "Pre-PR-#111 dataload() coupled file acquisition to a narrow explicit-Core/no-significance Arrow convenience route, forcing general configured file analyses through Polars iter_rows() and per-scalar Python validation (_append_numeric -> _finite_for_precision -> normalize_precision -> array('f') -> bytes -> Rust decode). PR #111 separated private native Arrow C Stream acquisition in crates/gafime-py/src/acquisition.rs feeding the existing full-config Rust planner/executor, cutting 100kx20 Parquet median wall from 658ms to 38.4ms and 100kx100 Parquet from 3.13s/552.5MiB to 167.7ms/247.6MiB while bounding Polars parser-floor RSS via independent-parser-v1.",
+        "rootCauses": [
+          "Acquisition/execution policy coupling in python/gafime/v1_adapter.py restricted the legacy Arrow shortcut to narrow explicit-Core/no-significance matching-dtype routes.",
+          "General configured dataload() fell back to feature_frame.iter_rows() -> _coerce_row_major_f32_for_cache -> _append_numeric -> _finite_for_precision -> normalize_precision (121.8M Python calls / 10.1M scalar appends on 100kx100).",
+          "External Polars version-dependent parser/allocator floor accounted for ~114-386 MiB RSS independent of GAFIME native compile delta (~7.4-7.6 MiB fp32 / 15.1-15.2 MiB fp64 on 100kx20)."
+        ],
+        "quantitativeReferences": {
+          "rc2_100kx20_direct_wall_ms": 28.8,
+          "rc2_100kx20_direct_rss_mib": 96.5,
+          "rc2_100kx20_parquet_wall_ms": 658.0,
+          "rc2_100kx20_parquet_rss_mib": 184.0,
+          "rc2_100kx100_contig_coerce_ms": 11.5,
+          "rc2_100kx100_contig_rss_mib": 141.1,
+          "rc2_100kx100_row_coerce_ms": 2770.0,
+          "rc2_100kx100_row_rss_mib": 551.0,
+          "rc2_100kx100_parquet_wall_ms": 3130.0,
+          "rc2_100kx100_parquet_rss_mib": 552.5,
+          "rc2_cprofile_total_calls": 121801508,
+          "rc2_cprofile_scalar_appends": 10100000,
+          "rc3_100kx20_parquet_mixed_wall_ms": 38.4,
+          "rc3_100kx20_parquet_mixed_rss_mib": 122.84,
+          "rc3_100kx100_parquet_mixed_wall_ms": 167.71,
+          "rc3_100kx100_parquet_mixed_rss_mib": 247.59,
+          "native_compile_delta_fp32_mib": [7.38, 7.55],
+          "native_compile_delta_fp64_mib": [15.14, 15.23]
+        },
+        "secondaryCaveats": [
+          "The archived 31.8 MB docs/evidence/rt-firsthit-sm89-65536x8192-final.ncu-rep is an unrelated RT-Core GBDT capture from commit cce2839c and MUST NOT be used as an RC3 ingestion profiler artifact.",
+          "PR #114 (ab1d937) addressed a separate RC3 Core benchmark calibration headroom failure (200ms vs 220ms loop selection) and is tracked outside Task 1 unless explicitly added."
+        ],
+        "forbiddenPromptSubstrings": [
+          "PR #111",
+          "v1.0.0-rc.3",
+          "2edd4df",
+          "b510b4d",
+          "acquisition.rs",
+          "iter_rows",
+          "_coerce_row_major_f32_for_cache",
+          "_append_numeric",
+          "_finite_for_precision",
+          "independent-parser-v1"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T1-01",
+          "category": "A",
+          "title": "CPU hotspot percentage grounded from Linux perf",
+          "description": "Reports primary CPU hotspot percentage in pre-fix dataload perf-report within observed CPython coercion/interpreter range.",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "numeric_tolerance",
+          "oracleCheck": {
+            "field": "measured_metrics.cpu_hotspot_pct",
+            "operator": "in_range",
+            "expected": [40.0, 100.0],
+            "unit": "pct"
+          }
+        },
+        {
+          "id": "T1-02",
+          "category": "A",
+          "title": "Wall-time amplification magnitude quantified",
+          "description": "Quantifies the >10x wall-time slowdown between direct contiguous execution and configured file dataload on 100k x 20 (~23x) and 100k x 100 (~27x).",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "numeric_tolerance",
+          "oracleCheck": {
+            "field": "measured_metrics.wall_slowdown_ratio",
+            "operator": "in_range",
+            "expected": [10.0, 40.0],
+            "unit": "x"
+          }
+        },
+        {
+          "id": "T1-03",
+          "category": "A",
+          "title": "Peak RSS amplification magnitude quantified",
+          "description": "Quantifies >350 MiB excess peak process RSS on 100k x 100 row coercion (~551 MiB vs ~141 MiB contiguous coercion and 38.15 MiB raw f32 buffer).",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "numeric_tolerance",
+          "oracleCheck": {
+            "field": "measured_metrics.peak_rss_excess_mib",
+            "operator": "in_range",
+            "expected": [350.0, 520.0],
+            "unit": "MiB"
+          }
+        },
+        {
+          "id": "T1-04",
+          "category": "A",
+          "title": "Null-not-zero honesty for perf-report wall duration",
+          "description": "Reports perf_report_duration_us strictly as null (never 0.0) because Linux perf report sampling carries sample percentages rather than wall duration.",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "invariant_check",
+          "oracleCheck": {
+            "field": "measured_metrics.perf_report_duration_us",
+            "operator": "null_not_zero",
+            "expected": null
+          }
+        },
+        {
+          "id": "T1-05",
+          "category": "A",
+          "title": "Polars parser RSS floor separated from native compilation delta",
+          "description": "Separates external Polars parser/runtime memory floor from GAFIME native compile HWM delta (~7.4-7.6 MiB fp32 / ~15.1-15.2 MiB fp64 on 100k x 20) instead of attributing total process VmHWM solely to native buffers.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "mechanistic_judgment",
+          "judgeRubric": {
+            "targetFields": ["root_cause_summary", "scope_limitations"],
+            "passCondition": "Explicitly distinguishes external file-parser/allocator RSS floor from GAFIME native compilation allocation delta (~7.4-15.2 MiB on 100k x 20).",
+            "failCondition": "Attributes the entire 180-550 MiB process VmHWM to a single GAFIME native leak or ignores parser/runtime baseline.",
+            "evidenceRequired": "Explicit attribution contrasting parser/runtime RSS floor against native compile footprint."
+          }
+        },
+        {
+          "id": "T1-06",
+          "category": "B",
+          "title": "Exact v1_adapter.py iter_rows fallback localization",
+          "description": "Localizes python/gafime/v1_adapter.py and symbols iter_rows and _coerce_row_major_f32_for_cache.",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "symbol_match",
+          "oracleCheck": {
+            "field": "localized_symbols",
+            "operator": "contains_all",
+            "expected": ["iter_rows", "_coerce_row_major_f32_for_cache"]
+          }
+        },
+        {
+          "id": "T1-07",
+          "category": "B",
+          "title": "Per-element Python validation loop symbols localized",
+          "description": "Localizes the O(rows * (cols + 1)) scalar Python validation symbols _append_numeric, _finite_for_precision, and normalize_precision.",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "symbol_match",
+          "oracleCheck": {
+            "field": "localized_symbols",
+            "operator": "contains_all",
+            "expected": ["_append_numeric", "_finite_for_precision", "normalize_precision"]
+          }
+        },
+        {
+          "id": "T1-08",
+          "category": "B",
+          "title": "Acquisition/execution policy coupling identified",
+          "description": "Explains that the architectural defect is acquisition/execution policy coupling: the legacy Arrow shortcut only supported a narrow explicit-Core/no-significance matching-dtype route, forcing all general configured dataload() calls through row materialization.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "mechanistic_judgment",
+          "judgeRubric": {
+            "targetFields": ["root_cause_summary"],
+            "passCondition": "Clearly explains why general configured dataload() bypasses the narrow legacy Arrow convenience shortcut and falls back to row iteration.",
+            "failCondition": "Describes the bug only as slow Polars I/O or misses the narrow Arrow-shortcut guard condition.",
+            "evidenceRequired": "Reference to the narrow Core/no-significance Arrow shortcut guard in v1_adapter.py."
+          }
+        },
+        {
+          "id": "T1-09",
+          "category": "B",
+          "title": "Redundant intermediate transport copies explained",
+          "description": "Identifies the multi-copy staging chain: Python row tuples -> array('f') -> Python bytes transport -> decoded Rust numeric vector.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "mechanistic_judgment",
+          "judgeRubric": {
+            "targetFields": ["root_cause_summary"],
+            "passCondition": "Accurately traces the intermediate Python tuple/list, array('f'), bytes serialization, and Rust decode staging copies.",
+            "failCondition": "Omits the Python-object/array/bytes transport amplification mechanism.",
+            "evidenceRequired": "Description of the multi-stage staging chain in v1_adapter.py."
+          }
+        },
+        {
+          "id": "T1-10",
+          "category": "B",
+          "title": "Rust PyO3 crate and Arrow C Stream protocol localized",
+          "description": "Localizes python/gafime/v1_adapter.py and crates/gafime-py as the boundary files for native __arrow_c_stream__ ingestion.",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "symbol_match",
+          "oracleCheck": {
+            "field": "localized_files",
+            "operator": "contains_all",
+            "expected": ["python/gafime/v1_adapter.py", "crates/gafime-py"]
+          }
+        },
+        {
+          "id": "T1-11",
+          "category": "C",
+          "title": "Pre-narrowing finite f32::MAX overflow guard",
+          "description": "Specifies/enforces pre-narrowing range check for fp32/mixed: finite source values with |v| > f32::MAX fail closed before narrowing, while preserving source NaN/Inf distinctions.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "invariant_judgment",
+          "judgeRubric": {
+            "targetFields": ["invariants_and_boundaries", "remediation_proposal"],
+            "passCondition": "Requires finite values exceeding f32::MAX to fail closed before narrowing while preserving source NaN/Inf semantics.",
+            "failCondition": "Allows silent saturation to Inf/f32::MAX or rejects valid source NaN/Inf inconsistently.",
+            "evidenceRequired": "Explicit pre-narrowing overflow rule for fp32/mixed."
+          }
+        },
+        {
+          "id": "T1-12",
+          "category": "C",
+          "title": "fp64 ingestion never stages through f32",
+          "description": "Specifies/enforces that fp64 profile ingestion preserves full 64-bit source values without intermediate f32 narrowing.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "invariant_judgment",
+          "judgeRubric": {
+            "targetFields": ["invariants_and_boundaries", "remediation_proposal"],
+            "passCondition": "Explicitly forbids staging fp64 profile inputs through f32.",
+            "failCondition": "Proposes an f32-only Arrow ingestion path.",
+            "evidenceRequired": "Profile-typed fp32/mixed/fp64 preservation requirement."
+          }
+        },
+        {
+          "id": "T1-13",
+          "category": "C",
+          "title": "Multi-batch and misaligned Arrow stream alignment",
+          "description": "Specifies/enforces consuming all Arrow batches/chunks including misaligned feature/target batch boundaries with strict schema and row-count validation.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "invariant_judgment",
+          "judgeRubric": {
+            "targetFields": ["invariants_and_boundaries", "remediation_proposal"],
+            "passCondition": "Handles multi-chunk/multi-batch streams and validates total row alignment even when feature and target batch boundaries differ.",
+            "failCondition": "Assumes a single contiguous Arrow batch or identical chunk boundaries.",
+            "evidenceRequired": "Explicit multi-batch consumption and row-alignment validation."
+          }
+        },
+        {
+          "id": "T1-14",
+          "category": "C",
+          "title": "Explicit Arrow FFI foreign-owner lifetime and pre-compile release",
+          "description": "Specifies/enforces single capsule transfer (__arrow_c_stream__), deterministic release callback on success and error, and dropping loader frames before resident compilation.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "invariant_judgment",
+          "judgeRubric": {
+            "targetFields": ["invariants_and_boundaries", "remediation_proposal"],
+            "passCondition": "Specifies single-ownership FFI capsule import with guaranteed release on success/error and dropping temporary loader frames before resident execution.",
+            "failCondition": "Ignores Arrow C Stream ownership/release lifetime or retains foreign loader frames during compilation.",
+            "evidenceRequired": "Arrow C Stream FFI lifetime and pre-compile release plan."
+          }
+        },
+        {
+          "id": "T1-15",
+          "category": "C",
+          "title": "Literal column projection and fail-closed API semantics preserved",
+          "description": "Preserves literal column-name projection, candidate identity/ordering, significance, warnings, fresh-seed semantics, and fail-closed unsupported backend errors.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "invariant_judgment",
+          "judgeRubric": {
+            "targetFields": ["invariants_and_boundaries", "remediation_proposal"],
+            "passCondition": "Preserves existing public dataload() contract, literal column selection, warnings, seed semantics, and fail-closed backend errors.",
+            "failCondition": "Breaks public API signatures or drops fail-closed unsupported backend checks.",
+            "evidenceRequired": "Explicit API and behavioral-parity preservation checklist."
+          }
+        },
+        {
+          "id": "T1-16",
+          "category": "D",
+          "title": "No false zero-copy resident Arrow claim",
+          "description": "Explicitly avoids claiming true zero-copy resident Arrow execution; recognizes Rust must materialize an owned, validated, profile-typed snapshot before fingerprinting and execution.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "scope_honesty_judgment",
+          "judgeRubric": {
+            "targetFields": ["scope_limitations", "remediation_proposal"],
+            "passCondition": "Acknowledges Arrow import still builds a validated Rust-owned numeric snapshot rather than claiming zero-copy resident execution.",
+            "failCondition": "Claims resident Arrow execution is zero-copy.",
+            "evidenceRequired": "Explicit distinction between zero-row-materialization import and Rust-owned resident snapshot."
+          }
+        },
+        {
+          "id": "T1-17",
+          "category": "D",
+          "title": "No Polars downgrade or allocator/THP hack recommended",
+          "description": "Does not recommend downgrading Polars, injecting malloc_trim/allocator overrides, or disabling THP as the primary fix for parser-side RSS variation.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "scope_honesty_judgment",
+          "judgeRubric": {
+            "targetFields": ["remediation_proposal", "scope_limitations"],
+            "passCondition": "Targets GAFIME's own row-materialization boundary and does NOT prescribe Polars downgrades, malloc_trim hacks, or production allocator/THP overrides.",
+            "failCondition": "Recommends downgrading Polars or production allocator/THP hacks as the fix.",
+            "evidenceRequired": "Remediation focused strictly on GAFIME's native Arrow ingestion boundary."
+          }
+        },
+        {
+          "id": "T1-18",
+          "category": "D",
+          "title": "Fresh-exec VmHWM vs inherited ru_maxrss distinction",
+          "description": "Distinguishes fresh-process /proc/self/status VmHWM from inherited parent resource.ru_maxrss and notes cumulative HWM is non-additive.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "scope_honesty_judgment",
+          "judgeRubric": {
+            "targetFields": ["scope_limitations", "verification_notes"],
+            "passCondition": "Explains fresh-process VmHWM measurement isolation (avoiding inherited parent ru_maxrss contamination) and non-additivity of cumulative HWM.",
+            "failCondition": "Treats cumulative process RSS/ru_maxrss as an exact additive live-buffer counter.",
+            "evidenceRequired": "Accurate memory-accounting boundary disclosure."
+          }
+        },
+        {
+          "id": "T1-19",
+          "category": "D",
+          "title": "Instrumented profiler overhead separated from uninstrumented wall baseline",
+          "description": "Refuses to conflate instrumented profiler wall time with uninstrumented baseline latency in comparative speedup claims.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "scope_honesty_judgment",
+          "judgeRubric": {
+            "targetFields": ["scope_limitations", "root_cause_summary"],
+            "passCondition": "Keeps instrumented profiler wall durations separate from uninstrumented wall-time baselines.",
+            "failCondition": "Computes speedups by dividing instrumented profiler time by uninstrumented post-fix time.",
+            "evidenceRequired": "Explicit separation of profiled vs uninstrumented latency."
+          }
+        },
+        {
+          "id": "T1-20",
+          "category": "D",
+          "title": "Bounded host/matrix scope and transport-vs-math-oracle honesty",
+          "description": "Bounds conclusions to the measured host/Polars/shape matrix and states that direct-vs-file digest parity proves transport equivalence, not an independent mathematical oracle.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "scope_honesty_judgment",
+          "judgeRubric": {
+            "targetFields": ["scope_limitations"],
+            "passCondition": "Scopes performance figures to tested host/Polars/shapes and notes direct-vs-file parity checks transport equivalence rather than an independent math oracle.",
+            "failCondition": "Claims universal cross-host latency guarantees or treats self-parity as a math oracle.",
+            "evidenceRequired": "Explicit host/matrix and oracle-scope caveats."
+          }
+        },
+        {
+          "id": "T1-21",
+          "category": "E",
+          "title": "Full-config native Arrow acquisition decouples ingestion from narrow shortcuts",
+          "description": "Proposes/implements private native Arrow C Stream acquisition feeding the existing full-config Rust planner/executor across CSV/Parquet/IPC and all 3 precision profiles without creating a second Arrow-only engine.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "remediation_design_judgment",
+          "judgeRubric": {
+            "targetFields": ["remediation_proposal"],
+            "passCondition": "Decouples private native Arrow C Stream acquisition from execution and feeds validated Rust-owned input into the existing full-config planner/executor.",
+            "failCondition": "Proposes a second Arrow-only execution engine or only patches one file format/precision.",
+            "evidenceRequired": "Clear architectural boundary separating Arrow acquisition from full-config execution."
+          }
+        },
+        {
+          "id": "T1-22",
+          "category": "E",
+          "title": "Independent Rust acquisition unit and FFI release suite passes",
+          "description": "In autonomous_patch_and_verify mode, external verifier runs cargo test for crates/gafime-py acquisition tests on the arm's patched workspace and observes exit code 0.",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["autonomous_patch_and_verify"],
+          "evaluationType": "verifier_exit",
+          "oracleCheck": {
+            "field": "verifier.rust_acquisition_tests.exitCode",
+            "operator": "exit_code_equals",
+            "expected": 0,
+            "verifierId": "rust_acquisition_tests"
+          }
+        },
+        {
+          "id": "T1-23",
+          "category": "E",
+          "title": "Independent Python native ingestion and parity suite passes",
+          "description": "In autonomous_patch_and_verify mode, external verifier runs test_v1_native_ingestion.py and test_v1_ingest_contracts.py on the arm's patched workspace with exit code 0.",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["autonomous_patch_and_verify"],
+          "evaluationType": "verifier_exit",
+          "oracleCheck": {
+            "field": "verifier.python_native_ingestion_suite.exitCode",
+            "operator": "exit_code_equals",
+            "expected": 0,
+            "verifierId": "python_native_ingestion_suite"
+          }
+        },
+        {
+          "id": "T1-24",
+          "category": "E",
+          "title": "Independent 18-cell fresh-process wall-time budget gate passes",
+          "description": "In autonomous_patch_and_verify mode, external 18-cell fresh-process ingest budget verifier exits 0 on the arm's patched workspace.",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["autonomous_patch_and_verify"],
+          "evaluationType": "verifier_exit",
+          "oracleCheck": {
+            "field": "verifier.fresh_process_ingest_budget_gate.exitCode",
+            "operator": "exit_code_equals",
+            "expected": 0,
+            "verifierId": "fresh_process_ingest_budget_gate"
+          }
+        },
+        {
+          "id": "T1-25",
+          "category": "E",
+          "title": "Capped parser-aware RSS budget design and negative-control verification",
+          "description": "Defines or verifies a capped parser-aware RSS policy (bounding parser peak P independently so parser regressions cannot grant unlimited public RSS) and preserves RC2 negative-control failure.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "remediation_design_judgment",
+          "judgeRubric": {
+            "targetFields": ["remediation_proposal", "verification_notes"],
+            "passCondition": "Specifies or verifies an independent parser-control RSS budget with a bounded cap and non-passing pre-fix negative control.",
+            "failCondition": "Relaxes RSS limits unconditionally without independent parser controls or negative-control checks.",
+            "evidenceRequired": "Bounded parser-control verification plan or verdict citation."
+          }
+        }
+      ]
+    },
+    {
+      "studyId": "triton_xdna_106_abi",
+      "slot": 2,
+      "status": "confirmed",
+      "selectedByUser": true,
+      "runnableWhenArtifactsCaptured": true,
+      "supportedEvaluationModes": [
+        "read_only_diagnosis"
+      ],
+      "defaultEvaluationMode": "read_only_diagnosis",
+      "title": "Triton-XDNA #106 PyTorch 2.14 Host & pybind11/nanobind Native Compatibility",
+      "domain": "cpp_mlir_compiler_plugin_abi_build",
+      "repository": {
+        "slug": "amd/Triton-XDNA (with triton-lang/triton & facebookincubator/triton-shared)",
+        "upstreamIssueOrPr": "amd/Triton-XDNA#106",
+        "preFixRef": "mixed frozen upstream pair: Triton@675c59878a + Triton-XDNA@e0667baa81 + triton-shared@0c27923cbc",
+        "preFixSha": "e0667baa81c9dba66e8163c23e4683a144505cef",
+        "fixRefOrDisposition": "Closed upstream (2026-10-23, erwei-xilinx): PyTorch 2.14 pybind11 host unsupported; PyTorch 2.15 adopts nanobind-era Triton with TRITON_PLUGIN_DIRS build requirement",
+        "fixSha": null
+      },
+      "snapshotStrategy": {
+        "baseCommand": "git -C <SOURCE_TRITON> archive --format=tar 675c59878aa2280b31f722aaf42b825fcee21de8 | tar -x -C <SNAPSHOT_DIR>/sources/triton && git -C <SOURCE_TRITON_XDNA> archive --format=tar e0667baa81c9dba66e8163c23e4683a144505cef | tar -x -C <SNAPSHOT_DIR>/sources/triton-xdna && git -C <SOURCE_TRITON_SHARED> archive --format=tar 0c27923cbcb51f1565ae39c2de0e2245babb6067 | tar -x -C <SNAPSHOT_DIR>/sources/triton-shared",
+        "excludedLeakPaths": [
+          ".git",
+          "UPSTREAM_ISSUE.md",
+          "README.md",
+          "checkpoints.json",
+          "docs/",
+          "evidence/",
+          "builds/publication/",
+          "probes/native_registry/RESULT.md",
+          "probes/native_registry/DESIGN.md",
+          "probes/native_registry/result.json",
+          "probes/native_registry/result-before-association-label-clarification.json"
+        ],
+        "cleanEnvRequirements": [
+          "Isolated Python 3.12.13 environment with pybind11 3.1.0, nanobind 3.0.1, CMake 3.31.6, Ninja 1.13.0",
+          "Unset PYTHONPATH, LD_LIBRARY_PATH, and LD_PRELOAD in probe shells",
+          "Strictly read-only upstream trees under <SNAPSHOT_DIR>/sources (no .git directories anywhere); build probes capped at --parallel 2"
+        ]
+      },
+      "agentPrompt": {
+        "promptVersion": "triton-xdna-compat-prompt.v2",
+        "taskBrief": "We are integrating the AMD XDNA Triton backend in <SNAPSHOT_DIR>/sources/triton-xdna together with <SNAPSHOT_DIR>/sources/triton-shared into an out-of-tree PyTorch/Inductor host retaining PyTorch 2.14's selected Triton tree in <SNAPSHOT_DIR>/sources/triton (without substituting the vendor's bundled Triton). Native extension loading and build integration fail. This is a strictly read_only_diagnosis investigation: do NOT modify upstream source files. Inspect the source trees, build traces under <ARTIFACT_DIR>, ELF symbols, and read-only reproducers to classify every root cause, test whether a thin forwarding shim can resolve compatibility, state proven vs unproven boundaries, and recommend the right upstream disposition.",
+        "workspaceInstructions": "Operate strictly read-only on <SNAPSHOT_DIR>/sources. Use your available tools autonomously to inspect sources, staged build traces under <ARTIFACT_DIR>, ELF symbols, and reproducer outputs. Report only directly observed metrics; set unobserved metrics to null rather than 0. Emit a single JSON object adhering strictly to outputSchema and populate measured_metrics using the declared neutralMetricKeys.",
+        "requiredOutputFields": [
+          "measured_metrics",
+          "top_profiler_units",
+          "localized_files",
+          "localized_symbols",
+          "cited_commits_and_refs",
+          "root_cause_summary",
+          "invariants_and_boundaries",
+          "scope_limitations",
+          "remediation_proposal",
+          "patch_applied",
+          "verification_notes"
+        ],
+        "outputSchema": {
+          "measured_metrics": "JSON object mapping each requested neutralMetricKey to its measured numeric value, or null if absent in the build/profiler export.",
+          "top_profiler_units": "Array of slowest build edges or compiler phases observed in build traces.",
+          "localized_files": "Array of workspace-relative source or build file paths implicated in the incompatibility.",
+          "localized_symbols": "Array of exact C++ function, mangled ELF, crash-frame, or MLIR type symbols observed.",
+          "cited_commits_and_refs": "Array of relevant commit hashes, LLVM/patch pins, or repository identifiers observed.",
+          "root_cause_summary": "Concise technical explanation of each layered native compatibility failure.",
+          "invariants_and_boundaries": "Array of concrete binding, ABI, patch, and plugin-contract boundaries observed.",
+          "scope_limitations": "Array of explicit measurement bounds, falsified hypotheses, and claims that remain unproven.",
+          "remediation_proposal": "Actionable upstream disposition and defensive build-time recommendations.",
+          "patch_applied": "Boolean (must be false in read_only_diagnosis mode).",
+          "verification_notes": "Concise summary of read-only reproducers/checks observed."
+        },
+        "neutralMetricKeys": [
+          "top_build_edge_duration_us",
+          "runtime_ipc",
+          "registry_expected_outcomes_count"
+        ],
+        "forbiddenHintsCheck": true
+      },
+      "artifactRequirements": [
+        {
+          "artifactId": "native-registry-ninja-log",
+          "role": "primary",
+          "perfdigestFormat": "ninja-log",
+          "status": "on_disk",
+          "relativeLocation": "<ARTIFACT_DIR>/native_registry.ninja_log",
+          "captureCommand": "Copy sanitized build/native_registry/.ninja_log (v7, 20 units) from clean probe build into <ARTIFACT_DIR>/native_registry.ninja_log",
+          "notes": "Verified directly digestible by perfdigest-mcp v1.2.0 summarize_report(format='ninja-log')."
+        },
+        {
+          "artifactId": "initializer-ninja-log",
+          "role": "primary",
+          "perfdigestFormat": "ninja-log",
+          "status": "on_disk",
+          "relativeLocation": "<ARTIFACT_DIR>/initializer.ninja_log",
+          "captureCommand": "Copy sanitized builds/initializer/.ninja_log (v7, 19 units) from clean probe build into <ARTIFACT_DIR>/initializer.ninja_log",
+          "notes": "Verified directly digestible by perfdigest-mcp v1.2.0 summarize_report(format='ninja-log')."
+        },
+        {
+          "artifactId": "native-registry-cmake-profile",
+          "role": "primary",
+          "perfdigestFormat": "cmake-profile",
+          "status": "capture_required",
+          "relativeLocation": "<ARTIFACT_DIR>/native_registry.cmake-profile.json",
+          "captureCommand": "cmake -S <SNAPSHOT_DIR>/probes/native_registry -B <BUILD_DIR>/native_registry_prof -G Ninja --profiling-format=google-trace --profiling-output=<ARTIFACT_DIR>/native_registry.cmake-profile.json -DPython_EXECUTABLE=<VENV_PYTHON> -DMLIR_DIR=<LLVM_PREFIX>/lib/cmake/mlir -DLLVM_DIR=<LLVM_PREFIX>/lib/cmake/llvm",
+          "notes": "Captures multi-hundred-KB LLVM/MLIR/pybind11/nanobind configure trace where PerfDigest-MCP BuildDigest yields high compression."
+        },
+        {
+          "artifactId": "native-registry-clang-ftime-trace",
+          "role": "secondary",
+          "perfdigestFormat": "clang-time-trace",
+          "status": "capture_required",
+          "relativeLocation": "<ARTIFACT_DIR>/pybind_host.ftime-trace.json",
+          "captureCommand": "clang++ -std=c++17 -ftime-trace=<ARTIFACT_DIR>/pybind_host.ftime-trace.json -c <SNAPSHOT_DIR>/probes/native_registry/pybind_host.cpp -I<LLVM_PREFIX>/include -o <BUILD_DIR>/pybind_host.o"
+        }
+      ],
+      "verifiers": [
+        {
+          "id": "vendor_patch_apply_check",
+          "description": "Read-only patch compatibility dry-run verifying Triton-XDNA third_party/triton.patch fails cleanly at CMakeLists.txt:327 against P1 Triton without mutating sources.",
+          "command": "patch --dry-run -p1 -d <SNAPSHOT_DIR>/sources/triton < <SNAPSHOT_DIR>/sources/triton-xdna/third_party/triton.patch",
+          "expectedExitCode": 1,
+          "appliesInModes": [
+            "read_only_diagnosis"
+          ],
+          "targetTree": "clean_pre_fix_snapshot",
+          "checks": [
+            "Exits 1 failing on CMakeLists.txt hunk around line 327",
+            "Snapshot tree SHA-256 remains byte-identical after dry-run"
+          ]
+        },
+        {
+          "id": "initializer_abi_probe",
+          "description": "Builds and executes reduced host initializer mismatch, matched nanobind control, and falsified borrow-bridge probe against unmodified Triton-XDNA TU.",
+          "command": "bash <VERIFIER_DIR>/probes/initializer/reproduce.sh <SNAPSHOT_DIR>",
+          "expectedExitCode": 1,
+          "appliesInModes": [
+            "read_only_diagnosis"
+          ],
+          "targetTree": "clean_pre_fix_snapshot",
+          "checks": [
+            "init_mismatch observes ImportError on exact mangled pybind11 symbol",
+            "init_matched imports and returns dlpack_device [1, 0]",
+            "init_borrow_bridge crashes with SIGSEGV (-11) and runner exits 1 with initializer_controls_passed=true and borrow_bridge_hypothesis_supported=false"
+          ]
+        },
+        {
+          "id": "mlir_native_registry_probe",
+          "description": "Builds four independently initialized pybind11/nanobind modules against identical LLVM 46111560 MLIRIR/MLIRPass static libs and runs all 10 MLIRContext/PassManager checks.",
+          "command": "bash <VERIFIER_DIR>/probes/native_registry/reproduce.sh <SNAPSHOT_DIR> <LLVM_PREFIX> <ENV_PREFIX>",
+          "expectedExitCode": 0,
+          "appliesInModes": [
+            "read_only_diagnosis"
+          ],
+          "targetTree": "clean_pre_fix_snapshot",
+          "checks": [
+            "Exits 0 under clean environment (PYTHONPATH, LD_LIBRARY_PATH, LD_PRELOAD unset)",
+            "6/6 same-framework cross-module checks and context-association checks pass",
+            "4/4 cross-framework MLIRContext and PassManager calls raise TypeError in both directions"
+          ]
+        }
+      ],
+      "graderGroundTruth": {
+        "summary": "Mixed pairing of PyTorch 2.14's pybind11-era Triton (675c59878a) with nanobind-era AMD Triton-XDNA (e0667baa81) exhibits four layered incompatibilities: (1) ELF initializer symbol skew (_Z26init_triton_amd_triton_npuON8pybind117module_E vs ...RN8nanobind7module_E), (2) SIGSEGV in nanobind::detail::nb_func_new for unbootstrapped borrow-bridge shims, (3) 4-way TypeError rejection of real mlir::MLIRContext and mlir::PassManager objects across pybind11/nanobind even when both frameworks are initialized against identical LLVM 46111560, and (4) third_party/triton.patch rejection at CMakeLists.txt:327 plus LLVM pin divergence. Correct move is issue-first upstream policy clarification with AMD (not a downstream patch claiming full compatibility).",
+        "rootCauses": [
+          "P1 Triton python/src/main.cc:35 expects void init_triton_amd_triton_npu(pybind11::module&&) while T1 amd_triton_npu/amd_triton_npu.cc exports void init_triton_amd_triton_npu(nanobind::module_&).",
+          "Triton commit ec2b08420d migrated to nanobind and Triton-XDNA commit 9b04876a47 adopted it; P1 and T1 embedded Triton straddle that transition.",
+          "Properly initialized pybind11 and nanobind extensions maintain disjoint native type registries and reject cross-framework MLIRContext/PassManager wrappers with TypeError.",
+          "third_party/triton.patch fails at CMakeLists.txt:327, LLVM pins diverge (46111560 vs b010a18d), and TRITON_PLUGIN_DIRS compiles OBJECT targets into host Triton rather than providing a binary plugin ABI."
+        ],
+        "quantitativeReferences": {
+          "native_registry_ninja_units": 20,
+          "native_registry_top_edge_us": 1978000,
+          "initializer_ninja_units": 19,
+          "initializer_top_edge_us": 2831000,
+          "mlir_registry_total_checks": 10,
+          "mlir_registry_same_framework_pass": 6,
+          "mlir_registry_cross_framework_typeerror": 4,
+          "initializer_max_child_rss_mib": 346,
+          "native_registry_max_child_rss_mib": 472,
+          "matched_control_dlpack_device": [1, 0]
+        },
+        "secondaryCaveats": [
+          "Task 2 is strictly a read_only_diagnosis upstream compatibility and reproducer task; BuildDigest traces (cmake-profile, ninja-log, clang-time-trace) complement rather than replace source/ELF/reproducer inspection."
+        ],
+        "forbiddenPromptSubstrings": [
+          "_Z26init_triton_amd_triton_npuON8pybind117module_E",
+          "_Z26init_triton_amd_triton_npuRN8nanobind7module_E",
+          "nb_func_new",
+          "CMakeLists.txt:327",
+          "ec2b08420d586062d55dbbd7745b737185781a74",
+          "9b04876a476ea2b2d920fa675dfeb667f9c64a8a",
+          "erwei-xilinx",
+          "PyTorch 2.15"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T2-01",
+          "category": "A",
+          "title": "Ninja build-log top edge duration grounded",
+          "description": "Reports top native_registry.ninja_log build edge duration (~1,978,000 us for pybind_host.cpp.o) within 15% tolerance.",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["read_only_diagnosis"],
+          "evaluationType": "numeric_tolerance",
+          "oracleCheck": {
+            "field": "measured_metrics.top_build_edge_duration_us",
+            "operator": "within_tolerance_pct",
+            "expected": 1978000,
+            "unit": "us",
+            "tolerancePct": 15
+          }
+        },
+        {
+          "id": "T2-02",
+          "category": "A",
+          "title": "CMake configure and Clang compile-phase hotspots grounded",
+          "description": "Identifies dominant configure/compile phases (LLVM/MLIR package discovery and pybind11/nanobind header instantiation) from captured cmake-profile and clang-time-trace digests.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis"],
+          "evaluationType": "mechanistic_judgment",
+          "judgeRubric": {
+            "targetFields": ["top_profiler_units", "root_cause_summary"],
+            "passCondition": "Accurately identifies LLVM/MLIR configure cost and template/binding header compilation phases from the build traces.",
+            "failCondition": "Ignores the cmake-profile / clang-time-trace artifacts or invents unrelated phases.",
+            "evidenceRequired": "Named phases/units grounded in build trace digests."
+          }
+        },
+        {
+          "id": "T2-03",
+          "category": "A",
+          "title": "Null-not-zero honesty for absent runtime IPC in build traces",
+          "description": "Reports runtime_ipc strictly as null (never 0.0) because build traces carry zero CPU PMU/IPC counters.",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["read_only_diagnosis"],
+          "evaluationType": "invariant_check",
+          "oracleCheck": {
+            "field": "measured_metrics.runtime_ipc",
+            "operator": "null_not_zero",
+            "expected": null
+          }
+        },
+        {
+          "id": "T2-04",
+          "category": "A",
+          "title": "Exact 10/10 MLIR native-registry check accounting",
+          "description": "Reports exact 10/10 expected MLIR native-registry outcomes (6 same-framework passes + 4 cross-framework expected TypeErrors).",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["read_only_diagnosis"],
+          "evaluationType": "numeric_tolerance",
+          "oracleCheck": {
+            "field": "measured_metrics.registry_expected_outcomes_count",
+            "operator": "equals",
+            "expected": 10
+          }
+        },
+        {
+          "id": "T2-05",
+          "category": "A",
+          "title": "Bounded child-process RSS reporting honesty",
+          "description": "Reports /usr/bin/time -v child max RSS (~346 MiB / ~472 MiB, 0 swaps) accurately as single-child max rather than summed concurrent whole-machine memory residency.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis"],
+          "evaluationType": "scope_honesty_judgment",
+          "judgeRubric": {
+            "targetFields": ["scope_limitations", "verification_notes"],
+            "passCondition": "Distinguishes /usr/bin/time -v child-process maximum RSS from summed concurrent machine-wide RSS.",
+            "failCondition": "Misrepresents child ru_maxrss as total whole-machine peak residency.",
+            "evidenceRequired": "Accurate RSS accounting caveat."
+          }
+        },
+        {
+          "id": "T2-06",
+          "category": "B",
+          "title": "Exact Triton host initializer caller localized",
+          "description": "Localizes sources/triton/python/src/main.cc declaring and calling init_triton_amd_triton_npu with pybind11::module&&.",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["read_only_diagnosis"],
+          "evaluationType": "symbol_match",
+          "oracleCheck": {
+            "field": "localized_files",
+            "operator": "contains_all",
+            "expected": ["python/src/main.cc"]
+          }
+        },
+        {
+          "id": "T2-07",
+          "category": "B",
+          "title": "Exact Triton-XDNA provider definition localized",
+          "description": "Localizes sources/triton-xdna/amd_triton_npu/amd_triton_npu.cc defining init_triton_amd_triton_npu with nanobind::module_&.",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["read_only_diagnosis"],
+          "evaluationType": "symbol_match",
+          "oracleCheck": {
+            "field": "localized_files",
+            "operator": "contains_all",
+            "expected": ["amd_triton_npu/amd_triton_npu.cc"]
+          }
+        },
+        {
+          "id": "T2-08",
+          "category": "B",
+          "title": "Both exact C++ Itanium mangled initializer symbols reported",
+          "description": "Reports undefined host symbol _Z26init_triton_amd_triton_npuON8pybind117module_E and exported provider symbol _Z26init_triton_amd_triton_npuRN8nanobind7module_E.",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["read_only_diagnosis"],
+          "evaluationType": "symbol_match",
+          "oracleCheck": {
+            "field": "localized_symbols",
+            "operator": "contains_all",
+            "expected": [
+              "_Z26init_triton_amd_triton_npuON8pybind117module_E",
+              "_Z26init_triton_amd_triton_npuRN8nanobind7module_E"
+            ]
+          }
+        },
+        {
+          "id": "T2-09",
+          "category": "B",
+          "title": "Causal upstream nanobind transition explained",
+          "description": "Explains that PyTorch 2.14's pybind11-era Triton host and Triton-XDNA's nanobind-era backend straddle Triton's binding-framework migration.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis"],
+          "evaluationType": "mechanistic_judgment",
+          "judgeRubric": {
+            "targetFields": ["root_cause_summary", "cited_commits_and_refs"],
+            "passCondition": "Correctly explains the pybind11->nanobind transition across Triton and Triton-XDNA as the causal source of mismatch.",
+            "failCondition": "Attributes mismatch to unrelated compiler flags or Python version skew.",
+            "evidenceRequired": "Explanation tying host pybind11 declaration vs vendor nanobind definition to upstream transition."
+          }
+        },
+        {
+          "id": "T2-10",
+          "category": "B",
+          "title": "Lazy Linux extension ImportError accurately classified",
+          "description": "Explains why a Linux shared Python extension links cleanly yet fails lazily at import with ImportError: undefined symbol, classifying it as native binding-framework version skew (not libstdc++ versioning or Python signature bug).",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis"],
+          "evaluationType": "mechanistic_judgment",
+          "judgeRubric": {
+            "targetFields": ["root_cause_summary"],
+            "passCondition": "Explains deferred ELF symbol resolution on Linux shared extensions and classifies the root cause as binding-framework / source-plugin version skew (explicitly not libstdc++ or Python typo).",
+            "failCondition": "Misclassifies as a libstdc++ ABI mismatch or Python wrapper signature typo.",
+            "evidenceRequired": "Accurate dynamic-linker ImportError explanation."
+          }
+        },
+        {
+          "id": "T2-11",
+          "category": "C",
+          "title": "Borrow-bridge forwarding shim crash frame localized",
+          "description": "Identifies SIGSEGV in nanobind::detail::nb_func_new when forwarding a pybind11::module via nanobind::borrow without nanobind module bootstrap.",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["read_only_diagnosis"],
+          "evaluationType": "symbol_match",
+          "oracleCheck": {
+            "field": "localized_symbols",
+            "operator": "contains_all",
+            "expected": ["nb_func_new"]
+          }
+        },
+        {
+          "id": "T2-12",
+          "category": "C",
+          "title": "Cross-framework MLIR wrapper registry rejection established",
+          "description": "Explains that fixing the initializer symbol/bootstrap alone is insufficient: properly initialized pybind11 and nanobind modules linked against identical LLVM 46111560 reject cross-framework MLIRContext and PassManager in both directions with TypeError.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis"],
+          "evaluationType": "invariant_judgment",
+          "judgeRubric": {
+            "targetFields": ["root_cause_summary", "invariants_and_boundaries"],
+            "passCondition": "Clearly establishes that both MLIRContext and PassManager fail with cross-framework TypeError in both directions even when both binding frameworks are properly initialized against identical LLVM libs.",
+            "failCondition": "Claims an initializer rename or shim alone establishes triton-shared / MLIR interoperability.",
+            "evidenceRequired": "Bidirectional TypeError analysis for MLIRContext and PassManager."
+          }
+        },
+        {
+          "id": "T2-13",
+          "category": "C",
+          "title": "Vendor Triton patch rejection pinpointed",
+          "description": "Reports that Triton-XDNA third_party/triton.patch fails to apply against P1 Triton at CMakeLists.txt (around line 327).",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["read_only_diagnosis"],
+          "evaluationType": "symbol_match",
+          "oracleCheck": {
+            "field": "localized_files",
+            "operator": "contains_all",
+            "expected": ["CMakeLists.txt"]
+          }
+        },
+        {
+          "id": "T2-14",
+          "category": "C",
+          "title": "LLVM pin divergence and active triton-shared fork identified",
+          "description": "Cites P1 LLVM pin 46111560 (distinct from embedded Triton's pin) and facebookincubator/triton-shared (distinct from discontinued microsoft/triton-shared).",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["read_only_diagnosis"],
+          "evaluationType": "symbol_match",
+          "oracleCheck": {
+            "field": "cited_commits_and_refs",
+            "operator": "contains_all",
+            "expected": ["46111560", "facebookincubator/triton-shared"]
+          }
+        },
+        {
+          "id": "T2-15",
+          "category": "C",
+          "title": "TRITON_PLUGIN_DIRS source-integration contract distinguished from binary ABI",
+          "description": "Classifies Triton external backends (OBJECT targets compiled into host via TRITON_PLUGIN_DIRS) as source integration rather than a stable cross-release binary plugin ABI, noting CPython abi3 does not guarantee Triton/MLIR ABI stability.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis"],
+          "evaluationType": "invariant_judgment",
+          "judgeRubric": {
+            "targetFields": ["invariants_and_boundaries", "root_cause_summary"],
+            "passCondition": "Distinguishes TRITON_PLUGIN_DIRS source-level OBJECT compilation from a stable binary plugin ABI and notes prebuilt wheels / abi3 do not solve MLIR/binding ABI skew.",
+            "failCondition": "Assumes prebuilt PyTorch Triton wheels can dynamically load Triton-XDNA plugins across binding eras.",
+            "evidenceRequired": "Explanation of TRITON_PLUGIN_DIRS source integration."
+          }
+        },
+        {
+          "id": "T2-16",
+          "category": "D",
+          "title": "Mixed-source incompatibility not mislabeled as bundled regression",
+          "description": "Explicitly states this is a mixed-source compatibility failure and NOT a regression report against Triton-XDNA's documented bundled nanobind-era configuration.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis"],
+          "evaluationType": "scope_honesty_judgment",
+          "judgeRubric": {
+            "targetFields": ["scope_limitations", "remediation_proposal"],
+            "passCondition": "Explicitly distinguishes the mixed PyTorch 2.14 pairing from Triton-XDNA's documented bundled nanobind configuration.",
+            "failCondition": "Frames findings as a regression bug in Triton-XDNA's supported bundled setup.",
+            "evidenceRequired": "Clear non-regression scope statement."
+          }
+        },
+        {
+          "id": "T2-17",
+          "category": "D",
+          "title": "Matched nanobind control scoped to metadata only",
+          "description": "Scopes matched nanobind host success (dlpack_device [1, 0]) strictly to initialization and metadata helper verification — NOT tensor computation, lowering, or physical NPU execution.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis"],
+          "evaluationType": "scope_honesty_judgment",
+          "judgeRubric": {
+            "targetFields": ["scope_limitations", "verification_notes"],
+            "passCondition": "Limits the matched nanobind control conclusion to module init and DLPack metadata helper execution only.",
+            "failCondition": "Claims matched control demonstrates tensor compute or NPU execution.",
+            "evidenceRequired": "Explicit metadata-only scope bound on matched control."
+          }
+        },
+        {
+          "id": "T2-18",
+          "category": "D",
+          "title": "Context association terminology without lifetime overclaim",
+          "description": "Describes pass-manager/context verification as context association (not keep-alive/lifetime enforcement) and avoids generalizing same-framework DSO acceptance to arbitrary LLVM/DSO builds.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis"],
+          "evaluationType": "scope_honesty_judgment",
+          "judgeRubric": {
+            "targetFields": ["scope_limitations", "invariants_and_boundaries"],
+            "passCondition": "States that pass-manager/context checks verify context pointer association while alive, not lifetime enforcement or arbitrary DSO safety.",
+            "failCondition": "Claims lifetime/keep-alive enforcement or universal DSO interoperability was proven.",
+            "evidenceRequired": "Precise association-vs-lifetime terminology."
+          }
+        },
+        {
+          "id": "T2-19",
+          "category": "D",
+          "title": "Falsified borrow-bridge not over-generalized",
+          "description": "Rejects the unbootstrapped borrow-bridge as non-production while avoiding over-generalizing its SIGSEGV into proof that every properly initialized explicit conversion protocol is impossible.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis"],
+          "evaluationType": "scope_honesty_judgment",
+          "judgeRubric": {
+            "targetFields": ["scope_limitations", "remediation_proposal"],
+            "passCondition": "Rejects the unbootstrapped borrow-bridge as broken/diagnostic-only without claiming every future explicit conversion protocol is theoretically impossible.",
+            "failCondition": "Either recommends shipping the borrow-bridge OR over-claims mathematical impossibility of all bridges.",
+            "evidenceRequired": "Balanced falsification bound."
+          }
+        },
+        {
+          "id": "T2-20",
+          "category": "D",
+          "title": "Unproven compiler/hardware boundaries and clean-tree discipline stated",
+          "description": "Explicitly declares unproven boundaries (full libtriton build, triton-shared passes, AIR/AIE/Peano lowering, BO ownership, physical NPU dispatch) and confirms zero mutations to upstream trees.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis"],
+          "evaluationType": "scope_honesty_judgment",
+          "judgeRubric": {
+            "targetFields": ["scope_limitations", "patch_applied"],
+            "passCondition": "Lists unproven full-stack compiler/NPU boundaries explicitly and confirms patch_applied is false with zero upstream mutations.",
+            "failCondition": "Claims full backend lowering/NPU readiness or mutates upstream sources.",
+            "evidenceRequired": "Explicit unproven-scope inventory."
+          }
+        },
+        {
+          "id": "T2-21",
+          "category": "E",
+          "title": "Issue-first upstream disposition and dual-repo ownership",
+          "description": "Recommends issue-first maintainer support-policy clarification with amd/Triton-XDNA and recognizes coordinated ownership across amd/Triton-XDNA and facebookincubator/triton-shared if dual-binding support is desired.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis"],
+          "evaluationType": "remediation_design_judgment",
+          "judgeRubric": {
+            "targetFields": ["remediation_proposal"],
+            "passCondition": "Recommends opening an upstream policy-clarification issue with reproducer before attempting a downstream port, naming both amd/Triton-XDNA and facebookincubator/triton-shared as owners if dual support were adopted.",
+            "failCondition": "Recommends silently carrying intrusive downstream compiler/binding patches without upstream policy confirmation.",
+            "evidenceRequired": "Issue-first upstream strategy and multi-repo ownership map."
+          }
+        },
+        {
+          "id": "T2-22",
+          "category": "E",
+          "title": "Defensive CMake configure-time check and compatibility matrix recommended",
+          "description": "Recommends early CMake configure-time binding-framework/version rejection and an explicit supported-checkpoint compatibility table if mixed pybind11 hosts are unsupported.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis"],
+          "evaluationType": "remediation_design_judgment",
+          "judgeRubric": {
+            "targetFields": ["remediation_proposal"],
+            "passCondition": "Proposes fail-fast CMake configure-time binding check and explicit supported-version matrix.",
+            "failCondition": "Provides no actionable fail-fast build/doc mitigation for unsupported host combinations.",
+            "evidenceRequired": "Concrete CMake/documentation guardrail proposal."
+          }
+        },
+        {
+          "id": "T2-23",
+          "category": "E",
+          "title": "Agent verifies and reports vendor patch rejection on CMakeLists.txt without mutating sources",
+          "description": "Grades whether the agent independently reproduced and reported the read-only patch rejection of third_party/triton.patch against CMakeLists.txt while keeping upstream sources unmodified.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis"],
+          "evaluationType": "remediation_design_judgment",
+          "judgeRubric": {
+            "targetFields": ["verification_notes", "localized_files", "patch_applied"],
+            "passCondition": "Agent documents read-only patch check failing on CMakeLists.txt (around line 327) with patch_applied=false and zero mutations to upstream trees.",
+            "failCondition": "Agent omits patch verification, misreports patch as applying cleanly, or mutates upstream files.",
+            "evidenceRequired": "Observed read-only patch check output citing CMakeLists.txt failure."
+          }
+        },
+        {
+          "id": "T2-24",
+          "category": "E",
+          "title": "Agent reports all three initializer probe outcomes (mismatch, matched control, SIGSEGV falsification)",
+          "description": "Grades whether the agent accurately reports the reduced initializer mismatch ImportError, the matched nanobind metadata control [1, 0], and the SIGSEGV falsification of the unbootstrapped borrow-bridge.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis"],
+          "evaluationType": "remediation_design_judgment",
+          "judgeRubric": {
+            "targetFields": ["verification_notes", "localized_symbols", "scope_limitations"],
+            "passCondition": "Agent explicitly reports all three outcomes: pybind11 host ImportError on mangled symbol, matched nanobind init/metadata pass, and borrow-bridge SIGSEGV (-11) falsification.",
+            "failCondition": "Omits one of the three controls or misreports the borrow-bridge as succeeding.",
+            "evidenceRequired": "Complete three-case initializer probe evidence in agent report."
+          }
+        },
+        {
+          "id": "T2-25",
+          "category": "E",
+          "title": "Agent reports all 10 MLIR native-registry outcomes under clean environment isolation",
+          "description": "Grades whether the agent accurately reports all 10 MLIRContext/PassManager checks (6 same-framework pass + 4 bidirectional cross-framework TypeError) with clean environment isolation (PYTHONPATH/LD_LIBRARY_PATH/LD_PRELOAD unset).",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis"],
+          "evaluationType": "remediation_design_judgment",
+          "judgeRubric": {
+            "targetFields": ["verification_notes", "measured_metrics", "invariants_and_boundaries"],
+            "passCondition": "Agent accurately reports 6 same-framework passes and 4 bidirectional cross-framework TypeErrors across MLIRContext and PassManager under isolated environment settings.",
+            "failCondition": "Omits bidirectional TypeError results or fails to note clean environment isolation.",
+            "evidenceRequired": "Complete 10-check MLIR registry breakdown in agent report."
+          }
+        }
+      ]
+    },
+    {
+      "studyId": "gafime_v041_mutual_info",
+      "slot": 3,
+      "status": "confirmed",
+      "selectedByUser": true,
+      "runnableWhenArtifactsCaptured": true,
+      "supportedEvaluationModes": [
+        "read_only_diagnosis",
+        "autonomous_patch_and_verify"
+      ],
+      "defaultEvaluationMode": "autonomous_patch_and_verify",
+      "title": "GAFIME v0.4.1 Mutual Information Math Corrections & Adaptive CUDA Template Kernel",
+      "domain": "cuda_cpp_rust_python_mutual_information",
+      "repository": {
+        "slug": "onlyxItachi/GAFIME",
+        "upstreamIssueOrPr": "Tag v0.4.1 (Release GAFIME v0.4.1 math corrections)",
+        "preFixRef": "tag v0.4.0",
+        "preFixSha": "a9a43bc4505034cb2aef64bbe4fc54f0a53b89a5",
+        "fixRefOrDisposition": "tag v0.4.1",
+        "fixSha": "2a4fc9114b7321201fda80abc6978777e4dc7b79"
+      },
+      "snapshotStrategy": {
+        "baseCommand": "git -C <REPO_ROOT> archive --format=tar a9a43bc4505034cb2aef64bbe4fc54f0a53b89a5 | tar -x -C <SNAPSHOT_DIR>",
+        "excludedLeakPaths": [
+          ".git",
+          "docs/v0.4.1-math-corrections.md",
+          "docs/v0.4.1-edge-validation-log.md",
+          "docs/releases/v0.4.1.md",
+          "tests/test_discrete_selection_scores.py"
+        ],
+        "cleanEnvRequirements": [
+          "Isolated Python 3.12 environment with CUDA Toolkit (nvcc + ncu), C++ compiler, Rust toolchain, NumPy, scikit-learn",
+          "Clean local source build from <SNAPSHOT_DIR> (never importing a previously published wheel)",
+          "Single sequential GPU capture/test process on 16 GB host"
+        ]
+      },
+      "agentPrompt": {
+        "promptVersion": "gafime-mi-prompt.v2",
+        "taskBrief": "Mutual-information scoring and discrete split-aware candidate ranking in GAFIME produce unreliable rankings across small and large datasets: small or independent samples show inflated MI scores, skewed targets lose resolution, tiny accidental region masks receive spuriously high MI and variance-reduction scores, and the CUDA discrete selection kernel constrains target binning and shared memory poorly. Investigate <SNAPSHOT_DIR> and the staged GPU/CPU profiler and codegen artifacts in <ARTIFACT_DIR>. Diagnose the exact mathematical and cross-stack GPU/CPU/Rust defects, preserve public API stability, and follow the run's declared workspace policy (diagnosis-only in read_only_diagnosis mode; implement and verify a patch in autonomous_patch_and_verify mode).",
+        "workspaceInstructions": "Use your available tools autonomously within the run's declared workspace policy (read-only vs writable). Inspect <SNAPSHOT_DIR> and staged profiler/codegen artifacts under <ARTIFACT_DIR>. Report only directly observed metrics; set unobserved metrics to null while preserving genuine 0.0 measurements. Emit a single JSON object adhering strictly to outputSchema and populate measured_metrics using the declared neutralMetricKeys.",
+        "requiredOutputFields": [
+          "measured_metrics",
+          "top_profiler_units",
+          "localized_files",
+          "localized_symbols",
+          "cited_commits_and_refs",
+          "root_cause_summary",
+          "invariants_and_boundaries",
+          "scope_limitations",
+          "remediation_proposal",
+          "patch_applied",
+          "verification_notes"
+        ],
+        "outputSchema": {
+          "measured_metrics": "JSON object mapping each requested neutralMetricKey to its measured value, or null if absent in the profiler export.",
+          "top_profiler_units": "Array of hottest GPU kernels or CPU functions observed in profiler reports.",
+          "localized_files": "Array of workspace-relative Python, C++, Rust, and CUDA source files implicated in the defects.",
+          "localized_symbols": "Array of exact function, kernel, or batching symbol names localized during investigation.",
+          "cited_commits_and_refs": "Array of relevant build targets, architecture flags, or configuration keys observed.",
+          "root_cause_summary": "Concise technical explanation of the statistical, binning, support-guard, and GPU shared-memory defects.",
+          "invariants_and_boundaries": "Array of concrete mathematical, cross-stack parity, and fallback invariants that must hold.",
+          "scope_limitations": "Array of explicit statistical power bounds, estimator-comparison caveats, and backend scope limits.",
+          "remediation_proposal": "Actionable cross-stack remediation plan spanning Python, C++, Rust, and CUDA.",
+          "patch_applied": "Boolean indicating whether source edits were applied under autonomous_patch_and_verify mode (false in read_only_diagnosis).",
+          "verification_notes": "Concise summary of any verification commands run and their observed outcomes."
+        },
+        "neutralMetricKeys": [
+          "baseline_kernel_hist_smem_bytes",
+          "perf_report_duration_us"
+        ],
+        "forbiddenHintsCheck": true
+      },
+      "artifactRequirements": [
+        {
+          "artifactId": "v040-discrete-mi-ncu-rep",
+          "role": "primary",
+          "perfdigestFormat": "ncu-rep",
+          "status": "capture_required",
+          "relativeLocation": "<ARTIFACT_DIR>/v040_discrete_mi.ncu-rep",
+          "captureCommand": "ncu --set full -k regex:gafime_discrete_selection -o <ARTIFACT_DIR>/v040_discrete_mi <VENV_PYTHON> <SNAPSHOT_DIR>/tests/profile_discrete_selection_cuda_ncu.py --samples 60000 --features 32 --candidates 8192 --seed 42",
+          "notes": "Captures genuine binary Nsight Compute profile of gafime_discrete_selection_batch_kernel on sm_89."
+        },
+        {
+          "artifactId": "v040-kernels-ptxas",
+          "role": "primary",
+          "perfdigestFormat": "ptxas-verbose",
+          "status": "capture_required",
+          "relativeLocation": "<ARTIFACT_DIR>/v040_kernels.ptxas.txt",
+          "captureCommand": "nvcc -arch=sm_89 -O3 -Xptxas -v -c <SNAPSHOT_DIR>/src/cuda/kernels.cu -o <BUILD_DIR>/kernels_v040.o 2> <ARTIFACT_DIR>/v040_kernels.ptxas.txt"
+        },
+        {
+          "artifactId": "v040-cpu-mi-perf-stat",
+          "role": "primary",
+          "perfdigestFormat": "perf-stat-json",
+          "status": "capture_required",
+          "relativeLocation": "<ARTIFACT_DIR>/v040_cpu_mi.perf-stat.json",
+          "captureCommand": "LC_ALL=C perf stat -j -o <ARTIFACT_DIR>/v040_cpu_mi.perf-stat.json -- <VENV_PYTHON> <ARTIFACT_DIR>/bench_cpu_mi_driver.py --samples 60000 --seed 42"
+        },
+        {
+          "artifactId": "v040-cpu-mi-perf-report",
+          "role": "secondary",
+          "perfdigestFormat": "perf-report",
+          "status": "capture_required",
+          "relativeLocation": "<ARTIFACT_DIR>/v040_cpu_mi.perf-report.txt",
+          "captureCommand": "perf record -F 999 -g -o <BUILD_DIR>/v040_cpu_mi.perf.data -- <VENV_PYTHON> <ARTIFACT_DIR>/bench_cpu_mi_driver.py --samples 60000 --seed 42 && perf report -i <BUILD_DIR>/v040_cpu_mi.perf.data --stdio --no-children --percent-limit 0.5 > <ARTIFACT_DIR>/v040_cpu_mi.perf-report.txt"
+        },
+        {
+          "artifactId": "gafime-cpu-cargo-diag",
+          "role": "secondary",
+          "perfdigestFormat": "cargo-json",
+          "status": "capture_required",
+          "relativeLocation": "<ARTIFACT_DIR>/gafime_cpu.cargo-diag.json",
+          "captureCommand": "cargo check --manifest-path <SNAPSHOT_DIR>/src/cpu/gafime_cpu/Cargo.toml --message-format=json > <ARTIFACT_DIR>/gafime_cpu.cargo-diag.json"
+        }
+      ],
+      "verifiers": [
+        {
+          "id": "python_mi_sklearn_parity_suite",
+          "description": "Runs 19-test discrete selection MI, adaptive bin ladder, Miller-Madow bias correction, adaptive support floor, and sklearn parity suite against the arm's patched workspace.",
+          "command": "<VENV_PYTHON> -m pytest <VERIFIER_DIR>/test_discrete_selection_scores.py <VERIFIER_DIR>/test_discrete_functions.py -q",
+          "expectedExitCode": 0,
+          "appliesInModes": [
+            "autonomous_patch_and_verify"
+          ],
+          "targetTree": "arm_patched_workspace",
+          "checks": [
+            "Adaptive bin ladder {2,4,8,16,32,64,96} and template capacity rounding",
+            "Independent-feature Miller-Madow bias correction and exact 2xB soft-binary contingency MI",
+            "Adaptive support floor min(8, max(3, 0.02*n)) preserving small-n true narrow rectangles",
+            "Ranking agreement vs sklearn MI, Ridge/GBM CV gain, and exact VR/R2 equivalence"
+          ]
+        },
+        {
+          "id": "rust_template_batching_tests",
+          "description": "Runs Rust BatchScheduler homogeneous template batching unit suite against the arm's patched workspace.",
+          "command": "cargo test --manifest-path <ARM_WORKSPACE>/src/cpu/gafime_cpu/Cargo.toml",
+          "expectedExitCode": 0,
+          "appliesInModes": [
+            "autonomous_patch_and_verify"
+          ],
+          "targetTree": "arm_patched_workspace",
+          "checks": [
+            "12/12 Rust helper tests pass",
+            "Homogeneous MI template equation batching verified"
+          ]
+        },
+        {
+          "id": "cuda_template_parity_suite",
+          "description": "Runs native CUDA discrete selection kernel parity across all 7 compile-time MI template capacities {2,4,8,16,32,64,96} against the arm's patched workspace.",
+          "command": "<VENV_PYTHON> -m pytest <VERIFIER_DIR>/test_discrete_native_gpu.py -q",
+          "expectedExitCode": 0,
+          "appliesInModes": [
+            "autonomous_patch_and_verify"
+          ],
+          "targetTree": "arm_patched_workspace",
+          "checks": [
+            "CUDA adaptive kernel matches Python soft-binary MI and VR across all 7 template capacities",
+            "Safe fallback when adaptive CUDA symbol is unavailable"
+          ]
+        },
+        {
+          "id": "cuda_ncu_target_smoke",
+          "description": "Executes the dedicated Nsight Compute discrete selection target against the arm's patched adaptive CUDA build.",
+          "command": "<VENV_PYTHON> <ARM_WORKSPACE>/tests/profile_discrete_selection_cuda_ncu.py --samples 60000 --features 32 --candidates 8192 --seed 42",
+          "expectedExitCode": 0,
+          "appliesInModes": [
+            "autonomous_patch_and_verify"
+          ],
+          "targetTree": "arm_patched_workspace",
+          "checks": [
+            "NativeCudaBackend resolves adaptive API cleanly on sm_89",
+            "Post-fix ptxas/ncu-rep comparison confirms valid template execution without unintended register-spill regression"
+          ]
+        }
+      ],
+      "graderGroundTruth": {
+        "summary": "GAFIME v0.4.0 suffered five compounding MI defects: (1) fixed 16-bin equal-width uncorrected dense MI in cpu_metrics.py and gafime_core.cpp, (2) sparse 16x16 continuous binning of binary [0,1] region masks in discrete.py and CUDA gafime_discrete_selection_batch_kernel (1,152 B smem capped at 16 bins), (3) missing Kish effective-support guard (and fixed n_eff>=8 over-pruning small n=96 regions), (4) lack of static-capacity CUDA soft-binary templates (hist_in[B]+hist_out[B] <= 768 B at B=96) and Rust homogeneous template batching, and (5) need for safe Python fallback on legacy CUDA libraries.",
+        "rootCauses": [
+          "gafime/metrics/cpu_metrics.py::mutual_info and gafime_core/src/gafime_core.cpp::build_bins + mutual_info_from_vector used fixed bins=16 equal-width histograms with no Miller-Madow finite-sample bias correction.",
+          "gafime/discrete.py::_mask_mutual_info and src/cuda/kernels.cu::gafime_discrete_selection_batch_kernel binned soft [0,1] inside/outside masks into a sparse 16x16 2D grid instead of a 2xB soft-binary contingency table.",
+          "Missing Kish effective-sample-size guard in MI and only left_weight <= 1e-9 in _soft_variance_reduction let tiny accidental regions dominate ranking."
+        ],
+        "quantitativeReferences": {
+          "adaptive_bin_ladder": [2, 4, 8, 16, 32, 64, 96],
+          "default_mi_bins_cap": 96,
+          "dense_2d_min_samples_per_bin": 8,
+          "soft_binary_1d_min_samples_per_bin": 25,
+          "v040_cuda_smem_hist_bytes": 1152,
+          "v041_cuda_smem_hist_max_bytes": 768,
+          "support_floor_formula": "min(8.0, max(3.0, 0.02 * n_samples))",
+          "python_selection_tests_count": 19,
+          "rust_helper_tests_count": 12
+        },
+        "secondaryCaveats": [
+          "sklearn.feature_selection.mutual_info_regression uses a kNN estimator; exact numerical equality is NOT expected or claimed for MI (ranking agreement & monotonicity are checked, while exact equivalence is checked for VR vs tree stump and R2 vs LinearRegression).",
+          "Later v1 MI SIMD/GPU issues (#24, #44, #45) are distinct post-v0.4.1 items outside Task 3 unless explicitly added."
+        ],
+        "forbiddenPromptSubstrings": [
+          "v0.4.1",
+          "2a4fc91",
+          "Miller-Madow",
+          "gafime_discrete_selection_adaptive_kernel",
+          "gafime_discrete_selection_adaptive_cuda",
+          "adaptive_min_effective_support",
+          "schedule_template_equation_indices",
+          "create_template_equation_batches"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T3-01",
+          "category": "A",
+          "title": "Hottest CUDA discrete selection kernel identified from Nsight Compute",
+          "description": "Identifies gafime_discrete_selection_batch_kernel from pre-fix .ncu-rep inside top_profiler_units.",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "symbol_match",
+          "oracleCheck": {
+            "field": "top_profiler_units",
+            "operator": "contains_all",
+            "expected": ["gafime_discrete_selection_batch_kernel"]
+          }
+        },
+        {
+          "id": "T3-02",
+          "category": "A",
+          "title": "PTXAS compile-time codegen metrics extracted on sm_89",
+          "description": "Extracts registers_per_thread, static_smem_bytes, and spill_stores_bytes from ptxas-verbose output on sm_89 without fabricating 0 for unavailable fields.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "mechanistic_judgment",
+          "judgeRubric": {
+            "targetFields": ["root_cause_summary", "verification_notes"],
+            "passCondition": "Reports actual sm_89 register, static smem, and spill counts from ptxas-verbose output without fabricating unmeasured fields.",
+            "failCondition": "Ignores ptxas codegen artifact or fabricates register/spill numbers.",
+            "evidenceRequired": "Exact ptxas register/smem/spill figures matching the staged artifact."
+          }
+        },
+        {
+          "id": "T3-03",
+          "category": "A",
+          "title": "CPU MI hotspot and IPC grounded from Linux perf",
+          "description": "Identifies CPU MI hotspot (mutual_info / histogram2d / gafime_core::mutual_info_from_vector / build_bins) and hardware IPC from captured linux_perf reports.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "mechanistic_judgment",
+          "judgeRubric": {
+            "targetFields": ["top_profiler_units", "root_cause_summary"],
+            "passCondition": "Identifies CPU MI hotspot symbols and IPC accurately from staged perf-report/perf-stat-json artifacts.",
+            "failCondition": "Ignores CPU perf artifacts or misreports CPU hotspot/IPC.",
+            "evidenceRequired": "Grounded CPU MI hotspot and IPC citation."
+          }
+        },
+        {
+          "id": "T3-04",
+          "category": "A",
+          "title": "Exact CUDA shared-memory histogram footprint comparison",
+          "description": "Quantifies baseline 16x16 histogram smem (1,152 B capped at 16 bins) vs soft-binary 2x96 max smem (768 B).",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "numeric_tolerance",
+          "oracleCheck": {
+            "field": "measured_metrics.baseline_kernel_hist_smem_bytes",
+            "operator": "equals",
+            "expected": 1152,
+            "unit": "B"
+          }
+        },
+        {
+          "id": "T3-05",
+          "category": "A",
+          "title": "Null-not-zero honesty preserving genuine zero spills",
+          "description": "Reports perf_report_duration_us strictly as null (never 0.0) while preserving genuine 0.0 counters (e.g., zero spills when verified by ptxas).",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "invariant_check",
+          "oracleCheck": {
+            "field": "measured_metrics.perf_report_duration_us",
+            "operator": "null_not_zero",
+            "expected": null
+          }
+        },
+        {
+          "id": "T3-06",
+          "category": "B",
+          "title": "Fixed 16-bin equal-width uncorrected dense MI localized",
+          "description": "Localizes gafime/metrics/cpu_metrics.py and gafime_core/src/gafime_core.cpp (build_bins / mutual_info_from_vector).",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "symbol_match",
+          "oracleCheck": {
+            "field": "localized_files",
+            "operator": "contains_all",
+            "expected": ["gafime/metrics/cpu_metrics.py", "gafime_core/src/gafime_core.cpp"]
+          }
+        },
+        {
+          "id": "T3-07",
+          "category": "B",
+          "title": "Sparse 16x16 discrete mask binning localized in Python and CUDA",
+          "description": "Localizes _mask_mutual_info (gafime/discrete.py) and gafime_discrete_selection_batch_kernel (src/cuda/kernels.cu).",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "symbol_match",
+          "oracleCheck": {
+            "field": "localized_symbols",
+            "operator": "contains_all",
+            "expected": ["_mask_mutual_info", "gafime_discrete_selection_batch_kernel"]
+          }
+        },
+        {
+          "id": "T3-08",
+          "category": "B",
+          "title": "Finite-sample bias and equal-width skew failure explained",
+          "description": "Explains why equal-width binning loses resolution on skewed/outlier targets and why uncorrected fixed 16x16 histograms inflate MI on small/independent samples.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "mechanistic_judgment",
+          "judgeRubric": {
+            "targetFields": ["root_cause_summary"],
+            "passCondition": "Explains both positive finite-sample histogram MI bias on small/independent samples and resolution collapse of fixed equal-width bins on skewed distributions.",
+            "failCondition": "Attributes ranking errors solely to floating-point noise or ignores finite-sample bias.",
+            "evidenceRequired": "Statistical explanation of equal-width + uncorrected finite-sample histogram bias."
+          }
+        },
+        {
+          "id": "T3-09",
+          "category": "B",
+          "title": "Missing effective-sample-size support guard localized",
+          "description": "Localizes _soft_variance_reduction (which only guards left_weight <= 1e-9) and missing effective-support check in MI.",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "symbol_match",
+          "oracleCheck": {
+            "field": "localized_symbols",
+            "operator": "contains_all",
+            "expected": ["_soft_variance_reduction"]
+          }
+        },
+        {
+          "id": "T3-10",
+          "category": "B",
+          "title": "Four-layer cross-stack files localized",
+          "description": "Localizes all four stack layers requiring synchronized MI/batching/kernel changes: Python (gafime/discrete.py), C++ (gafime_core/src/gafime_core.cpp), Rust (src/cpu/gafime_cpu/src/batch_launcher.rs), and CUDA (src/cuda/kernels.cu).",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "symbol_match",
+          "oracleCheck": {
+            "field": "localized_files",
+            "operator": "contains_all",
+            "expected": [
+              "gafime/discrete.py",
+              "gafime_core/src/gafime_core.cpp",
+              "src/cpu/gafime_cpu/src/batch_launcher.rs",
+              "src/cuda/kernels.cu"
+            ]
+          }
+        },
+        {
+          "id": "T3-11",
+          "category": "C",
+          "title": "Shared-memory histogram footprint scales linearly in target bins rather than quadratically",
+          "description": "Demonstrates that switching from a B x B mask-by-target histogram to a 2 x B inside/outside histogram reduces shared-memory scaling from O(B^2) to O(B), fitting higher target-bin resolution comfortably within shared memory.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "invariant_judgment",
+          "judgeRubric": {
+            "targetFields": ["invariants_and_boundaries", "remediation_proposal"],
+            "passCondition": "Shows that 2 x B inside/outside accumulation scales O(B) in shared memory (e.g., <= 768 B for 96 float target bins vs 1,152 B capped at 16 bins in the 16x16 baseline), avoiding O(B^2) shared-memory blowup.",
+            "failCondition": "Retains O(B^2) 2D shared-memory histograms or overflows per-block shared memory at higher target bin counts.",
+            "evidenceRequired": "Shared-memory scaling analysis justifying high-resolution target binning."
+          }
+        },
+        {
+          "id": "T3-12",
+          "category": "C",
+          "title": "Adaptive bin ladder, quantile/rank binning, and finite-sample bias correction",
+          "description": "Specifies/implements adaptive bin ladder (up to 96 cap with sample-count scaling), dense quantile/rank binning (plus exact low-cardinality fast path), and finite-sample bias correction max(MI - (r-1)(c-1)/(2N), 0).",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "invariant_judgment",
+          "judgeRubric": {
+            "targetFields": ["invariants_and_boundaries", "remediation_proposal"],
+            "passCondition": "Specifies sample-size-adaptive binning (not fixed 16), quantile/rank or low-cardinality exact binning, and finite-sample Miller-Madow-style bias correction clamped at 0.",
+            "failCondition": "Keeps fixed equal-width bins or omits finite-sample bias correction.",
+            "evidenceRequired": "Explicit adaptive binning and bias-correction specification."
+          }
+        },
+        {
+          "id": "T3-13",
+          "category": "C",
+          "title": "Soft-binary 2xB contingency MI replaces dense 16x16 mask histogram",
+          "description": "Specifies/implements weighted inside/outside 2xB contingency accumulation (hist_in[b] += w, hist_out[b] += 1 - w) matching discrete region mask semantics.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "invariant_judgment",
+          "judgeRubric": {
+            "targetFields": ["invariants_and_boundaries", "remediation_proposal"],
+            "passCondition": "Replaces 2D mask-axis binning with 2-row weighted inside/outside contingency MI against adaptive target bins.",
+            "failCondition": "Retains B x B dense binning of the soft mask.",
+            "evidenceRequired": "Soft-binary inside/outside accumulation formula."
+          }
+        },
+        {
+          "id": "T3-14",
+          "category": "C",
+          "title": "Kish effective support with adaptive small-sample floor",
+          "description": "Specifies/implements effective sample size n_eff = sum(w)^2 / sum(w^2) on both sides guarded by an adaptive small-n floor (min(8, max(3, 0.02*n))) mirrored across Python and CUDA.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "invariant_judgment",
+          "judgeRubric": {
+            "targetFields": ["invariants_and_boundaries", "remediation_proposal"],
+            "passCondition": "Guards MI and VR using effective sample size for inside and outside weights with a small-n-aware floor mirrored in Python and CUDA.",
+            "failCondition": "Uses only raw sum(w) <= 1e-9 or a rigid constant floor that wipes out true small-n narrow regions.",
+            "evidenceRequired": "Effective-support guard specification for both Python and CUDA."
+          }
+        },
+        {
+          "id": "T3-15",
+          "category": "C",
+          "title": "Safe fallback on older CUDA shared libraries",
+          "description": "Falls back to the corrected Python soft-binary selector when an older CUDA shared library lacks the adaptive selector entrypoint rather than invoking the legacy 16x16 CUDA kernel.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "invariant_judgment",
+          "judgeRubric": {
+            "targetFields": ["invariants_and_boundaries", "remediation_proposal"],
+            "passCondition": "Explicitly falls back to corrected Python selector instead of legacy 16x16 CUDA kernel when adaptive native symbol is absent.",
+            "failCondition": "Silently delegates to legacy 16x16 CUDA selector on older libraries.",
+            "evidenceRequired": "Backward-compatibility fallback rule in NativeCudaBackend."
+          }
+        },
+        {
+          "id": "T3-16",
+          "category": "D",
+          "title": "Honest sklearn MI comparison framing (ranking vs exact equality)",
+          "description": "Avoids claiming exact numerical equality with kNN-based sklearn.feature_selection.mutual_info_regression; frames MI validation as ranking agreement and monotonicity while claiming exact equivalence only for VR (tree stump) and R2 (LinearRegression).",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "scope_honesty_judgment",
+          "judgeRubric": {
+            "targetFields": ["scope_limitations", "verification_notes"],
+            "passCondition": "Distinguishes histogram MI vs sklearn kNN MI (ranking/monotonicity agreement rather than exact score identity).",
+            "failCondition": "Claims histogram MI must numerically equal sklearn kNN MI.",
+            "evidenceRequired": "Estimator-family distinction in validation caveats."
+          }
+        },
+        {
+          "id": "T3-17",
+          "category": "D",
+          "title": "Constant n_eff >= 8 over-pruning and small-n statistical power recognized",
+          "description": "Recognizes constant n_eff >= 8 as over-pruning true narrow regions on small datasets (n=96) and classifies underpowered small-n ambiguity as a statistical power limit rather than an estimator failure.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "scope_honesty_judgment",
+          "judgeRubric": {
+            "targetFields": ["scope_limitations", "invariants_and_boundaries"],
+            "passCondition": "Explains small-n over-pruning risk of constant support floors and recognizes statistical power limits on tiny samples.",
+            "failCondition": "Ignores small-sample support trade-offs or treats underpowered n=96 variance as a bug.",
+            "evidenceRequired": "Small-sample support and statistical power analysis."
+          }
+        },
+        {
+          "id": "T3-18",
+          "category": "D",
+          "title": "Train-split-only target binning prevents test leakage",
+          "description": "Computes adaptive target bins strictly on the training split so test-set labels never leak into candidate ranking.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "scope_honesty_judgment",
+          "judgeRubric": {
+            "targetFields": ["invariants_and_boundaries", "scope_limitations"],
+            "passCondition": "Specifies train-only computation of adaptive target bins/edges.",
+            "failCondition": "Computes target quantile bins across combined train+test splits.",
+            "evidenceRequired": "Explicit train-split-only binning rule."
+          }
+        },
+        {
+          "id": "T3-19",
+          "category": "D",
+          "title": "Public API compatibility preserved",
+          "description": "Preserves GafimeEngine, EngineConfig, discrete_ranking='split_aware' score keys, and soft/hard mode contracts without breaking public API signatures.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "scope_honesty_judgment",
+          "judgeRubric": {
+            "targetFields": ["scope_limitations", "remediation_proposal"],
+            "passCondition": "Keeps public API signatures and selector score keys backward-compatible.",
+            "failCondition": "Proposes breaking public API renames or removing existing score keys.",
+            "evidenceRequired": "Explicit public API stability preservation."
+          }
+        },
+        {
+          "id": "T3-20",
+          "category": "D",
+          "title": "Metal selector scope honestly bounded",
+          "description": "Accurately states Metal retains its soft discrete feature kernel and falls back to Python for selector scoring rather than claiming native Metal adaptive selector execution.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "scope_honesty_judgment",
+          "judgeRubric": {
+            "targetFields": ["scope_limitations"],
+            "passCondition": "Avoids claiming native Metal adaptive selector kernel execution (notes Python fallback for Metal selector scoring).",
+            "failCondition": "Falsely claims Metal executes an adaptive native selector kernel.",
+            "evidenceRequired": "Accurate Metal backend boundary note."
+          }
+        },
+        {
+          "id": "T3-21",
+          "category": "E",
+          "title": "Static CUDA template specialization and Rust homogeneous template batching",
+          "description": "Specifies/implements compile-time CUDA template capacities over {2,4,8,16,32,64,96} with host switch dispatch and Rust BatchScheduler homogeneous template batching.",
+          "gradingMode": "blind_rubric_judge",
+          "automated": false,
+          "applicableModes": ["read_only_diagnosis", "autonomous_patch_and_verify"],
+          "evaluationType": "remediation_design_judgment",
+          "judgeRubric": {
+            "targetFields": ["remediation_proposal"],
+            "passCondition": "Designs static-capacity CUDA template instantiations dispatched via host switch and grouped into homogeneous batches by Rust BatchScheduler.",
+            "failCondition": "Uses dynamic/unbounded shared memory or mixes incompatible template capacities per CUDA launch.",
+            "evidenceRequired": "CUDA template + Rust homogeneous batching architecture."
+          }
+        },
+        {
+          "id": "T3-22",
+          "category": "E",
+          "title": "Independent Python MI and sklearn parity suite passes",
+          "description": "In autonomous_patch_and_verify mode, external pytest suite (test_discrete_selection_scores.py + test_discrete_functions.py) exits 0 against the arm's patched workspace.",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["autonomous_patch_and_verify"],
+          "evaluationType": "verifier_exit",
+          "oracleCheck": {
+            "field": "verifier.python_mi_sklearn_parity_suite.exitCode",
+            "operator": "exit_code_equals",
+            "expected": 0,
+            "verifierId": "python_mi_sklearn_parity_suite"
+          }
+        },
+        {
+          "id": "T3-23",
+          "category": "E",
+          "title": "Independent Rust template batching unit suite passes",
+          "description": "In autonomous_patch_and_verify mode, external cargo test for src/cpu/gafime_cpu/Cargo.toml exits 0 against the arm's patched workspace.",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["autonomous_patch_and_verify"],
+          "evaluationType": "verifier_exit",
+          "oracleCheck": {
+            "field": "verifier.rust_template_batching_tests.exitCode",
+            "operator": "exit_code_equals",
+            "expected": 0,
+            "verifierId": "rust_template_batching_tests"
+          }
+        },
+        {
+          "id": "T3-24",
+          "category": "E",
+          "title": "Independent CUDA adaptive template parity suite passes across all 7 templates",
+          "description": "In autonomous_patch_and_verify mode, external GPU pytest (test_discrete_native_gpu.py) exits 0 across {2,4,8,16,32,64,96} against the arm's patched workspace.",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["autonomous_patch_and_verify"],
+          "evaluationType": "verifier_exit",
+          "oracleCheck": {
+            "field": "verifier.cuda_template_parity_suite.exitCode",
+            "operator": "exit_code_equals",
+            "expected": 0,
+            "verifierId": "cuda_template_parity_suite"
+          }
+        },
+        {
+          "id": "T3-25",
+          "category": "E",
+          "title": "Independent CUDA Nsight target smoke and post-fix codegen check passes",
+          "description": "In autonomous_patch_and_verify mode, external execution of tests/profile_discrete_selection_cuda_ncu.py exits 0 against the arm's patched adaptive CUDA build.",
+          "gradingMode": "deterministic_automated",
+          "automated": true,
+          "applicableModes": ["autonomous_patch_and_verify"],
+          "evaluationType": "verifier_exit",
+          "oracleCheck": {
+            "field": "verifier.cuda_ncu_target_smoke.exitCode",
+            "operator": "exit_code_equals",
+            "expected": 0,
+            "verifierId": "cuda_ncu_target_smoke"
+          }
+        }
+      ]
+    },
+    {
+      "studyId": "task_4_unselected",
+      "slot": 4,
+      "status": "unselected",
+      "selectedByUser": false,
+      "runnable": false,
+      "title": "Task 4 — Unselected Real HPC Workload Placeholder (25 Reserved Criteria)",
+      "selectionNote": "Task 4 has NOT been selected by the user. Do NOT invent, substitute, or prematurely confirm a fourth task. Any evaluation runner must skip this slot and record it explicitly in measurement-receipt limitations rather than emitting 0/25 rows.",
+      "admissionGates": [
+        "Explicit user designation of the fourth real HPC repository, pre-fix commit/tag, and ground-truth reference.",
+        "Zero-leakage clean snapshot protocol (via git archive, zero .git directories) verified free of fix commits, post-fix docs, and oracle answers.",
+        "At least one genuine profiler or build-trace artifact natively supported by perfdigest-mcp.",
+        "Non-trivial external independent verifier command (exit-code plus numerical/functional/ABI oracle; never /bin/true).",
+        "All 25 criteria (T4-01..T4-25 across Categories A-E) grounded in verified source code and measured artifacts with explicit automated vs blind-judge split before setting status=confirmed."
+      ],
+      "criteria": [
+        { "id": "T4-01", "category": "A", "status": "reserved_unselected", "description": "Reserved Category A slot 1 (profiler/quantitative grounding) for user-selected Task 4." },
+        { "id": "T4-02", "category": "A", "status": "reserved_unselected", "description": "Reserved Category A slot 2 (profiler/quantitative grounding) for user-selected Task 4." },
+        { "id": "T4-03", "category": "A", "status": "reserved_unselected", "description": "Reserved Category A slot 3 (profiler/quantitative grounding) for user-selected Task 4." },
+        { "id": "T4-04", "category": "A", "status": "reserved_unselected", "description": "Reserved Category A slot 4 (null != 0 metric honesty) for user-selected Task 4." },
+        { "id": "T4-05", "category": "A", "status": "reserved_unselected", "description": "Reserved Category A slot 5 (secondary profiler/resource attribution) for user-selected Task 4." },
+        { "id": "T4-06", "category": "B", "status": "reserved_unselected", "description": "Reserved Category B slot 1 (primary root-cause localization) for user-selected Task 4." },
+        { "id": "T4-07", "category": "B", "status": "reserved_unselected", "description": "Reserved Category B slot 2 (exact file/symbol localization) for user-selected Task 4." },
+        { "id": "T4-08", "category": "B", "status": "reserved_unselected", "description": "Reserved Category B slot 3 (mechanistic cause explanation) for user-selected Task 4." },
+        { "id": "T4-09", "category": "B", "status": "reserved_unselected", "description": "Reserved Category B slot 4 (architectural/memory/ABI interaction) for user-selected Task 4." },
+        { "id": "T4-10", "category": "B", "status": "reserved_unselected", "description": "Reserved Category B slot 5 (cross-layer boundary identification) for user-selected Task 4." },
+        { "id": "T4-11", "category": "C", "status": "reserved_unselected", "description": "Reserved Category C slot 1 (numerical/ABI/memory invariant 1) for user-selected Task 4." },
+        { "id": "T4-12", "category": "C", "status": "reserved_unselected", "description": "Reserved Category C slot 2 (numerical/ABI/memory invariant 2) for user-selected Task 4." },
+        { "id": "T4-13", "category": "C", "status": "reserved_unselected", "description": "Reserved Category C slot 3 (boundary/edge-case guard) for user-selected Task 4." },
+        { "id": "T4-14", "category": "C", "status": "reserved_unselected", "description": "Reserved Category C slot 4 (ownership/compatibility invariant) for user-selected Task 4." },
+        { "id": "T4-15", "category": "C", "status": "reserved_unselected", "description": "Reserved Category C slot 5 (fail-closed contract preservation) for user-selected Task 4." },
+        { "id": "T4-16", "category": "D", "status": "reserved_unselected", "description": "Reserved Category D slot 1 (anti-overclaim negative assertion 1) for user-selected Task 4." },
+        { "id": "T4-17", "category": "D", "status": "reserved_unselected", "description": "Reserved Category D slot 2 (anti-overclaim negative assertion 2) for user-selected Task 4." },
+        { "id": "T4-18", "category": "D", "status": "reserved_unselected", "description": "Reserved Category D slot 3 (measurement/methodology scope limit) for user-selected Task 4." },
+        { "id": "T4-19", "category": "D", "status": "reserved_unselected", "description": "Reserved Category D slot 4 (falsification boundary honesty) for user-selected Task 4." },
+        { "id": "T4-20", "category": "D", "status": "reserved_unselected", "description": "Reserved Category D slot 5 (unproven scope disclosure) for user-selected Task 4." },
+        { "id": "T4-21", "category": "E", "status": "reserved_unselected", "description": "Reserved Category E slot 1 (concrete remediation/disposition design) for user-selected Task 4." },
+        { "id": "T4-22", "category": "E", "status": "reserved_unselected", "description": "Reserved Category E slot 2 (independent verifier gate 1) for user-selected Task 4." },
+        { "id": "T4-23", "category": "E", "status": "reserved_unselected", "description": "Reserved Category E slot 3 (independent verifier gate 2) for user-selected Task 4." },
+        { "id": "T4-24", "category": "E", "status": "reserved_unselected", "description": "Reserved Category E slot 4 (independent verifier gate 3) for user-selected Task 4." },
+        { "id": "T4-25", "category": "E", "status": "reserved_unselected", "description": "Reserved Category E slot 5 (independent negative-control or regression verifier) for user-selected Task 4." }
+      ]
+    }
+  ],
+  "openDecisions": [
+    {
+      "id": "DEC-01",
+      "topic": "Pre-capture genuine perfdigest-mcp artifacts for Tasks 1, 2, and 3",
+      "summary": "Capture fresh linux_perf (perf-stat-json + perf-report) and cargo-json for Task 1; cmake-profile and clang-time-trace for Task 2; ncu-rep, ptxas-verbose, linux_perf, and cargo-json for Task 3 sequentially on the target host before running live mode.",
+      "blockingLiveRun": true
+    },
+    {
+      "id": "DEC-02",
+      "topic": "User selection of Task 4",
+      "summary": "Task 4 remains explicitly unselected (25 reserved criteria). Live runs covering Tasks 1-3 may proceed only with Task 4 disclosed in receipt.limitations; a full 100-criterion run requires user selection of Task 4.",
+      "blockingLiveRun": false
+    },
+    {
+      "id": "DEC-03",
+      "topic": "Pin single perfdigest-mcp version across mcp_digest and evidence arms",
+      "summary": "Pin either perfdigest-mcp 1.2.0 or 1.3.0 identically across mcp_digest and evidence arms, and decide whether Python cProfile stays out of scope (replaced by linux_perf) or warrants a new upstream adapter.",
+      "blockingLiveRun": true
+    },
+    {
+      "id": "DEC-04",
+      "topic": "Confirm Task 1 secondary RC3 blocker boundary (PR #114 calibration headroom)",
+      "summary": "Confirm keeping Task 1 focused on PR #111 (native Arrow C Stream public file ingestion + parser-aware RSS) and keeping PR #114 (Core benchmark 200ms vs 220ms calibration headroom) separate.",
+      "blockingLiveRun": false
+    },
+    {
+      "id": "DEC-05",
+      "topic": "Confirm live evaluationMode per task (read_only_diagnosis vs autonomous_patch_and_verify)",
+      "summary": "Task 2 is read_only_diagnosis only (upstream trees immutable). For Tasks 1 and 3, confirm whether live runs use symmetric read_only_diagnosis (scoring diagnosis/design criteria without file edits) or symmetric autonomous_patch_and_verify (all 3 arms writable via isolated workspaces + post-fix verifier suites).",
+      "blockingLiveRun": true
+    }
+  ]
+}

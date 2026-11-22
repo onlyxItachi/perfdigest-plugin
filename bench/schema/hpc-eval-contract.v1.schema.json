@@ -1,0 +1,1115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "perfdigest.hpc-eval-contract.v1"
+    },
+    "contractVersion": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "primaryArms": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "string",
+          "const": "raw"
+        },
+        {
+          "type": "string",
+          "const": "mcp_digest"
+        },
+        {
+          "type": "string",
+          "const": "evidence"
+        }
+      ]
+    },
+    "deliveryStrategies": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "string",
+          "const": "in_execution"
+        },
+        {
+          "type": "string",
+          "const": "in_execution_tool_delivery"
+        },
+        {
+          "type": "string",
+          "const": "single_turn"
+        },
+        {
+          "type": "string",
+          "const": "two_turn"
+        },
+        {
+          "type": "string",
+          "const": "skill_background_worker"
+        }
+      ]
+    },
+    "evidenceDeliveryVocabulary": {
+      "type": "object",
+      "properties": {
+        "in_execution": {
+          "type": "string",
+          "const": "in_execution_async_input"
+        },
+        "in_execution_tool_delivery": {
+          "type": "string",
+          "const": "in_execution_tool_delivery"
+        },
+        "single_turn": {
+          "type": "string",
+          "const": "single_turn_with_evidence"
+        },
+        "two_turn": {
+          "type": "string",
+          "const": "same_session_next_turn"
+        },
+        "skill_background_worker": {
+          "type": "string",
+          "const": "skill_background_worker"
+        },
+        "none": {
+          "type": "string",
+          "const": "none"
+        }
+      },
+      "required": [
+        "in_execution",
+        "in_execution_tool_delivery",
+        "single_turn",
+        "two_turn",
+        "skill_background_worker",
+        "none"
+      ],
+      "additionalProperties": false
+    },
+    "evaluationModes": {
+      "type": "object",
+      "properties": {
+        "read_only_diagnosis": {
+          "type": "object",
+          "properties": {
+            "writeAccessAllowed": {
+              "type": "boolean",
+              "const": false
+            },
+            "symmetricAcrossAllArms": {
+              "type": "boolean",
+              "const": true
+            },
+            "verifierTargetTree": {
+              "type": "string",
+              "const": "clean_pre_fix_snapshot"
+            },
+            "evidenceIntegrationPaths": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "writeAccessAllowed",
+            "symmetricAcrossAllArms",
+            "verifierTargetTree",
+            "evidenceIntegrationPaths",
+            "description"
+          ],
+          "additionalProperties": false
+        },
+        "autonomous_patch_and_verify": {
+          "type": "object",
+          "properties": {
+            "writeAccessAllowed": {
+              "type": "boolean",
+              "const": true
+            },
+            "symmetricAcrossAllArms": {
+              "type": "boolean",
+              "const": true
+            },
+            "verifierTargetTree": {
+              "type": "string",
+              "const": "arm_patched_workspace"
+            },
+            "evidenceIntegrationPaths": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "writeAccessAllowed",
+            "symmetricAcrossAllArms",
+            "verifierTargetTree",
+            "evidenceIntegrationPaths",
+            "description"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "read_only_diagnosis",
+        "autonomous_patch_and_verify"
+      ],
+      "additionalProperties": false
+    },
+    "criteriaBudget": {
+      "type": "object",
+      "properties": {
+        "totalCriteria": {
+          "type": "number",
+          "const": 100
+        },
+        "criteriaPerTask": {
+          "type": "number",
+          "const": 25
+        },
+        "totalTaskSlots": {
+          "type": "number",
+          "const": 4
+        },
+        "confirmedTasks": {
+          "type": "number",
+          "const": 3
+        },
+        "unselectedTasks": {
+          "type": "number",
+          "const": 1
+        },
+        "groundedCriteria": {
+          "type": "number",
+          "const": 75
+        },
+        "reservedCriteria": {
+          "type": "number",
+          "const": 25
+        },
+        "categoriesPerTask": {
+          "type": "number",
+          "const": 5
+        },
+        "criteriaPerCategory": {
+          "type": "number",
+          "const": 5
+        }
+      },
+      "required": [
+        "totalCriteria",
+        "criteriaPerTask",
+        "totalTaskSlots",
+        "confirmedTasks",
+        "unselectedTasks",
+        "groundedCriteria",
+        "reservedCriteria",
+        "categoriesPerTask",
+        "criteriaPerCategory"
+      ],
+      "additionalProperties": false
+    },
+    "categoryTaxonomy": {
+      "type": "object",
+      "properties": {
+        "A": {
+          "type": "string",
+          "minLength": 1
+        },
+        "B": {
+          "type": "string",
+          "minLength": 1
+        },
+        "C": {
+          "type": "string",
+          "minLength": 1
+        },
+        "D": {
+          "type": "string",
+          "minLength": 1
+        },
+        "E": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "additionalProperties": false
+    },
+    "perfdigestMcpCompatibility": {
+      "type": "object",
+      "properties": {
+        "recommendedVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "testedVersions": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "tools": {
+          "minItems": 7,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "supportedFormats": {
+          "minItems": 14,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "unsupportedFormatsObserved": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "format": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "mitigation": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "format",
+              "reason",
+              "mitigation"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "recommendedVersion",
+        "testedVersions",
+        "tools",
+        "supportedFormats",
+        "unsupportedFormatsObserved"
+      ],
+      "additionalProperties": false
+    },
+    "fairnessAndIntegrityInvariants": {
+      "type": "object",
+      "properties": {
+        "zeroOracleLeakage": {
+          "type": "boolean",
+          "const": true
+        },
+        "nativeToolsEnabledInRaw": {
+          "type": "boolean",
+          "const": true
+        },
+        "symmetricWritePolicyAcrossArms": {
+          "type": "boolean",
+          "const": true
+        },
+        "preserveFailedTimedOutAbstained": {
+          "type": "boolean",
+          "const": true
+        },
+        "nullNotZeroMetricHonesty": {
+          "type": "boolean",
+          "const": true
+        },
+        "independentNonTrivialVerifier": {
+          "type": "boolean",
+          "const": true
+        },
+        "noLocalUserPaths": {
+          "type": "boolean",
+          "const": true
+        }
+      },
+      "required": [
+        "zeroOracleLeakage",
+        "nativeToolsEnabledInRaw",
+        "symmetricWritePolicyAcrossArms",
+        "preserveFailedTimedOutAbstained",
+        "nullNotZeroMetricHonesty",
+        "independentNonTrivialVerifier",
+        "noLocalUserPaths"
+      ],
+      "additionalProperties": false
+    },
+    "tasks": {
+      "minItems": 4,
+      "maxItems": 4,
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "studyId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "slot": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3
+              },
+              "status": {
+                "type": "string",
+                "const": "confirmed"
+              },
+              "selectedByUser": {
+                "type": "boolean",
+                "const": true
+              },
+              "runnableWhenArtifactsCaptured": {
+                "type": "boolean"
+              },
+              "supportedEvaluationModes": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "read_only_diagnosis",
+                    "autonomous_patch_and_verify"
+                  ]
+                }
+              },
+              "defaultEvaluationMode": {
+                "type": "string",
+                "enum": [
+                  "read_only_diagnosis",
+                  "autonomous_patch_and_verify"
+                ]
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "domain": {
+                "type": "string",
+                "minLength": 1
+              },
+              "repository": {
+                "type": "object",
+                "properties": {
+                  "slug": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "upstreamIssueOrPr": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "preFixRef": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "preFixSha": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{40}$"
+                  },
+                  "fixRefOrDisposition": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "fixSha": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{40}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "slug",
+                  "upstreamIssueOrPr",
+                  "preFixRef",
+                  "preFixSha",
+                  "fixRefOrDisposition",
+                  "fixSha"
+                ],
+                "additionalProperties": false
+              },
+              "snapshotStrategy": {
+                "type": "object",
+                "properties": {
+                  "baseCommand": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "excludedLeakPaths": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "cleanEnvRequirements": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                },
+                "required": [
+                  "baseCommand",
+                  "excludedLeakPaths",
+                  "cleanEnvRequirements"
+                ],
+                "additionalProperties": false
+              },
+              "agentPrompt": {
+                "type": "object",
+                "properties": {
+                  "promptVersion": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "taskBrief": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "workspaceInstructions": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "requiredOutputFields": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "outputSchema": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "neutralMetricKeys": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "forbiddenHintsCheck": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                },
+                "required": [
+                  "promptVersion",
+                  "taskBrief",
+                  "workspaceInstructions",
+                  "requiredOutputFields",
+                  "outputSchema",
+                  "neutralMetricKeys",
+                  "forbiddenHintsCheck"
+                ],
+                "additionalProperties": false
+              },
+              "artifactRequirements": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "artifactId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "primary",
+                        "secondary"
+                      ]
+                    },
+                    "perfdigestFormat": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "on_disk",
+                        "capture_required"
+                      ]
+                    },
+                    "relativeLocation": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "captureCommand": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "notes": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "artifactId",
+                    "role",
+                    "perfdigestFormat",
+                    "status",
+                    "relativeLocation",
+                    "captureCommand"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "verifiers": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "command": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "expectedExitCode": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 255
+                    },
+                    "appliesInModes": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "read_only_diagnosis",
+                          "autonomous_patch_and_verify"
+                        ]
+                      }
+                    },
+                    "targetTree": {
+                      "type": "string",
+                      "enum": [
+                        "clean_pre_fix_snapshot",
+                        "arm_patched_workspace"
+                      ]
+                    },
+                    "checks": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "description",
+                    "command",
+                    "expectedExitCode",
+                    "appliesInModes",
+                    "targetTree",
+                    "checks"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "graderGroundTruth": {
+                "type": "object",
+                "properties": {
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "rootCauses": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "quantitativeReferences": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  },
+                  "secondaryCaveats": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "forbiddenPromptSubstrings": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                },
+                "required": [
+                  "summary",
+                  "rootCauses",
+                  "quantitativeReferences",
+                  "secondaryCaveats",
+                  "forbiddenPromptSubstrings"
+                ],
+                "additionalProperties": false
+              },
+              "criteria": {
+                "minItems": 25,
+                "maxItems": 25,
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^T[1-3]-(?:0[1-9]|1[0-9]|2[0-5])$"
+                        },
+                        "category": {
+                          "type": "string",
+                          "enum": [
+                            "A",
+                            "B",
+                            "C",
+                            "D",
+                            "E"
+                          ]
+                        },
+                        "title": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "description": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "gradingMode": {
+                          "type": "string",
+                          "const": "deterministic_automated"
+                        },
+                        "automated": {
+                          "type": "boolean",
+                          "const": true
+                        },
+                        "applicableModes": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "read_only_diagnosis",
+                              "autonomous_patch_and_verify"
+                            ]
+                          }
+                        },
+                        "evaluationType": {
+                          "type": "string",
+                          "enum": [
+                            "numeric_tolerance",
+                            "symbol_match",
+                            "invariant_check",
+                            "verifier_exit"
+                          ]
+                        },
+                        "oracleCheck": {
+                          "type": "object",
+                          "properties": {
+                            "field": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "operator": {
+                              "type": "string",
+                              "enum": [
+                                "within_tolerance_pct",
+                                "in_range",
+                                "contains_all",
+                                "equals",
+                                "null_not_zero",
+                                "exit_code_equals",
+                                "non_empty_array"
+                              ]
+                            },
+                            "expected": {},
+                            "unit": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "tolerancePct": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 100
+                            },
+                            "verifierId": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "field",
+                            "operator",
+                            "expected"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "category",
+                        "title",
+                        "description",
+                        "gradingMode",
+                        "automated",
+                        "applicableModes",
+                        "evaluationType",
+                        "oracleCheck"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^T[1-3]-(?:0[1-9]|1[0-9]|2[0-5])$"
+                        },
+                        "category": {
+                          "type": "string",
+                          "enum": [
+                            "A",
+                            "B",
+                            "C",
+                            "D",
+                            "E"
+                          ]
+                        },
+                        "title": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "description": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "gradingMode": {
+                          "type": "string",
+                          "const": "blind_rubric_judge"
+                        },
+                        "automated": {
+                          "type": "boolean",
+                          "const": false
+                        },
+                        "applicableModes": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "read_only_diagnosis",
+                              "autonomous_patch_and_verify"
+                            ]
+                          }
+                        },
+                        "evaluationType": {
+                          "type": "string",
+                          "enum": [
+                            "mechanistic_judgment",
+                            "invariant_judgment",
+                            "scope_honesty_judgment",
+                            "remediation_design_judgment"
+                          ]
+                        },
+                        "judgeRubric": {
+                          "type": "object",
+                          "properties": {
+                            "targetFields": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "passCondition": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "failCondition": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "evidenceRequired": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "targetFields",
+                            "passCondition",
+                            "failCondition",
+                            "evidenceRequired"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "category",
+                        "title",
+                        "description",
+                        "gradingMode",
+                        "automated",
+                        "applicableModes",
+                        "evaluationType",
+                        "judgeRubric"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "studyId",
+              "slot",
+              "status",
+              "selectedByUser",
+              "runnableWhenArtifactsCaptured",
+              "supportedEvaluationModes",
+              "defaultEvaluationMode",
+              "title",
+              "domain",
+              "repository",
+              "snapshotStrategy",
+              "agentPrompt",
+              "artifactRequirements",
+              "verifiers",
+              "graderGroundTruth",
+              "criteria"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "studyId": {
+                "type": "string",
+                "const": "task_4_unselected"
+              },
+              "slot": {
+                "type": "number",
+                "const": 4
+              },
+              "status": {
+                "type": "string",
+                "const": "unselected"
+              },
+              "selectedByUser": {
+                "type": "boolean",
+                "const": false
+              },
+              "runnable": {
+                "type": "boolean",
+                "const": false
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "selectionNote": {
+                "type": "string",
+                "minLength": 1
+              },
+              "admissionGates": {
+                "minItems": 5,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "criteria": {
+                "minItems": 25,
+                "maxItems": 25,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^T4-(?:0[1-9]|1[0-9]|2[0-5])$"
+                    },
+                    "category": {
+                      "type": "string",
+                      "enum": [
+                        "A",
+                        "B",
+                        "C",
+                        "D",
+                        "E"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "const": "reserved_unselected"
+                    },
+                    "description": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "category",
+                    "status",
+                    "description"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "studyId",
+              "slot",
+              "status",
+              "selectedByUser",
+              "runnable",
+              "title",
+              "selectionNote",
+              "admissionGates",
+              "criteria"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "openDecisions": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "topic": {
+            "type": "string",
+            "minLength": 1
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "blockingLiveRun": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "topic",
+          "summary",
+          "blockingLiveRun"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "schema",
+    "contractVersion",
+    "title",
+    "description",
+    "primaryArms",
+    "deliveryStrategies",
+    "evidenceDeliveryVocabulary",
+    "evaluationModes",
+    "criteriaBudget",
+    "categoryTaxonomy",
+    "perfdigestMcpCompatibility",
+    "fairnessAndIntegrityInvariants",
+    "tasks",
+    "openDecisions"
+  ],
+  "additionalProperties": false,
+  "$id": "https://github.com/onlyxItachi/perfdigest-plugin/bench/schema/hpc-eval-contract.v1.schema.json",
+  "title": "PerfDigest Production-Representative HPC Evaluation Contract v1"
+}

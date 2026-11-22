@@ -6,14 +6,22 @@
 //   - measured cells carry wall-time stats;
 //   - every (group, scenario) has at most one baseline;
 //   - cell `layer` assignments are consistent with group/id and `layerSummary` matches `cells`.
+import { existsSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { manifestSchema, mcpReuseResultSchema, realWorkloadEvalResultSchema, resultSchema, lifecycleBenchmarkResultSchema, regressionCorpusSchema, multiModelEvalResultSchema, measurementReceiptSchema, benchmarkSourceTraceSchema } from './schema/formats.mjs';
+import { manifestSchema, mcpReuseResultSchema, realWorkloadEvalResultSchema, resultSchema, lifecycleBenchmarkResultSchema, regressionCorpusSchema, multiModelEvalResultSchema, measurementReceiptSchema, benchmarkSourceTraceSchema, hpcEvalContractSchema } from './schema/formats.mjs';
+import { validateHpcContractDocument } from './schema/hpc-contract-validator.mjs';
 
 const benchDir = dirname(fileURLToPath(import.meta.url));
 const listJson = async (dir) => (await readdir(join(benchDir, dir)).catch(() => [])).filter((f) => f.endsWith('.json')).map((f) => join(benchDir, dir, f));
-const files = process.argv.slice(2).length ? process.argv.slice(2) : [...await listJson('manifests'), ...await listJson('results')];
+const hpcContractPath = join(benchDir, 'hpc-eval-contract.json');
+const defaultFiles = [
+  ...await listJson('manifests'),
+  ...await listJson('results'),
+  ...(existsSync(hpcContractPath) ? [hpcContractPath] : []),
+];
+const files = process.argv.slice(2).length ? process.argv.slice(2) : defaultFiles;
 
 function expectedLayer(c) {
   if (c.id === 'runtime.uvx.perfdigest-mcp' || c.id.startsWith('engine.')) return 'engine';
@@ -42,6 +50,8 @@ function selectSchema(doc) {
     case 'perfdigest.benchmark.v3-reconciled-v2-audit.v1':
     case 'perfdigest.benchmark.source-trace.v1':
       return { kind: 'source-trace', schema: benchmarkSourceTraceSchema };
+    case 'perfdigest.hpc-eval-contract.v1':
+      return { kind: 'hpc-eval-contract', schema: hpcEvalContractSchema };
     default:
       return { kind: 'unknown', schema: resultSchema };
   }
@@ -133,6 +143,12 @@ for (const file of files) {
       }
     }
   }
+  if (parsed.success && kind === 'hpc-eval-contract') {
+    const check = validateHpcContractDocument(doc);
+    if (!check.valid) {
+      problems.push(...check.problems);
+    }
+  }
   if (problems.length) {
     failures++;
     console.error(`FAIL ${file}\n  ${problems.join('\n  ')}`);
@@ -153,7 +169,9 @@ for (const file of files) {
                   ? `measurement-receipt, ${doc.experimentId} (${doc.sampleSize.totalCells} cells)`
                   : kind === 'source-trace'
                     ? `source-trace, ${(doc.cells ?? doc.reconciledCells ?? []).length} cells`
-                    : `result, ${doc.cells.length} cells`;
+                    : kind === 'hpc-eval-contract'
+                      ? `hpc-eval-contract, ${doc.criteriaBudget.confirmedTasks} confirmed + ${doc.criteriaBudget.unselectedTasks} unselected (${doc.criteriaBudget.groundedCriteria} grounded + ${doc.criteriaBudget.reservedCriteria} reserved = ${doc.criteriaBudget.totalCriteria} criteria)`
+                      : `result, ${doc.cells.length} cells`;
     console.log(`ok   ${file} (${summary})`);
   }
 }

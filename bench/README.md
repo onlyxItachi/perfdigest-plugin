@@ -14,6 +14,7 @@ alternative backend on **contract parity** before any number is interpreted.
 |---|---|
 | `run-matrix.mjs` | Harness. Reads a manifest, runs cells, checks parity, writes a `benchmark-result.v1` JSON. |
 | `manifests/default.json` | `benchmark-manifest.v1`: the cell list (build / runtime / worker), N and warmups. |
+| `hpc-eval-contract.json` | `hpc-eval-contract.v1`: 100-criterion (4 × 25) production-representative HPC evaluation contract (3 confirmed workloads + explicit `task_4_unselected` placeholder); see [`docs/HPC_EVALUATION_CONTRACT.md`](../docs/HPC_EVALUATION_CONTRACT.md). |
 | `schema/formats.mjs` | zod source of truth for both formats. |
 | `schema/*.schema.json` | JSON Schema (draft 2020-12) **generated** from `formats.mjs` (`node bench/schema/build-schema.mjs`; `--check` in CI). |
 | `validate.mjs` | Validates manifests/results (zod + reporting rules). |
